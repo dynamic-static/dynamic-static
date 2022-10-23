@@ -448,12 +448,6 @@ int main(int, const char* [])
                     VkViewport viewport{ .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
                     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                    // Bind the gvk::math::Camera uniform gvk::Buffer and the floor resources then
-                    //  issue a draw call for the floor.  Then bind the floating cube resources...
-                    //  we can leave the gvk::math::Camera uniform gvk::Buffer bound and update the
-                    //  gvk::Pipeline and gvk::DescriptorSet at index 1 without distrubing the
-                    //  gvk::DescriptorSet at index 0...then issue a draw call for the floating
-                    //  cube...
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
