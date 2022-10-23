@@ -24,12 +24,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#pragma once
+#include "dynamic-static.physics/context.hpp"
 
-#ifdef _MSVC_LANG
-#pragma warning(push, 0)
-#endif
-#include "btBulletDynamicsCommon.h"
-#ifdef _MSVC_LANG
-#pragma warning(pop)
-#endif
+namespace dst {
+namespace phys {
+
+
+
+} // namespace phys
+} // namespace dst

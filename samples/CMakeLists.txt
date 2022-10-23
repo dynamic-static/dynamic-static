@@ -10,4 +10,5 @@ macro(dst_add_sample target)
     )
 endmacro()
 
+dst_add_sample(block-blaster)
 dst_add_sample(placeholder)
