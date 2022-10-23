@@ -125,13 +125,6 @@ struct CameraUniforms
 
 int main(int, const char* [])
 {
-	VkResult vkResult = VK_SUCCESS;
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	///collision configuration contains default setup for memory, collision setup. Advanced users can create their own configuration.
 	btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
 
@@ -220,25 +213,19 @@ int main(int, const char* [])
 		pBoxRigidBody = body;
 	}
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	GfxContext gfxContext;
-	GfxContext::create("dynamic-static - block-blaster", &gfxContext);
+	auto vkResult = GfxContext::create("dynamic-static - block-blaster", &gfxContext);
+	assert(vkResult == VK_SUCCESS);
 
 	gvk::Pipeline pipeline;
 
 	gvk::Mesh boxMesh;
 	gvk::Buffer boxUniformBuffer;
 	gvk::DescriptorSet boxDescriptorSet;
-	gvk::math::Transform boxTransform;
 
 	gvk::Mesh groundMesh;
 	gvk::Buffer groundUniformBuffer;
 	gvk::DescriptorSet groundDescriptorSet;
-	gvk::math::Transform groundTransform;
 
 	gvk::math::Camera camera;
 	gvk::Buffer cameraUniformBuffer;
@@ -247,129 +234,122 @@ int main(int, const char* [])
 	cameraController.set_camera(&camera);
 	camera.transform.translation.z = -32;
 
-	{
-		gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-			gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, gvk::math::Color::Aquamarine, &boxMesh));
-			gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, gvk::math::Color::BlanchedAlmond, &groundMesh));
-			gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &boxUniformBuffer));
-			gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &groundUniformBuffer));
-			gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
-			gvk::spirv::ShaderInfo vertexShaderInfo{
-				.language = gvk::spirv::ShadingLanguage::Glsl,
-				.stage = VK_SHADER_STAGE_VERTEX_BIT,
-				.lineOffset = __LINE__,
-				.source = R"(
-					#version 450
+	gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+		gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, gvk::math::Color::Aquamarine, &boxMesh));
+		gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, gvk::math::Color::BlanchedAlmond, &groundMesh));
+		gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &boxUniformBuffer));
+		gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &groundUniformBuffer));
+		gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
+		gvk::spirv::ShaderInfo vertexShaderInfo{
+			.language = gvk::spirv::ShadingLanguage::Glsl,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.lineOffset = __LINE__,
+			.source = R"(
+				#version 450
 
-					layout(set = 0, binding = 0)
-					uniform CameraUniformBuffer
-					{
-						mat4 view;
-						mat4 projection;
-					} camera;
+				layout(set = 0, binding = 0)
+				uniform CameraUniformBuffer
+				{
+					mat4 view;
+					mat4 projection;
+				} camera;
 
-					layout(set = 1, binding = 0)
-					uniform ObjectUniformBuffer
-					{
-						mat4 world;
-					} object;
+				layout(set = 1, binding = 0)
+				uniform ObjectUniformBuffer
+				{
+					mat4 world;
+				} object;
 
-					layout(location = 0) in vec3 vsPosition;
-					layout(location = 1) in vec2 vsTexCoord;
-					layout(location = 2) in vec4 vsColor;
-					layout(location = 0) out vec2 fsTexCoord;
-					layout(location = 1) out vec4 fsColor;
+				layout(location = 0) in vec3 vsPosition;
+				layout(location = 1) in vec2 vsTexCoord;
+				layout(location = 2) in vec4 vsColor;
+				layout(location = 0) out vec2 fsTexCoord;
+				layout(location = 1) out vec4 fsColor;
 
-					out gl_PerVertex
-					{
-						vec4 gl_Position;
-					};
+				out gl_PerVertex
+				{
+					vec4 gl_Position;
+				};
 
-					void main()
-					{
-						gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-						fsTexCoord = vsTexCoord;
-						fsColor = vsColor;
-					}
-				)"
-			};
-			gvk::spirv::ShaderInfo fragmentShaderInfo{
-				.language = gvk::spirv::ShadingLanguage::Glsl,
-				.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-				.lineOffset = __LINE__,
-				.source = R"(
-					#version 450
+				void main()
+				{
+					gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
+					fsTexCoord = vsTexCoord;
+					fsColor = vsColor;
+				}
+			)"
+		};
+		gvk::spirv::ShaderInfo fragmentShaderInfo{
+			.language = gvk::spirv::ShadingLanguage::Glsl,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.lineOffset = __LINE__,
+			.source = R"(
+				#version 450
 
-					layout(location = 0) in vec2 fsTexCoord;
-					layout(location = 1) in vec4 fsColor;
-					layout(location = 0) out vec4 fragColor;
+				layout(location = 0) in vec2 fsTexCoord;
+				layout(location = 1) in vec4 fsColor;
+				layout(location = 0) out vec4 fragColor;
 
-					void main()
-					{
-						fragColor = fsColor;
-					}
-				)"
-			};
+				void main()
+				{
+					fragColor = fsColor;
+				}
+			)"
+		};
 			
-			gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionTexcoordColor>(
-				gfxContext.get_wsi_manager().get_render_pass(),
-				VK_CULL_MODE_NONE,
-				vertexShaderInfo,
-				fragmentShaderInfo,
-				&pipeline
-			));
+		gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionTexcoordColor>(
+			gfxContext.get_wsi_manager().get_render_pass(),
+			VK_CULL_MODE_NONE,
+			vertexShaderInfo,
+			fragmentShaderInfo,
+			&pipeline
+		));
 
-			std::vector<gvk::DescriptorSet> descriptorSets;
-			gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
-			assert(descriptorSets.size() == 2);
-			cameraDescriptorSet = descriptorSets[0];
-			boxDescriptorSet = descriptorSets[1];
-			gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
-			assert(descriptorSets.size() == 2);
-			groundDescriptorSet = descriptorSets[1];
+		std::vector<gvk::DescriptorSet> descriptorSets;
+		gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
+		assert(descriptorSets.size() == 2);
+		cameraDescriptorSet = descriptorSets[0];
+		boxDescriptorSet = descriptorSets[1];
+		gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
+		assert(descriptorSets.size() == 2);
+		groundDescriptorSet = descriptorSets[1];
 
-			auto boxUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-			boxUniformBufferDescriptorInfo.buffer = boxUniformBuffer;
-			auto groundUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-			groundUniformBufferDescriptorInfo.buffer = groundUniformBuffer;
-			auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-			cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
+		auto boxUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
+		boxUniformBufferDescriptorInfo.buffer = boxUniformBuffer;
+		auto groundUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
+		groundUniformBufferDescriptorInfo.buffer = groundUniformBuffer;
+		auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
+		cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
 
-			// Write the descriptors...
-			std::array<VkWriteDescriptorSet, 3> writeDescriptorSets{
-				VkWriteDescriptorSet {
-					.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
-					.dstSet          = boxDescriptorSet,
-					.dstBinding      = 0,
-					.descriptorCount = 1,
-					.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-					.pBufferInfo     = &boxUniformBufferDescriptorInfo,
-				},
-				VkWriteDescriptorSet {
-					.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
-					.dstSet          = groundDescriptorSet,
-					.dstBinding      = 0,
-					.descriptorCount = 1,
-					.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-					.pBufferInfo     = &groundUniformBufferDescriptorInfo,
-				},
-				VkWriteDescriptorSet {
-					.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
-					.dstSet          = cameraDescriptorSet,
-					.dstBinding      = 0,
-					.descriptorCount = 1,
-					.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-					.pBufferInfo     = &cameraUniformBufferDescriptorInfo,
-				},
-			};
-			vkUpdateDescriptorSets(gfxContext.get_devices()[0], (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
-		} gvk_result_scope_end;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Write the descriptors...
+		std::array<VkWriteDescriptorSet, 3> writeDescriptorSets{
+			VkWriteDescriptorSet {
+				.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
+				.dstSet          = boxDescriptorSet,
+				.dstBinding      = 0,
+				.descriptorCount = 1,
+				.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.pBufferInfo     = &boxUniformBufferDescriptorInfo,
+			},
+			VkWriteDescriptorSet {
+				.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
+				.dstSet          = groundDescriptorSet,
+				.dstBinding      = 0,
+				.descriptorCount = 1,
+				.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.pBufferInfo     = &groundUniformBufferDescriptorInfo,
+			},
+			VkWriteDescriptorSet {
+				.sType           = gvk::get_stype<VkWriteDescriptorSet>(),
+				.dstSet          = cameraDescriptorSet,
+				.dstBinding      = 0,
+				.descriptorCount = 1,
+				.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.pBufferInfo     = &cameraUniformBufferDescriptorInfo,
+			},
+		};
+		vkUpdateDescriptorSets(gfxContext.get_devices()[0], (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
+	} gvk_result_scope_end;
 
 	/// Do some simulation
 
@@ -453,7 +433,6 @@ int main(int, const char* [])
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)groundDescriptorSet, 0, nullptr);
                     groundMesh.record_cmds(commandBuffer);
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)boxDescriptorSet, 0, nullptr);
                     boxMesh.record_cmds(commandBuffer);
                 }
@@ -468,42 +447,6 @@ int main(int, const char* [])
 	}
 	vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
 	assert(vkResult == VK_SUCCESS);
-
-#if 0
-	///-----stepsimulation_start-----
-	for (int i = 0; i < 150; i++)
-	{
-		dynamicsWorld->stepSimulation(1.f / 60.f, 10);
-
-		//print positions of all objects
-		for (int j = dynamicsWorld->getNumCollisionObjects() - 1; j >= 0; j--)
-		{
-			btCollisionObject* obj = dynamicsWorld->getCollisionObjectArray()[j];
-			btRigidBody* body = btRigidBody::upcast(obj);
-			btTransform trans;
-			if (body && body->getMotionState())
-			{
-				body->getMotionState()->getWorldTransform(trans);
-			}
-			else
-			{
-				trans = obj->getWorldTransform();
-			}
-			printf("world pos object %d = %f,%f,%f\n", j, float(trans.getOrigin().getX()), float(trans.getOrigin().getY()), float(trans.getOrigin().getZ()));
-		}
-	}
-#endif
-
-	///-----stepsimulation_end-----
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	//cleanup in the reverse order of creation/initialization
-
-	///-----cleanup_start-----
 
 	//remove the rigidbodies from the dynamics world and delete them
 	for (int i = dynamicsWorld->getNumCollisionObjects() - 1; i >= 0; i--)
@@ -542,11 +485,6 @@ int main(int, const char* [])
 
 	//next line is optional: it will be cleared by the destructor when the array goes out of scope
 	collisionShapes.clear();
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	return 0;
 }
