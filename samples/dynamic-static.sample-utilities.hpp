@@ -33,7 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <iostream>
 
 class GfxContext final
-	: public gvk::Context
+    : public gvk::Context
 {
 private:
     static VkBool32 debug_utils_messenger_callback(
@@ -56,28 +56,28 @@ private:
     }
 
 public:
-	static VkResult create(const char* pApplicationName, GfxContext* pGfxContext)
-	{
-		auto applicationInfo = gvk::get_default<VkApplicationInfo>();
-		applicationInfo.pApplicationName = pApplicationName;
-		auto sysSurfaceCreateInfo = gvk::get_default<gvk::sys::Surface::CreateInfo>();
-		auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
-		debugUtilsMessengerCreateInfo.messageSeverity =
-			// VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-			// VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		debugUtilsMessengerCreateInfo.messageType =
-			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-		debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
-		auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
-		contextCreateInfo.pApplicationInfo = &applicationInfo;
-		contextCreateInfo.pSysSurfaceCreateInfo = &sysSurfaceCreateInfo;
-		contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
-		return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
-	}
+    static VkResult create(const char* pApplicationName, GfxContext* pGfxContext)
+    {
+        auto applicationInfo = gvk::get_default<VkApplicationInfo>();
+        applicationInfo.pApplicationName = pApplicationName;
+        auto sysSurfaceCreateInfo = gvk::get_default<gvk::sys::Surface::CreateInfo>();
+        auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
+        debugUtilsMessengerCreateInfo.messageSeverity =
+            // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+            // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debugUtilsMessengerCreateInfo.messageType =
+            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
+        auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
+        contextCreateInfo.pApplicationInfo = &applicationInfo;
+        contextCreateInfo.pSysSurfaceCreateInfo = &sysSurfaceCreateInfo;
+        contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
+        return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
+    }
 
 protected:
     VkResult create_instance(const VkInstanceCreateInfo* pInstanceCreateInfo, const VkAllocationCallbacks* pAllocator) override
@@ -165,8 +165,10 @@ inline VkResult dst_sample_create_pipeline(
         //  shaders...
         gvk::spirv::Context spirvContext;
         gvk_result(gvk::spirv::Context::create(&gvk::get_default<gvk::spirv::Context::CreateInfo>(), &spirvContext));
-        gvk_result(spirvContext.compile(&vertexShaderInfo));
-        gvk_result(spirvContext.compile(&fragmentShaderInfo));
+        spirvContext.compile(&vertexShaderInfo);
+        gvk_result(dst_sample_validate_shader_info(vertexShaderInfo));
+        spirvContext.compile(&fragmentShaderInfo);
+        gvk_result(dst_sample_validate_shader_info(fragmentShaderInfo));
         auto vsVkResult = dst_sample_validate_shader_info(vertexShaderInfo);
         auto fsVkResult = dst_sample_validate_shader_info(fragmentShaderInfo);
         gvk_result(vsVkResult);
@@ -194,7 +196,7 @@ inline VkResult dst_sample_create_pipeline(
 
         // Create an array of VkPipelineShaderStageCreateInfo for the shaders used in
         //  this gvk::Pipeline...
-        std::array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos{
+        std::array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
             vertexPipelineShaderStageCreateInfo,
             fragmentPipelineShaderStageCreateInfo,
         };
@@ -204,7 +206,7 @@ inline VkResult dst_sample_create_pipeline(
         // NOTE : gvk::get_vertex_description<VertexType>(0) is used to get an array of
         //  VkVertexInputAttributeDescriptions at binding 0 which indicates that the
         //  array is associated with the 0th element of pVertexBindingDescriptions...
-        VkVertexInputBindingDescription vertexInputBindingDescription{ 0, sizeof(VertexType), VK_VERTEX_INPUT_RATE_VERTEX };
+        VkVertexInputBindingDescription vertexInputBindingDescription { 0, sizeof(VertexType), VK_VERTEX_INPUT_RATE_VERTEX };
         auto vertexInputAttributeDescriptions = gvk::get_vertex_description<VertexType>(0);
         auto pipelineVertexInputStateCreateInfo = gvk::get_default<VkPipelineVertexInputStateCreateInfo>();
         pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
@@ -263,7 +265,7 @@ inline VkResult dst_sample_create_pipeline(
         graphicsPipelineCreateInfo.layout = pipelineLayout;
         graphicsPipelineCreateInfo.renderPass = renderPass;
         gvk_result(gvk::Pipeline::create(renderPass.get<gvk::Device>(), VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, pPipeline));
-    } gvk_result_scope_end
+    } gvk_result_scope_end;
     return gvkResult;
 }
 
@@ -271,7 +273,8 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
 {
     assert(pipeline);
     assert(pDescriptorSets);
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
+    {
         std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
         std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
         for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
@@ -282,7 +285,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
                 descriptorPoolSizes.push_back({
                     .type = descriptorSetLayoutBinding.descriptorType,
                     .descriptorCount = descriptorSetLayoutBinding.descriptorCount
-                });
+                    });
             }
         }
 
@@ -300,7 +303,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
         descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
         pDescriptorSets->resize(vkDescriptorSetLayouts.size());
         gvk_result(gvk::DescriptorSet::allocate(pipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, pDescriptorSets->data()));
-    } gvk_result_scope_end
+    } gvk_result_scope_end;
     return gvkResult;
 }
 
@@ -312,7 +315,7 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Context& context, gv
     auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
     bufferCreateInfo.size = sizeof(UniformBufferObjectType);
     bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    VmaAllocationCreateInfo vmaAllocationCreateInfo{ };
+    VmaAllocationCreateInfo vmaAllocationCreateInfo { };
     vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
     return gvk::Buffer::create(context.get_devices()[0], &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
@@ -355,6 +358,6 @@ VkResult dst_sample_acquire_submit_present(gvk::Context& context)
             vkResult = vkQueuePresentKHR(queue, &presentInfo);
             gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
         }
-    } gvk_result_scope_end
+    } gvk_result_scope_end;
     return gvkResult;
 }

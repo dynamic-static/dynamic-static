@@ -66,6 +66,21 @@ struct VertexPositionTexcoordColor
     glm::vec4 color;
 };
 
+struct VertexPositionNormalColor
+{
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec4 color;
+};
+
+struct VertexPositionNormalTexcoordColor
+{
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 texcoord;
+    glm::vec4 color;
+};
+
 } // namespace gfx
 } // namespace dst
 
@@ -90,6 +105,16 @@ inline auto gvk::get_vertex_description<dst::gfx::VertexPositionTexcoord>(uint32
     return gvk::get_vertex_input_attribute_descriptions<
         glm::vec3,
         glm::vec2
+    >(binding);
+}
+
+template <>
+inline auto gvk::get_vertex_description<dst::gfx::VertexPositionNormalColor>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<
+        glm::vec3,
+        glm::vec3,
+        glm::vec4
     >(binding);
 }
 

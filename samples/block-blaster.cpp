@@ -31,60 +31,107 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <memory>
 #include <vector>
 
-VkResult create_sphere_mesh(
-    const gvk::Context& context,
-    float radius,
-    gvk::Mesh* pMesh
-)
+void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector<glm::vec3>* pVertices, std::vector<glm::uvec3>* pFaces)
 {
-    (void)context;
     (void)radius;
-    (void)pMesh;
-    return VK_ERROR_INITIALIZATION_FAILED;
+    assert(pVertices);
+    assert(pFaces);
+    // FROM : https://gitlab.com/libeigen/eigen/-/blob/master/demos/opengl/icosphere.cpp
+    static const float X = 0.525731112119133606f;
+    static const float Z = 0.850650808352039932f;
+    static const std::array<glm::vec3, 12> Vertices {
+        glm::vec3 { -X, 0, Z }, glm::vec3 {  X, 0,  Z }, glm::vec3 { -X,  0, -Z }, glm::vec3 {  X,  0, -Z },
+        glm::vec3 {  0, Z, X }, glm::vec3 {  0, Z, -X }, glm::vec3 {  0, -Z,  X }, glm::vec3 {  0, -Z, -X },
+        glm::vec3 {  Z, X, 0 }, glm::vec3 { -Z, X,  0 }, glm::vec3 {  Z, -X,  0 }, glm::vec3 { -Z, -X,  0 }
+    };
+    static const std::array<glm::u32vec3, 20> Faces {
+        glm::u32vec3 { 0,  4,  1 }, glm::u32vec3 { 0, 9,  4 }, glm::u32vec3 { 9,  5, 4 }, glm::u32vec3 {  4, 5, 8 }, glm::u32vec3 { 4, 8,  1 },
+        glm::u32vec3 { 8, 10,  1 }, glm::u32vec3 { 8, 3, 10 }, glm::u32vec3 { 5,  3, 8 }, glm::u32vec3 {  5, 2, 3 }, glm::u32vec3 { 2, 7,  3 },
+        glm::u32vec3 { 7, 10,  3 }, glm::u32vec3 { 7, 6, 10 }, glm::u32vec3 { 7, 11, 6 }, glm::u32vec3 { 11, 0, 6 }, glm::u32vec3 { 0, 1,  6 },
+        glm::u32vec3 { 6,  1, 10 }, glm::u32vec3 { 9, 0, 11 }, glm::u32vec3 { 9, 11, 2 }, glm::u32vec3 {  9, 2, 5 }, glm::u32vec3 { 7, 2, 11 },
+    };
+    pVertices->clear();
+    pVertices->reserve(Vertices.size());
+    pVertices->insert(pVertices->end(), Vertices.begin(), Vertices.end());
+    pFaces->clear();
+    pFaces->reserve(Faces.size());
+    pFaces->insert(pFaces->end(), Faces.begin(), Faces.end());
+    for (; 0 < subdivisions; --subdivisions) {
+
+    }
 }
 
-VkResult create_box_mesh(
-    const gvk::Context& context,
-    const glm::vec3& dimensions,
-    const glm::vec4& topColor,
-    const glm::vec4& bottomColor,
-    gvk::Mesh* pMesh
-)
+VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, const glm::vec4& color, gvk::Mesh* pMesh)
+{
+    std::vector<glm::vec3> positions;
+    std::vector<glm::u32vec3> faces;
+    create_icosphere_mesh_data(radius, subdivisions, &positions, &faces);
+    std::vector<dst::gfx::VertexPositionNormalColor> vertices;
+    vertices.reserve(positions.size());
+    for (const auto& position : positions) {
+        vertices.emplace_back();
+        vertices.back().position = position;
+        vertices.back().normal = glm::normalize(position);
+        vertices.back().color = color;
+    }
+    std::vector<uint32_t> indices;
+    indices.reserve(faces.size() * 3);
+    for (const auto& face : faces) {
+        indices.push_back(face[0]);
+        indices.push_back(face[1]);
+        indices.push_back(face[2]);
+    }
+    return pMesh->write(
+        context.get_devices()[0],
+        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
+        context.get_command_buffers()[0],
+        VK_NULL_HANDLE,
+        (uint32_t)vertices.size(),
+        vertices.data(),
+        (uint32_t)indices.size(),
+        indices.data()
+    );
+}
+
+VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, const glm::vec4& color, gvk::Mesh* pMesh)
 {
     float w = dimensions[0] * 0.5f;
     float h = dimensions[1] * 0.5f;
     float d = dimensions[2] * 0.5f;
-    std::array<dst::gfx::VertexPositionTexcoordColor, 24> vertices {
+    static const glm::vec3 UnitX { 1, 0, 0 };
+    static const glm::vec3 UnitY { 0, 1, 0 };
+    static const glm::vec3 UnitZ { 0, 0, 1 };
+    std::array<dst::gfx::VertexPositionNormalColor, 24> vertices {
         // Top
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 1, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 1, 1 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 1 }, { topColor }},
+        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, {  UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, {  UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, {  UnitY }, { color } },
         // Left
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, { -UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, { -UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, { -UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitX }, { color } },
         // Front
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  w }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  w }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  w }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  w }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, {  UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, {  UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, {  UnitZ }, { color } },
         // Right
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor}},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor}},
+        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, {  UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, {  UnitX }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, {  UnitX }, { color } },
         // Back
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, { -UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, { -UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitZ }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, { -UnitZ }, { color } },
         // Bottom
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, { -UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, { -UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, { -UnitY }, { color } },
+        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitY }, { color } },
     };
     size_t index_i = 0;
     size_t vertex_i = 0;
@@ -121,6 +168,7 @@ struct CameraUniforms
 {
     glm::mat4 view { };
     glm::mat4 projection { };
+    glm::vec3 position { };
 };
 
 int main(int, const char* [])
@@ -236,8 +284,9 @@ int main(int, const char* [])
 
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
     {
-        gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, gvk::math::Color::Aquamarine, &boxMesh));
-        gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, gvk::math::Color::BlanchedAlmond, &groundMesh));
+        gvk_result(create_icosphere_mesh(gfxContext, 1, 1, gvk::math::Color::Blue, &boxMesh));
+        // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
+        gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &groundMesh));
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &boxUniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &groundUniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
@@ -253,6 +302,7 @@ int main(int, const char* [])
                 {
                     mat4 view;
                     mat4 projection;
+                    vec3 position;
                 } camera;
 
                 layout(set = 1, binding = 0)
@@ -262,10 +312,13 @@ int main(int, const char* [])
                 } object;
 
                 layout(location = 0) in vec3 vsPosition;
-                layout(location = 1) in vec2 vsTexCoord;
+                layout(location = 1) in vec3 vsNormal;
                 layout(location = 2) in vec4 vsColor;
-                layout(location = 0) out vec2 fsTexCoord;
-                layout(location = 1) out vec4 fsColor;
+
+                layout(location = 0) out vec3 fsPosition;
+                layout(location = 1) out vec3 fsNormal;
+                layout(location = 2) out vec4 fsColor;
+                layout(location = 3) out vec3 fsCameraPosition;
 
                 out gl_PerVertex
                 {
@@ -274,9 +327,11 @@ int main(int, const char* [])
 
                 void main()
                 {
-                    gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-                    fsTexCoord = vsTexCoord;
+                    fsPosition = vsPosition;
+                    fsNormal = vsNormal;
                     fsColor = vsColor;
+                    fsCameraPosition = camera.position;
+                    gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
                 }
             )"
         };
@@ -287,24 +342,35 @@ int main(int, const char* [])
             .source = R"(
                 #version 450
 
-                layout(location = 0) in vec2 fsTexCoord;
-                layout(location = 1) in vec4 fsColor;
+                layout(location = 0) in vec3 fsPosition;
+                layout(location = 1) in vec3 fsNormal;
+                layout(location = 2) in vec4 fsColor;
+                layout(location = 3) in vec3 fsCameraPosition;
+
                 layout(location = 0) out vec4 fragColor;
 
                 void main()
                 {
-                    fragColor = fsColor;
+                    vec3 lightPosition = vec3(0, 100, 0);
+                    vec3 lightDirection = normalize(lightPosition - fsPosition);
+                    vec3 normal = normalize(fsNormal);
+                    vec3 ambient = fsColor.rgb * 0.25;
+                    vec3 diffuse = vec3(dot(lightDirection, normal));
+                    vec3 viewDirection = normalize(fsCameraPosition - fsPosition);
+                    vec3 reflectionDirection = reflect(-lightDirection, normal);
+                    vec3 specular = vec3(0.3) * pow(max(0, dot(viewDirection, reflectionDirection)), 8);
+                    fragColor = vec4(ambient + diffuse + specular, 1);
                 }
             )"
         };
 
-        gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionTexcoordColor>(
+        gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionNormalColor>(
             gfxContext.get_wsi_manager().get_render_pass(),
             VK_CULL_MODE_NONE,
             vertexShaderInfo,
             fragmentShaderInfo,
             &pipeline
-            ));
+        ));
 
         std::vector<gvk::DescriptorSet> descriptorSets;
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
@@ -384,6 +450,7 @@ int main(int, const char* [])
         CameraUniforms cameraUbo { };
         cameraUbo.view = camera.view();
         cameraUbo.projection = camera.projection();
+        cameraUbo.position = camera.transform.translation;
         VmaAllocationInfo allocationInfo { };
         vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
