@@ -101,6 +101,7 @@ protected:
         assert(pDeviceCreateInfo);
         auto enabledFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
         enabledFeatures.samplerAnisotropy = VK_TRUE;
+        enabledFeatures.fillModeNonSolid = VK_TRUE;
         auto deviceCreateInfo = *pDeviceCreateInfo;
         deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
         return gvk::Context::create_devices(&deviceCreateInfo, pAllocator);
@@ -155,6 +156,7 @@ template <typename VertexType>
 inline VkResult dst_sample_create_pipeline(
     const gvk::RenderPass& renderPass,
     VkCullModeFlagBits cullMode,
+    VkPolygonMode polygonMode,
     gvk::spirv::ShaderInfo& vertexShaderInfo,
     gvk::spirv::ShaderInfo& fragmentShaderInfo,
     gvk::Pipeline* pPipeline
@@ -219,6 +221,7 @@ inline VkResult dst_sample_create_pipeline(
         //  culling, etc...
         auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
         pipelineRasterizationStateCreateInfo.cullMode = cullMode;
+        pipelineRasterizationStateCreateInfo.polygonMode = polygonMode;
 
         // VkPipelineMultisampleStateCreateInfo describes how multi sampling should
         //  occur.  rasterizationSamples should match the sample count of the

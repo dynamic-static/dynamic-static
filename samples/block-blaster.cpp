@@ -29,43 +29,130 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <iostream>
 #include <map>
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
-void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector<glm::vec3>* pVertices, std::vector<glm::uvec3>* pFaces)
+void subdivide_icosphere_face(size_t face, std::vector<glm::vec3>& vertices, std::vector<glm::u32vec3>& faces)
 {
+    //               V0
+    //              /\
+    //             /  \
+    //            /    \
+    //           /      \
+    //          /        \
+    //         /          \
+    //        /            \
+    //       /              \
+    //      /                \
+    //  V2 /__________________\ V1
+    //
+    const auto I0 = faces[face][0];
+    const auto I1 = faces[face][1];
+    const auto I2 = faces[face][2];
+    const auto V0 = vertices[I0];
+    const auto V1 = vertices[I1];
+    const auto V2 = vertices[I2];
+    const auto VertexCount = vertices.size();
+
+    std::array<glm::vec3, 3> midpoints {
+        (V0 + V1) * 0.5f,
+        (V1 + V2) * 0.5f,
+        (V2 + V0) * 0.5f,
+    };
+
+    //               V0
+    //              /\
+    //             /  \
+    //            /    \
+    //           /      \
+    //       V5 /________\ V3
+    //         /\        /\
+    //        /  \      /  \
+    //       /    \    /    \
+    //      /      \  /      \
+    //  V2 /________\/________\ V1
+    //               V4
+    const auto I3 = VertexCount + 0;
+    const auto I4 = VertexCount + 1;
+    const auto I5 = VertexCount + 2;
+
+    faces[face][1] = (uint32_t)I3;
+    faces[face][2] = (uint32_t)I5;
+    std::array<glm::u32vec3, 3> subdividedFaces {
+        glm::u32vec3 { I5, I4, I2 },
+        glm::u32vec3 { I5, I3, I4 },
+        glm::u32vec3 { I3, I1, I4 },
+    };
+
+    vertices.reserve(VertexCount + midpoints.size());
+    vertices.insert(vertices.end(), midpoints.begin(), midpoints.end());
+    faces.reserve(faces.size() + subdividedFaces.size());
+    faces.insert(faces.end(), subdividedFaces.begin(), subdividedFaces.end());
+
+    // processNewVertex(vertices[I3]);
+    // processNewVertex(vertices[I4]);
+    // processNewVertex(vertices[I5]);
+}
+
+void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector<glm::vec3>& vertices, std::vector<glm::uvec3>& faces)
+{
+    // radius = 2.5f;
+    subdivisions = 2;
     (void)radius;
-    assert(pVertices);
-    assert(pFaces);
+
     // FROM : https://gitlab.com/libeigen/eigen/-/blob/master/demos/opengl/icosphere.cpp
     static const float X = 0.525731112119133606f;
     static const float Z = 0.850650808352039932f;
-    static const std::array<glm::vec3, 12> Vertices {
-        glm::vec3 { -X, 0, Z }, glm::vec3 {  X, 0,  Z }, glm::vec3 { -X,  0, -Z }, glm::vec3 {  X,  0, -Z },
-        glm::vec3 {  0, Z, X }, glm::vec3 {  0, Z, -X }, glm::vec3 {  0, -Z,  X }, glm::vec3 {  0, -Z, -X },
-        glm::vec3 {  Z, X, 0 }, glm::vec3 { -Z, X,  0 }, glm::vec3 {  Z, -X,  0 }, glm::vec3 { -Z, -X,  0 }
+    static const std::array<glm::vec3, 12> IcosahedronVertices {
+        glm::vec3 { -X,  0,  Z }, glm::vec3 {  X,  0,  Z }, glm::vec3 { -X,  0, -Z }, glm::vec3 {  X,  0, -Z },
+        glm::vec3 {  0,  Z,  X }, glm::vec3 {  0,  Z, -X }, glm::vec3 {  0, -Z,  X }, glm::vec3 {  0, -Z, -X },
+        glm::vec3 {  Z,  X,  0 }, glm::vec3 { -Z,  X,  0 }, glm::vec3 {  Z, -X,  0 }, glm::vec3 { -Z, -X,  0 },
     };
-    static const std::array<glm::u32vec3, 20> Faces {
-        glm::u32vec3 { 0,  4,  1 }, glm::u32vec3 { 0, 9,  4 }, glm::u32vec3 { 9,  5, 4 }, glm::u32vec3 {  4, 5, 8 }, glm::u32vec3 { 4, 8,  1 },
-        glm::u32vec3 { 8, 10,  1 }, glm::u32vec3 { 8, 3, 10 }, glm::u32vec3 { 5,  3, 8 }, glm::u32vec3 {  5, 2, 3 }, glm::u32vec3 { 2, 7,  3 },
-        glm::u32vec3 { 7, 10,  3 }, glm::u32vec3 { 7, 6, 10 }, glm::u32vec3 { 7, 11, 6 }, glm::u32vec3 { 11, 0, 6 }, glm::u32vec3 { 0, 1,  6 },
-        glm::u32vec3 { 6,  1, 10 }, glm::u32vec3 { 9, 0, 11 }, glm::u32vec3 { 9, 11, 2 }, glm::u32vec3 {  9, 2, 5 }, glm::u32vec3 { 7, 2, 11 },
+    static const std::array<glm::u32vec3, 20> IcosahedronFaces {
+        glm::u32vec3 { 0,  4,  1 }, glm::u32vec3 {  0,  9,  4 }, glm::u32vec3 {  9,  5,  4 }, glm::u32vec3 {  4,  5,  8 }, glm::u32vec3 {  4,  8,  1 },
+        glm::u32vec3 { 8, 10,  1 }, glm::u32vec3 {  8,  3, 10 }, glm::u32vec3 {  5,  3,  8 }, glm::u32vec3 {  5,  2,  3 }, glm::u32vec3 {  2,  7,  3 },
+        glm::u32vec3 { 7, 10,  3 }, glm::u32vec3 {  7,  6, 10 }, glm::u32vec3 {  7, 11,  6 }, glm::u32vec3 { 11,  0,  6 }, glm::u32vec3 {  0,  1,  6 },
+        glm::u32vec3 { 6,  1, 10 }, glm::u32vec3 {  9,  0, 11 }, glm::u32vec3 {  9, 11,  2 }, glm::u32vec3 {  9,  2,  5 }, glm::u32vec3 {  7,  2, 11 },
     };
-    pVertices->clear();
-    pVertices->reserve(Vertices.size());
-    pVertices->insert(pVertices->end(), Vertices.begin(), Vertices.end());
-    pFaces->clear();
-    pFaces->reserve(Faces.size());
-    pFaces->insert(pFaces->end(), Faces.begin(), Faces.end());
-    for (; 0 < subdivisions; --subdivisions) {
 
+    vertices.clear();
+    vertices.reserve(IcosahedronVertices.size());
+    // std::map<glm::vec3, uint32_t> uniqueVertices;
+    // uniqueVertices.reserve(IcosahedronVertices.size());
+    for (uint32_t vertex_i = 0; vertex_i < (uint32_t)IcosahedronVertices.size(); ++vertex_i) {
+        // uniqueVertices.insert({ IcosahedronVertices[vertex_i], vertex_i });
+        vertices.push_back(IcosahedronVertices[vertex_i]);
     }
+
+    faces.clear();
+    faces.reserve(IcosahedronFaces.size());
+    faces.insert(faces.end(), IcosahedronFaces.begin(), IcosahedronFaces.end());
+    for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
+        auto faceCount = faces.size();
+        for (size_t face_i = 0; face_i < faceCount; ++face_i) {
+            subdivide_icosphere_face(face_i, vertices, faces);
+        }
+    }
+
+    for (auto& vertex : vertices) {
+        vertex = glm::normalize(vertex) * radius;
+    }
+
+#if 0
+    for (size_t face_i = 0; face_i < IcosahedronFaces.size(); ++face_i) {
+        for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
+            subdivide_icosphere_face(face_i, vertices, faces);
+        }
+    }
+#endif
 }
 
 VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, const glm::vec4& color, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> positions;
     std::vector<glm::u32vec3> faces;
-    create_icosphere_mesh_data(radius, subdivisions, &positions, &faces);
+    create_icosphere_mesh_data(radius, subdivisions, positions, faces);
     std::vector<dst::gfx::VertexPositionNormalColor> vertices;
     vertices.reserve(positions.size());
     for (const auto& position : positions) {
@@ -250,7 +337,8 @@ int main(int, const char* [])
         if (isDynamic)
             colShape->calculateLocalInertia(mass, localInertia);
 
-        startTransform.setOrigin(btVector3(2, 10, 0));
+        // startTransform.setOrigin(btVector3(2, 10, 0));
+        startTransform.setOrigin(btVector3(0, 0, 0));
 
         //using motionstate is recommended, it provides interpolation capabilities, and only synchronizes 'active' objects
         btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
@@ -280,11 +368,16 @@ int main(int, const char* [])
     gvk::DescriptorSet cameraDescriptorSet;
     gvk::math::FreeCameraController cameraController;
     cameraController.set_camera(&camera);
-    camera.transform.translation.z = -32;
+    // camera.transform.translation.z = -32;
+    camera.transform.translation.z = -2.5f;
+
+    // camera.transform.translation.x = 0;
+    // camera.transform.translation.y = -3;
+    // camera.transform.translation.z = -8;
 
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
     {
-        gvk_result(create_icosphere_mesh(gfxContext, 1, 1, gvk::math::Color::Blue, &boxMesh));
+        gvk_result(create_icosphere_mesh(gfxContext, 1, 1, gvk::math::Color::White, &boxMesh));
         // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
         gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &groundMesh));
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &boxUniformBuffer));
@@ -359,14 +452,16 @@ int main(int, const char* [])
                     vec3 viewDirection = normalize(fsCameraPosition - fsPosition);
                     vec3 reflectionDirection = reflect(-lightDirection, normal);
                     vec3 specular = vec3(0.3) * pow(max(0, dot(viewDirection, reflectionDirection)), 8);
-                    fragColor = vec4(ambient + diffuse + specular, 1);
+                    // fragColor = vec4(ambient + diffuse + specular, 1);
+                    fragColor = vec4(1, 1, 1, 1);
                 }
             )"
         };
 
         gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionNormalColor>(
             gfxContext.get_wsi_manager().get_render_pass(),
-            VK_CULL_MODE_NONE,
+            VK_CULL_MODE_BACK_BIT,
+            VK_POLYGON_MODE_LINE,
             vertexShaderInfo,
             fragmentShaderInfo,
             &pipeline
@@ -447,16 +542,9 @@ int main(int, const char* [])
         }
         cameraController.update(cameraControllerUpdateInfo);
 
-        CameraUniforms cameraUbo { };
-        cameraUbo.view = camera.view();
-        cameraUbo.projection = camera.projection();
-        cameraUbo.position = camera.transform.translation;
-        VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-        assert(allocationInfo.pMappedData);
-        memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
+        // dynamicsWorld->stepSimulation(deltaTime, 10);
 
-        dynamicsWorld->stepSimulation(deltaTime, 10);
+        VmaAllocationInfo allocationInfo { };
 
         btTransform btTransform;
         pBoxRigidBody->getMotionState()->getWorldTransform(btTransform);
@@ -473,10 +561,23 @@ int main(int, const char* [])
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &groundUbo, sizeof(ObjectUniforms));
 
+        CameraUniforms cameraUbo { };
+        cameraUbo.view = camera.view();
+        cameraUbo.projection = camera.projection();
+        cameraUbo.position = camera.transform.translation;
+        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        assert(allocationInfo.pMappedData);
+        memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
+
         float x = camera.transform.translation.x;
         float y = camera.transform.translation.y;
         float z = camera.transform.translation.z;
-        std::cout << x << ", " << y << ", " << z << std::endl;
+        pBoxRigidBody->getMotionState()->getWorldTransform(btTransform);
+        auto btv = btTransform.getOrigin();
+        float btx = btv.x();
+        float bty = btv.y();
+        float btz = btv.z();
+        std::cout << x << ", " << y << ", " << z << " :::: " << btx << ", " << bty << ", " << btz << std::endl;
 
         auto& wsiManager = gfxContext.get_wsi_manager();
         if (wsiManager.update()) {
@@ -499,8 +600,8 @@ int main(int, const char* [])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)groundDescriptorSet, 0, nullptr);
-                    groundMesh.record_cmds(commandBuffer);
+                    // vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)groundDescriptorSet, 0, nullptr);
+                    // groundMesh.record_cmds(commandBuffer);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)boxDescriptorSet, 0, nullptr);
                     boxMesh.record_cmds(commandBuffer);
                 }
