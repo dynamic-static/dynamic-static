@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.sample-utilities.hpp"
 
+#include <functional>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -33,7 +34,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
-void subdivide_icosphere_face(size_t face, std::vector<glm::vec3>& vertices, std::vector<glm::u32vec3>& faces)
+using IcosphereVertex = glm::float3;
+using IcosphereIndex = uint32_t;
+using IcosphereFace = std::array<IcosphereIndex, 3>;
+using IcosphereEdge = std::pair<IcosphereIndex, IcosphereIndex>;
+
+class IcosphereEdgeHasher
+{
+public:
+    size_t operator()(const IcosphereEdge& edge) const
+    {
+        return std::hash<IcosphereIndex> { }(edge.first) ^ std::hash<IcosphereIndex> { }(edge.second);
+    }
+};
+
+template <typename CreateVertexFunctionType, typename CreatFacesFunctionType>
+void subdivide_icosphere_face(const IcosphereFace& face, CreateVertexFunctionType createVertex, CreatFacesFunctionType createFaces)
 {
     //               V0
     //              /\
@@ -47,19 +63,9 @@ void subdivide_icosphere_face(size_t face, std::vector<glm::vec3>& vertices, std
     //      /                \
     //  V2 /__________________\ V1
     //
-    const auto I0 = faces[face][0];
-    const auto I1 = faces[face][1];
-    const auto I2 = faces[face][2];
-    const auto V0 = vertices[I0];
-    const auto V1 = vertices[I1];
-    const auto V2 = vertices[I2];
-    const auto VertexCount = vertices.size();
-
-    std::array<glm::vec3, 3> midpoints {
-        (V0 + V1) * 0.5f,
-        (V1 + V2) * 0.5f,
-        (V2 + V0) * 0.5f,
-    };
+    const auto I0 = face[0];
+    const auto I1 = face[1];
+    const auto I2 = face[2];
 
     //               V0
     //              /\
@@ -73,100 +79,85 @@ void subdivide_icosphere_face(size_t face, std::vector<glm::vec3>& vertices, std
     //      /      \  /      \
     //  V2 /________\/________\ V1
     //               V4
-    const auto I3 = VertexCount + 0;
-    const auto I4 = VertexCount + 1;
-    const auto I5 = VertexCount + 2;
-
-    faces[face][1] = (uint32_t)I3;
-    faces[face][2] = (uint32_t)I5;
-    std::array<glm::u32vec3, 3> subdividedFaces {
-        glm::u32vec3 { I5, I4, I2 },
-        glm::u32vec3 { I5, I3, I4 },
-        glm::u32vec3 { I3, I1, I4 },
-    };
-
-    vertices.reserve(VertexCount + midpoints.size());
-    vertices.insert(vertices.end(), midpoints.begin(), midpoints.end());
-    faces.reserve(faces.size() + subdividedFaces.size());
-    faces.insert(faces.end(), subdividedFaces.begin(), subdividedFaces.end());
-
-    // processNewVertex(vertices[I3]);
-    // processNewVertex(vertices[I4]);
-    // processNewVertex(vertices[I5]);
+    const auto I3 = (IcosphereIndex)createVertex(IcosphereEdge { std::minmax(I0, I1) });
+    const auto I4 = (IcosphereIndex)createVertex(IcosphereEdge { std::minmax(I1, I2) });
+    const auto I5 = (IcosphereIndex)createVertex(IcosphereEdge { std::minmax(I2, I0) });
+    createFaces(
+        IcosphereFace { face[0], I3, I5 },
+        {
+            IcosphereFace { I5, I4, I2 },
+            IcosphereFace { I5, I3, I4 },
+            IcosphereFace { I3, I1, I4 },
+        }
+    );
 }
 
-void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector<glm::vec3>& vertices, std::vector<glm::uvec3>& faces)
+void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector<IcosphereVertex>& vertices, std::vector<IcosphereFace>& faces)
 {
-    // radius = 2.5f;
-    subdivisions = 2;
-    (void)radius;
-
     // FROM : https://gitlab.com/libeigen/eigen/-/blob/master/demos/opengl/icosphere.cpp
     static const float X = 0.525731112119133606f;
     static const float Z = 0.850650808352039932f;
-    static const std::array<glm::vec3, 12> IcosahedronVertices {
+    static const std::array<IcosphereVertex, 12> IcosahedronVertices {
         glm::vec3 { -X,  0,  Z }, glm::vec3 {  X,  0,  Z }, glm::vec3 { -X,  0, -Z }, glm::vec3 {  X,  0, -Z },
         glm::vec3 {  0,  Z,  X }, glm::vec3 {  0,  Z, -X }, glm::vec3 {  0, -Z,  X }, glm::vec3 {  0, -Z, -X },
         glm::vec3 {  Z,  X,  0 }, glm::vec3 { -Z,  X,  0 }, glm::vec3 {  Z, -X,  0 }, glm::vec3 { -Z, -X,  0 },
     };
-    static const std::array<glm::u32vec3, 20> IcosahedronFaces {
-        glm::u32vec3 { 0,  4,  1 }, glm::u32vec3 {  0,  9,  4 }, glm::u32vec3 {  9,  5,  4 }, glm::u32vec3 {  4,  5,  8 }, glm::u32vec3 {  4,  8,  1 },
-        glm::u32vec3 { 8, 10,  1 }, glm::u32vec3 {  8,  3, 10 }, glm::u32vec3 {  5,  3,  8 }, glm::u32vec3 {  5,  2,  3 }, glm::u32vec3 {  2,  7,  3 },
-        glm::u32vec3 { 7, 10,  3 }, glm::u32vec3 {  7,  6, 10 }, glm::u32vec3 {  7, 11,  6 }, glm::u32vec3 { 11,  0,  6 }, glm::u32vec3 {  0,  1,  6 },
-        glm::u32vec3 { 6,  1, 10 }, glm::u32vec3 {  9,  0, 11 }, glm::u32vec3 {  9, 11,  2 }, glm::u32vec3 {  9,  2,  5 }, glm::u32vec3 {  7,  2, 11 },
+    static const std::array<IcosphereFace, 20> IcosahedronFaces {
+        IcosphereFace { 0,  4,  1 }, IcosphereFace {  0,  9,  4 }, IcosphereFace {  9,  5,  4 }, IcosphereFace {  4,  5,  8 }, IcosphereFace {  4,  8,  1 },
+        IcosphereFace { 8, 10,  1 }, IcosphereFace {  8,  3, 10 }, IcosphereFace {  5,  3,  8 }, IcosphereFace {  5,  2,  3 }, IcosphereFace {  2,  7,  3 },
+        IcosphereFace { 7, 10,  3 }, IcosphereFace {  7,  6, 10 }, IcosphereFace {  7, 11,  6 }, IcosphereFace { 11,  0,  6 }, IcosphereFace {  0,  1,  6 },
+        IcosphereFace { 6,  1, 10 }, IcosphereFace {  9,  0, 11 }, IcosphereFace {  9, 11,  2 }, IcosphereFace {  9,  2,  5 }, IcosphereFace {  7,  2, 11 },
     };
 
     vertices.clear();
     vertices.reserve(IcosahedronVertices.size());
-    // std::map<glm::vec3, uint32_t> uniqueVertices;
-    // uniqueVertices.reserve(IcosahedronVertices.size());
     for (uint32_t vertex_i = 0; vertex_i < (uint32_t)IcosahedronVertices.size(); ++vertex_i) {
-        // uniqueVertices.insert({ IcosahedronVertices[vertex_i], vertex_i });
-        vertices.push_back(IcosahedronVertices[vertex_i]);
+        vertices.push_back(IcosahedronVertices[vertex_i] * radius);
     }
 
     faces.clear();
     faces.reserve(IcosahedronFaces.size());
     faces.insert(faces.end(), IcosahedronFaces.begin(), IcosahedronFaces.end());
+
+    std::unordered_map<IcosphereEdge, IcosphereIndex, IcosphereEdgeHasher> uniqueVertices;
     for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
-        auto faceCount = faces.size();
-        for (size_t face_i = 0; face_i < faceCount; ++face_i) {
-            subdivide_icosphere_face(face_i, vertices, faces);
+        auto faceCount = (uint32_t)faces.size();
+        for (uint32_t face_i = 0; face_i < faceCount; ++face_i) {
+            subdivide_icosphere_face(faces[face_i],
+                [&](const IcosphereEdge& edge)
+                {
+                    auto itr = uniqueVertices.find(edge);
+                    if (itr == uniqueVertices.end()) {
+                        const auto& V0 = vertices[edge.first];
+                        const auto& V1 = vertices[edge.second];
+                        vertices.push_back(glm::normalize((V0 + V1) * 0.5f) * radius);
+                        itr = uniqueVertices.insert(itr, { edge, (IcosphereIndex)vertices.size() - 1 });
+                    }
+                    return itr->second;
+                },
+                [&](const IcosphereFace& face, const std::array<IcosphereFace, 3>& subdividedFaces)
+                {
+                    faces[face_i] = face;
+                    faces.reserve(faces.size() + subdividedFaces.size());
+                    faces.insert(faces.end(), subdividedFaces.begin(), subdividedFaces.end());
+                }
+            );
         }
     }
-
-    for (auto& vertex : vertices) {
-        vertex = glm::normalize(vertex) * radius;
-    }
-
-#if 0
-    for (size_t face_i = 0; face_i < IcosahedronFaces.size(); ++face_i) {
-        for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
-            subdivide_icosphere_face(face_i, vertices, faces);
-        }
-    }
-#endif
 }
 
 VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, const glm::vec4& color, gvk::Mesh* pMesh)
 {
-    std::vector<glm::vec3> positions;
-    std::vector<glm::u32vec3> faces;
-    create_icosphere_mesh_data(radius, subdivisions, positions, faces);
+    std::vector<IcosphereVertex> icosphereVertices;
+    std::vector<IcosphereFace> icosphereFaces;
+    create_icosphere_mesh_data(radius, subdivisions, icosphereVertices, icosphereFaces);
     std::vector<dst::gfx::VertexPositionNormalColor> vertices;
-    vertices.reserve(positions.size());
-    for (const auto& position : positions) {
+    vertices.reserve(icosphereVertices.size());
+    for (const auto& vertex : icosphereVertices) {
         vertices.emplace_back();
-        vertices.back().position = position;
-        vertices.back().normal = glm::normalize(position);
+        vertices.back().position = vertex;
+        vertices.back().normal = glm::normalize(vertex);
         vertices.back().color = color;
-    }
-    std::vector<uint32_t> indices;
-    indices.reserve(faces.size() * 3);
-    for (const auto& face : faces) {
-        indices.push_back(face[0]);
-        indices.push_back(face[1]);
-        indices.push_back(face[2]);
     }
     return pMesh->write(
         context.get_devices()[0],
@@ -175,8 +166,8 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
         VK_NULL_HANDLE,
         (uint32_t)vertices.size(),
         vertices.data(),
-        (uint32_t)indices.size(),
-        indices.data()
+        (uint32_t)icosphereFaces.size() * 3,
+        &icosphereFaces[0][0]
     );
 }
 
@@ -355,9 +346,9 @@ int main(int, const char* [])
 
     gvk::Pipeline pipeline;
 
-    gvk::Mesh boxMesh;
-    gvk::Buffer boxUniformBuffer;
-    gvk::DescriptorSet boxDescriptorSet;
+    gvk::Mesh sphereMesh;
+    gvk::Buffer sphereUniformBuffer;
+    gvk::DescriptorSet sphereDescriptorSet;
 
     gvk::Mesh groundMesh;
     gvk::Buffer groundUniformBuffer;
@@ -377,10 +368,10 @@ int main(int, const char* [])
 
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
     {
-        gvk_result(create_icosphere_mesh(gfxContext, 1, 1, gvk::math::Color::White, &boxMesh));
+        gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::White, &sphereMesh));
         // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
         gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &groundMesh));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &boxUniformBuffer));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &sphereUniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &groundUniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
         gvk::spirv::ShaderInfo vertexShaderInfo {
@@ -471,13 +462,13 @@ int main(int, const char* [])
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
         cameraDescriptorSet = descriptorSets[0];
-        boxDescriptorSet = descriptorSets[1];
+        sphereDescriptorSet = descriptorSets[1];
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
         groundDescriptorSet = descriptorSets[1];
 
-        auto boxUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        boxUniformBufferDescriptorInfo.buffer = boxUniformBuffer;
+        auto sphereUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
+        sphereUniformBufferDescriptorInfo.buffer = sphereUniformBuffer;
         auto groundUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
         groundUniformBufferDescriptorInfo.buffer = groundUniformBuffer;
         auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
@@ -487,11 +478,11 @@ int main(int, const char* [])
         std::array<VkWriteDescriptorSet, 3> writeDescriptorSets {
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = boxDescriptorSet,
+                .dstSet = sphereDescriptorSet,
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &boxUniformBufferDescriptorInfo,
+                .pBufferInfo = &sphereUniformBufferDescriptorInfo,
             },
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
@@ -550,7 +541,7 @@ int main(int, const char* [])
         pBoxRigidBody->getMotionState()->getWorldTransform(btTransform);
         ObjectUniforms boxUbo { };
         btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), boxUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), sphereUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &boxUbo, sizeof(ObjectUniforms));
 
@@ -568,16 +559,6 @@ int main(int, const char* [])
         vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
-
-        float x = camera.transform.translation.x;
-        float y = camera.transform.translation.y;
-        float z = camera.transform.translation.z;
-        pBoxRigidBody->getMotionState()->getWorldTransform(btTransform);
-        auto btv = btTransform.getOrigin();
-        float btx = btv.x();
-        float bty = btv.y();
-        float btz = btv.z();
-        std::cout << x << ", " << y << ", " << z << " :::: " << btx << ", " << bty << ", " << btz << std::endl;
 
         auto& wsiManager = gfxContext.get_wsi_manager();
         if (wsiManager.update()) {
@@ -602,8 +583,8 @@ int main(int, const char* [])
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     // vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)groundDescriptorSet, 0, nullptr);
                     // groundMesh.record_cmds(commandBuffer);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)boxDescriptorSet, 0, nullptr);
-                    boxMesh.record_cmds(commandBuffer);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)sphereDescriptorSet, 0, nullptr);
+                    sphereMesh.record_cmds(commandBuffer);
                 }
                 vkCmdEndRenderPass(commandBuffer);
 
