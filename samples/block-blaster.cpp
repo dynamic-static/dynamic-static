@@ -102,7 +102,6 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
         (uint32_t)triangles.size() * 3,
         &triangles[0][0]
     );
-#endif
 }
 
 VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, const glm::vec4& color, gvk::Mesh* pMesh)
