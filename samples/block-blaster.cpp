@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.sample-utilities.hpp"
 
 #include "dynamic-static.physics/context.hpp"
+#include "dynamic-static.graphics/primitives.hpp"
 
 #include <functional>
 #include <iostream>
@@ -36,6 +37,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
+#if 0
 using IcosphereVertex = glm::float3;
 using IcosphereIndex = uint32_t;
 using IcosphereFace = std::array<IcosphereIndex, 3>;
@@ -147,9 +149,11 @@ void create_icosphere_mesh_data(float radius, uint32_t subdivisions, std::vector
         }
     }
 }
+#endif
 
 VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, const glm::vec4& color, gvk::Mesh* pMesh)
 {
+#if 0
     std::vector<IcosphereVertex> icosphereVertices;
     std::vector<IcosphereFace> icosphereFaces;
     create_icosphere_mesh_data(radius, subdivisions, icosphereVertices, icosphereFaces);
@@ -171,6 +175,71 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
         (uint32_t)icosphereFaces.size() * 3,
         &icosphereFaces[0][0]
     );
+#else
+    // TODO : Documentation
+    std::vector<dst::gfx::VertexPositionNormalColor> vertices;
+    auto createVertex = [&](const glm::vec3& vertex)
+    {
+        vertices.push_back({ });
+        vertices.back().position = vertex * radius;
+        vertices.back().normal = vertex;
+        vertices.back().color = color;
+        return (uint32_t)vertices.size() - 1;
+    };
+
+    // TODO : Documentation
+    for (const auto& vertex : dst::gfx::primitive::Icosahedron::Vertices) {
+        createVertex(vertex);
+    }
+
+    // TODO : Documentation
+    const auto& icosahedronTriangles = dst::gfx::primitive::Icosahedron::Triangles;
+    std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles;
+    triangles.insert(triangles.end(), icosahedronTriangles.begin(), icosahedronTriangles.end());
+
+    // TODO : Documentation
+    std::unordered_map<dst::gfx::primitive::Edge<uint32_t>, uint32_t, dst::gfx::primitive::EdgeHasher<uint32_t>> edges;
+    for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
+        auto triangleCount = (uint32_t)triangles.size();
+        for (uint32_t triangle_i = 0; triangle_i < triangleCount; ++triangle_i) {
+            dst::gfx::primitive::subdivide_triangle(
+                triangles[triangle_i],
+                [&](const dst::gfx::primitive::Edge<uint32_t>& edge)
+                {
+                    auto itr = edges.find(edge);
+                    if (itr == edges.end()) {
+                        auto v0 = vertices[edge[0]].position;
+                        auto v1 = vertices[edge[1]].position;
+                        auto vertex = glm::normalize((v0 + v1) * 0.5f);
+                        auto index = createVertex(vertex);
+                        itr = edges.insert(itr, { edge, index });
+                    }
+                    return itr->second;
+                },
+                [&](
+                    const dst::gfx::primitive::Triangle<uint32_t>& subdividedTriangle,
+                    const std::array<dst::gfx::primitive::Triangle<uint32_t>, 3>& newTriangles
+                )
+                {
+                    triangles[triangle_i] = subdividedTriangle;
+                    triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
+                }
+            );
+        }
+    }
+
+    // TODO : Documentation
+    return pMesh->write(
+        context.get_devices()[0],
+        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
+        context.get_command_buffers()[0],
+        VK_NULL_HANDLE,
+        (uint32_t)vertices.size(),
+        vertices.data(),
+        (uint32_t)triangles.size() * 3,
+        &triangles[0][0]
+    );
+#endif
 }
 
 VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, const glm::vec4& color, gvk::Mesh* pMesh)
@@ -409,6 +478,7 @@ int main(int, const char* [])
                     vec3 reflectionDirection = reflect(-lightDirection, normal);
                     vec3 specular = vec3(0.3) * pow(max(0, dot(viewDirection, reflectionDirection)), 8);
                     fragColor = vec4(ambient + diffuse + specular, 1);
+fragColor = fsColor;
                 }
             )"
         };
@@ -416,7 +486,7 @@ int main(int, const char* [])
         gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionNormalColor>(
             gfxContext.get_wsi_manager().get_render_pass(),
             VK_CULL_MODE_BACK_BIT,
-            VK_POLYGON_MODE_FILL,
+            VK_POLYGON_MODE_LINE,
             vertexShaderInfo,
             fragmentShaderInfo,
             &pipeline
@@ -553,7 +623,7 @@ int main(int, const char* [])
     //remove the rigidbodies from the dynamics world and delete them
     for (int i = physicsContext.mupWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
         btCollisionObject* obj = physicsContext.mupWorld->getCollisionObjectArray()[i];
-        btRigidBody* body = btRigidBody::upcast(obj);
+        // btRigidBody* body = btRigidBody::upcast(obj);
         physicsContext.mupWorld->removeCollisionObject(obj);
     }
     return 0;

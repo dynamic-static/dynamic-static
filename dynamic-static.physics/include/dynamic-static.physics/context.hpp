@@ -49,6 +49,7 @@ public:
             pContext->mupSolver.get(),
             pContext->mupCollisionConfiguration.get()
         );
+        pContext->mupWorld->setGravity(btVector3(0, -9.8f, 0));
     }
 
     inline void reset()

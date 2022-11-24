@@ -13,8 +13,9 @@ dst_add_static_library(
         "${includeDirectory}"
     includeFiles
         "${includePath}/defines.hpp"
+        "${includePath}/primitives.hpp"
     sourceFiles
-        "${sourcePath}/placeholder.cpp"
+        "${sourcePath}/primitives.cpp"
 )
 
 ################################################################################
