@@ -26,8 +26,47 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.physics/defines.hpp"
 
-namespace dst {
-namespace phys {
+#include <cassert>
+#include <memory>
 
-} // namespace phys
+namespace dst {
+namespace physics {
+
+class Context final
+{
+public:
+    inline static void create(Context* pContext)
+    {
+        assert(pContext);
+        pContext->reset();
+        pContext->mupCollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
+        pContext->mupDispatcher = std::make_unique<btCollisionDispatcher>(pContext->mupCollisionConfiguration.get());
+        pContext->mupBroadPhaseInterface = std::make_unique<btDbvtBroadphase>();
+        pContext->mupSolver = std::make_unique<btSequentialImpulseConstraintSolver>();
+        pContext->mupWorld = std::make_unique<btDiscreteDynamicsWorld>(
+            pContext->mupDispatcher.get(),
+            pContext->mupBroadPhaseInterface.get(),
+            pContext->mupSolver.get(),
+            pContext->mupCollisionConfiguration.get()
+        );
+    }
+
+    inline void reset()
+    {
+        mupWorld.reset();
+        mupSolver.reset();
+        mupBroadPhaseInterface.reset();
+        mupDispatcher.reset();
+        mupCollisionConfiguration.reset();
+    }
+
+public:
+    std::unique_ptr<btCollisionConfiguration> mupCollisionConfiguration;
+    std::unique_ptr<btCollisionDispatcher> mupDispatcher;
+    std::unique_ptr<btBroadphaseInterface> mupBroadPhaseInterface;
+    std::unique_ptr<btSequentialImpulseConstraintSolver> mupSolver;
+    std::unique_ptr<btDiscreteDynamicsWorld> mupWorld;
+};
+
+} // namespace physics
 } // namespace dst

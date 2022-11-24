@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.sample-utilities.hpp"
 
+#include "dynamic-static.physics/context.hpp"
+
 #include <functional>
 #include <iostream>
 #include <map>
@@ -249,96 +251,33 @@ struct CameraUniforms
     glm::vec3 position { };
 };
 
+class Object final
+{
+public:
+    void update_uniform_buffer(const VmaAllocator& vmaAllocator)
+    {
+        btTransform btTransform { };
+        upRigidBody->getMotionState()->getWorldTransform(btTransform);
+        ObjectUniforms boxUbo { };
+        btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
+        VmaAllocationInfo allocationInfo { };
+        vmaGetAllocationInfo(vmaAllocator, uniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        assert(allocationInfo.pMappedData);
+        memcpy(allocationInfo.pMappedData, &boxUbo, sizeof(ObjectUniforms));
+    }
+
+    gvk::Mesh mesh;
+    gvk::Buffer uniformBuffer;
+    gvk::DescriptorSet descriptorSet;
+    std::unique_ptr<btMotionState> upMotionState;
+    std::unique_ptr<btRigidBody> upRigidBody;
+    std::unique_ptr<btCollisionShape> upCollisionShape;
+};
+
 int main(int, const char* [])
 {
-    ///collision configuration contains default setup for memory, collision setup. Advanced users can create their own configuration.
-    btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
-
-    ///use the default collision dispatcher. For parallel processing you can use a diffent dispatcher (see Extras/BulletMultiThreaded)
-    btCollisionDispatcher* dispatcher = new btCollisionDispatcher(collisionConfiguration);
-
-    ///btDbvtBroadphase is a good general purpose broadphase. You can also try out btAxis3Sweep.
-    btBroadphaseInterface* overlappingPairCache = new btDbvtBroadphase();
-
-    ///the default constraint solver. For parallel processing you can use a different solver (see Extras/BulletMultiThreaded)
-    btSequentialImpulseConstraintSolver* solver = new btSequentialImpulseConstraintSolver;
-
-    btDiscreteDynamicsWorld* dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-
-    dynamicsWorld->setGravity(btVector3(0, -9.80665f, 0));
-
-    ///-----initialization_end-----
-
-    //keep track of the shapes, we release memory at exit.
-    //make sure to re-use collision shapes among rigid bodies whenever possible!
-    btAlignedObjectArray<btCollisionShape*> collisionShapes;
-
-    ///create a few basic rigid bodies
-
-    btRigidBody* pBoxRigidBody = nullptr;
-    btRigidBody* pGroundRigidBody = nullptr;
-
-    //the ground is a cube of side 100 at position y = -56.
-    //the sphere will hit it at y = -6, with center at -5
-    {
-        btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(50.), btScalar(50.)));
-
-        collisionShapes.push_back(groundShape);
-
-        btTransform groundTransform;
-        groundTransform.setIdentity();
-        groundTransform.setOrigin(btVector3(0, -56, 0));
-
-        btScalar mass(0.);
-
-        //rigidbody is dynamic if and only if mass is non zero, otherwise static
-        bool isDynamic = (mass != 0.f);
-
-        btVector3 localInertia(0, 0, 0);
-        if (isDynamic)
-            groundShape->calculateLocalInertia(mass, localInertia);
-
-        //using motionstate is optional, it provides interpolation capabilities, and only synchronizes 'active' objects
-        btDefaultMotionState* myMotionState = new btDefaultMotionState(groundTransform);
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, groundShape, localInertia);
-        btRigidBody* body = new btRigidBody(rbInfo);
-
-        //add the body to the dynamics world
-        dynamicsWorld->addRigidBody(body);
-        pGroundRigidBody = body;
-    }
-
-    {
-        //create a dynamic rigidbody
-
-        btCollisionShape* colShape = new btBoxShape(btVector3(1, 1, 1));
-        // btCollisionShape* colShape = new btSphereShape(btScalar(1.));
-        collisionShapes.push_back(colShape);
-
-        /// Create Dynamic Objects
-        btTransform startTransform;
-        startTransform.setIdentity();
-
-        btScalar mass(1.f);
-
-        //rigidbody is dynamic if and only if mass is non zero, otherwise static
-        bool isDynamic = (mass != 0.f);
-
-        btVector3 localInertia(0, 0, 0);
-        if (isDynamic)
-            colShape->calculateLocalInertia(mass, localInertia);
-
-        // startTransform.setOrigin(btVector3(2, 10, 0));
-        startTransform.setOrigin(btVector3(0, 0, 0));
-
-        //using motionstate is recommended, it provides interpolation capabilities, and only synchronizes 'active' objects
-        btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, colShape, localInertia);
-        btRigidBody* body = new btRigidBody(rbInfo);
-
-        dynamicsWorld->addRigidBody(body);
-        pBoxRigidBody = body;
-    }
+    dst::physics::Context physicsContext;
+    dst::physics::Context::create(&physicsContext);
 
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - block-blaster", &gfxContext);
@@ -346,33 +285,59 @@ int main(int, const char* [])
 
     gvk::Pipeline pipeline;
 
-    gvk::Mesh sphereMesh;
-    gvk::Buffer sphereUniformBuffer;
-    gvk::DescriptorSet sphereDescriptorSet;
+    Object sphere;
+    {
+        btScalar mass = 1;
+        btVector3 inertia(0, 0, 0);
+        btTransform transform { };
+        transform.setIdentity();
+        transform.setOrigin(btVector3(2, 10, 0));
 
-    gvk::Mesh groundMesh;
-    gvk::Buffer groundUniformBuffer;
-    gvk::DescriptorSet groundDescriptorSet;
+        sphere.upCollisionShape = std::make_unique<btSphereShape>((btScalar)1);
+        sphere.upCollisionShape->calculateLocalInertia(mass, inertia);
+        sphere.upMotionState = std::make_unique<btDefaultMotionState>(transform);
+        sphere.upRigidBody = std::make_unique<btRigidBody>(
+            btRigidBody::btRigidBodyConstructionInfo(
+                mass, sphere.upMotionState.get(), sphere.upCollisionShape.get(), inertia
+            )
+        );
+        physicsContext.mupWorld->addRigidBody(sphere.upRigidBody.get());
+    }
+
+    Object ground;
+    {
+        btScalar mass = 0;
+        btVector3 inertia(0, 0, 0);
+        btVector3 origin(0, -56, 0);
+        btTransform transform { };
+        transform.setIdentity();
+        transform.setOrigin(origin);
+
+        ground.upCollisionShape = std::make_unique<btBoxShape>(btVector3((btScalar)50, (btScalar)50, (btScalar)50));
+        // Skip calculateLocalInertia() to make this rigid body static
+        ground.upMotionState = std::make_unique<btDefaultMotionState>(transform);
+        ground.upRigidBody = std::make_unique<btRigidBody>(
+            btRigidBody::btRigidBodyConstructionInfo(
+                mass, ground.upMotionState.get(), ground.upCollisionShape.get(), inertia
+            )
+        );
+        physicsContext.mupWorld->addRigidBody(ground.upRigidBody.get());
+    }
 
     gvk::math::Camera camera;
     gvk::Buffer cameraUniformBuffer;
     gvk::DescriptorSet cameraDescriptorSet;
     gvk::math::FreeCameraController cameraController;
     cameraController.set_camera(&camera);
-    // camera.transform.translation.z = -32;
-    camera.transform.translation.z = -2.5f;
-
-    // camera.transform.translation.x = 0;
-    // camera.transform.translation.y = -3;
-    // camera.transform.translation.z = -8;
+    camera.transform.translation.z = -32;
 
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
     {
-        gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::White, &sphereMesh));
+        gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::DodgerBlue, &sphere.mesh));
         // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
-        gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &groundMesh));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &sphereUniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &groundUniformBuffer));
+        gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &ground.mesh));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &sphere.uniformBuffer));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &ground.uniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
         gvk::spirv::ShaderInfo vertexShaderInfo {
             .language = gvk::spirv::ShadingLanguage::Glsl,
@@ -443,8 +408,7 @@ int main(int, const char* [])
                     vec3 viewDirection = normalize(fsCameraPosition - fsPosition);
                     vec3 reflectionDirection = reflect(-lightDirection, normal);
                     vec3 specular = vec3(0.3) * pow(max(0, dot(viewDirection, reflectionDirection)), 8);
-                    // fragColor = vec4(ambient + diffuse + specular, 1);
-                    fragColor = vec4(1, 1, 1, 1);
+                    fragColor = vec4(ambient + diffuse + specular, 1);
                 }
             )"
         };
@@ -452,7 +416,7 @@ int main(int, const char* [])
         gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionNormalColor>(
             gfxContext.get_wsi_manager().get_render_pass(),
             VK_CULL_MODE_BACK_BIT,
-            VK_POLYGON_MODE_LINE,
+            VK_POLYGON_MODE_FILL,
             vertexShaderInfo,
             fragmentShaderInfo,
             &pipeline
@@ -462,15 +426,15 @@ int main(int, const char* [])
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
         cameraDescriptorSet = descriptorSets[0];
-        sphereDescriptorSet = descriptorSets[1];
+        sphere.descriptorSet = descriptorSets[1];
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
-        groundDescriptorSet = descriptorSets[1];
+        ground.descriptorSet = descriptorSets[1];
 
         auto sphereUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        sphereUniformBufferDescriptorInfo.buffer = sphereUniformBuffer;
+        sphereUniformBufferDescriptorInfo.buffer = sphere.uniformBuffer;
         auto groundUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        groundUniformBufferDescriptorInfo.buffer = groundUniformBuffer;
+        groundUniformBufferDescriptorInfo.buffer = ground.uniformBuffer;
         auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
         cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
 
@@ -478,7 +442,7 @@ int main(int, const char* [])
         std::array<VkWriteDescriptorSet, 3> writeDescriptorSets {
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = sphereDescriptorSet,
+                .dstSet = sphere.descriptorSet,
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -486,7 +450,7 @@ int main(int, const char* [])
             },
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = groundDescriptorSet,
+                .dstSet = ground.descriptorSet,
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -533,30 +497,18 @@ int main(int, const char* [])
         }
         cameraController.update(cameraControllerUpdateInfo);
 
-        // dynamicsWorld->stepSimulation(deltaTime, 10);
+        physicsContext.mupWorld->stepSimulation(deltaTime, 10);
 
-        VmaAllocationInfo allocationInfo { };
-
-        btTransform btTransform;
-        pBoxRigidBody->getMotionState()->getWorldTransform(btTransform);
-        ObjectUniforms boxUbo { };
-        btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), sphereUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-        assert(allocationInfo.pMappedData);
-        memcpy(allocationInfo.pMappedData, &boxUbo, sizeof(ObjectUniforms));
-
-        pGroundRigidBody->getMotionState()->getWorldTransform(btTransform);
-        ObjectUniforms groundUbo { };
-        btTransform.getOpenGLMatrix(&groundUbo.world[0][0]);
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), groundUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-        assert(allocationInfo.pMappedData);
-        memcpy(allocationInfo.pMappedData, &groundUbo, sizeof(ObjectUniforms));
+        auto vmaAllocator = gfxContext.get_devices()[0].get<VmaAllocator>();
+        sphere.update_uniform_buffer(vmaAllocator);
+        ground.update_uniform_buffer(vmaAllocator);
 
         CameraUniforms cameraUbo { };
         cameraUbo.view = camera.view();
         cameraUbo.projection = camera.projection();
         cameraUbo.position = camera.transform.translation;
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        VmaAllocationInfo allocationInfo { };
+        vmaGetAllocationInfo(vmaAllocator, cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
@@ -581,10 +533,10 @@ int main(int, const char* [])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
-                    // vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)groundDescriptorSet, 0, nullptr);
-                    // groundMesh.record_cmds(commandBuffer);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)sphereDescriptorSet, 0, nullptr);
-                    sphereMesh.record_cmds(commandBuffer);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)ground.descriptorSet, 0, nullptr);
+                    ground.mesh.record_cmds(commandBuffer);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)sphere.descriptorSet, 0, nullptr);
+                    sphere.mesh.record_cmds(commandBuffer);
                 }
                 vkCmdEndRenderPass(commandBuffer);
 
@@ -599,39 +551,10 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
 
     //remove the rigidbodies from the dynamics world and delete them
-    for (int i = dynamicsWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
-        btCollisionObject* obj = dynamicsWorld->getCollisionObjectArray()[i];
+    for (int i = physicsContext.mupWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
+        btCollisionObject* obj = physicsContext.mupWorld->getCollisionObjectArray()[i];
         btRigidBody* body = btRigidBody::upcast(obj);
-        if (body && body->getMotionState()) {
-            delete body->getMotionState();
-        }
-        dynamicsWorld->removeCollisionObject(obj);
-        delete obj;
+        physicsContext.mupWorld->removeCollisionObject(obj);
     }
-
-    //delete collision shapes
-    for (int j = 0; j < collisionShapes.size(); j++) {
-        btCollisionShape* shape = collisionShapes[j];
-        collisionShapes[j] = 0;
-        delete shape;
-    }
-
-    //delete dynamics world
-    delete dynamicsWorld;
-
-    //delete solver
-    delete solver;
-
-    //delete broadphase
-    delete overlappingPairCache;
-
-    //delete dispatcher
-    delete dispatcher;
-
-    delete collisionConfiguration;
-
-    //next line is optional: it will be cleared by the destructor when the array goes out of scope
-    collisionShapes.clear();
-
     return 0;
 }
