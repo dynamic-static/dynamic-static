@@ -287,15 +287,11 @@ int main(int, const char* [])
     dst::physics::Context physicsContext;
     dst::physics::Context::create(&physicsContext);
 
-    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth));
-    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth));
-    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth));
-    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth));
+    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
+    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
+    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
+    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
     btSphereShape ballCollisionShape(BallRadius);
-
-    btBoxShape groundCollisionShape(btVector3(50, 50, 50));
-
-
 
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Block Blaster", &gfxContext);
@@ -310,14 +306,7 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialPosition.setValue(0, 12, 0);
         rigidBodyCreateInfo.pCollisionShape = &ballCollisionShape;
         RigidBody::create(physicsContext, &rigidBodyCreateInfo, &sphere.rigidBody);
-    }
-
-    Object ground;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialPosition.setValue(0, -56, 0);
-        rigidBodyCreateInfo.pCollisionShape = &groundCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ground.rigidBody);
+        sphere.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
     }
 
     Object ceiling;
@@ -387,10 +376,7 @@ int main(int, const char* [])
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &rightWall.uniformBuffer));
 
         gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::DodgerBlue, &sphere.mesh));
-        // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
-        gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &ground.mesh));
         gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &sphere.uniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &ground.uniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
         gvk::spirv::ShaderInfo vertexShaderInfo {
             .language = gvk::spirv::ShadingLanguage::Glsl,
@@ -516,19 +502,14 @@ fragColor = fsColor;
         sphere.descriptorSet = descriptorSets[1];
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
-        ground.descriptorSet = descriptorSets[1];
 
-        auto sphereUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        sphereUniformBufferDescriptorInfo.buffer = sphere.uniformBuffer;
-        auto groundUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        groundUniformBufferDescriptorInfo.buffer = ground.uniformBuffer;
         auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
         cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
 
         sphere.update_descriptor_set(gfxContext.get_devices()[0]);
 
         // Write the descriptors...
-        std::array<VkWriteDescriptorSet, 2> writeDescriptorSets {
+        std::array<VkWriteDescriptorSet, 1> writeDescriptorSets {
 #if 0
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
@@ -539,14 +520,6 @@ fragColor = fsColor;
                 .pBufferInfo = &sphereUniformBufferDescriptorInfo,
             },
 #endif
-            VkWriteDescriptorSet {
-                .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = ground.descriptorSet,
-                .dstBinding = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &groundUniformBufferDescriptorInfo,
-            },
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
                 .dstSet = cameraDescriptorSet,
@@ -591,7 +564,6 @@ fragColor = fsColor;
         physicsContext.mupWorld->stepSimulation(deltaTime, 10);
 
         sphere.update_uniform_buffer(gfxContext.get_devices()[0]);
-        ground.update_uniform_buffer(gfxContext.get_devices()[0]);
 
         paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
         ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
@@ -629,10 +601,8 @@ fragColor = fsColor;
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)ground.descriptorSet, 0, nullptr);
-                    ground.mesh.record_cmds(commandBuffer);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)sphere.descriptorSet, 0, nullptr);
-                    sphere.mesh.record_cmds(commandBuffer);
+
+                    sphere.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
 
                     paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
