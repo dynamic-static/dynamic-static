@@ -197,21 +197,17 @@ public:
         assert(pCreateInfo);
         assert(pCreateInfo->pCollisionShape);
         assert(pRigidBody);
-
         btTransform transform { };
         transform.setIdentity();
         transform.setOrigin(pCreateInfo->initialPosition);
         pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>(transform);
-
         btVector3 inertia { };
         if (pCreateInfo->mass) {
             pCreateInfo->pCollisionShape->calculateLocalInertia(pCreateInfo->mass, inertia);
         }
-
         pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(
             btRigidBody::btRigidBodyConstructionInfo(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, inertia)
         );
-
         physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
     }
 
@@ -222,7 +218,6 @@ public:
         return btTransform;
     }
 
-private:
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
 };
@@ -230,16 +225,34 @@ private:
 class Object final
 {
 public:
-    void update_uniform_buffer(const VmaAllocator& vmaAllocator)
+    void update_descriptor_set(const gvk::Device& device)
+    {
+        auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+        descriptorBufferInfo.buffer = uniformBuffer;
+        auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+        writeDescriptorSet.descriptorCount = 1;
+        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescriptorSet.dstSet = descriptorSet;
+        writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+        vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+    }
+
+    void update_uniform_buffer(const gvk::Device& device)
     {
         btTransform btTransform { };
         btTransform = rigidBody.get_bt_transform();
         ObjectUniforms boxUbo { };
         btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
         VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(vmaAllocator, uniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        vmaGetAllocationInfo(device.get<VmaAllocator>(), uniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &boxUbo, sizeof(ObjectUniforms));
+    }
+
+    void record_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout)
+    {
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &(const VkDescriptorSet&)descriptorSet, 0, nullptr);
+        mesh.record_cmds(commandBuffer);
     }
 
     gvk::Mesh mesh;
@@ -250,12 +263,12 @@ public:
 
 int main(int, const char* [])
 {
-    const float CeilingWidth = 1;
+    const float CeilingWidth = 32;
     const float CeilingHeight = 1;
     const float CeilingDepth = 1;
 
     const float WallWidth = 1;
-    const float WallHeight = 1;
+    const float WallHeight = 64;
     const float WallDepth = 1;
 
     const float BrickWidth = 1;
@@ -263,7 +276,7 @@ int main(int, const char* [])
     const float BrickDepth = 1;
     const uint32_t BrickCount = 4;
 
-    const float PaddleWidth = 1;
+    const float PaddleWidth = 4;
     const float PaddleHeight = 1;
     const float PaddleDepth = 1;
 
@@ -294,7 +307,7 @@ int main(int, const char* [])
     {
         RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.mass = 1;
-        rigidBodyCreateInfo.initialPosition.setValue(2, 10, 0);
+        rigidBodyCreateInfo.initialPosition.setValue(0, 12, 0);
         rigidBodyCreateInfo.pCollisionShape = &ballCollisionShape;
         RigidBody::create(physicsContext, &rigidBodyCreateInfo, &sphere.rigidBody);
     }
@@ -307,27 +320,71 @@ int main(int, const char* [])
         RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ground.rigidBody);
     }
 
+    Object ceiling;
+    {
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialPosition.setValue(0, 32, 0);
+        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ceiling.rigidBody);
+    }
+
+    Object leftWall;
+    {
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialPosition.setValue(16, 0, 0);
+        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &leftWall.rigidBody);
+    }
+
+    Object rightWall;
+    {
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialPosition.setValue(-16, 0, 0);
+        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &rightWall.rigidBody);
+    }
+
+    Object paddle;
+    {
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialPosition.setValue(0, -32, 0);
+        rigidBodyCreateInfo.pCollisionShape = &paddleCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &paddle.rigidBody);
+    }
+
     gvk::math::Camera camera;
     gvk::Buffer cameraUniformBuffer;
     gvk::DescriptorSet cameraDescriptorSet;
     gvk::math::FreeCameraController cameraController;
     cameraController.set_camera(&camera);
-    camera.transform.translation.z = -32;
+    camera.transform.translation.z = -64;
 
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
-    {
-        gvk::Mesh ceilingMesh;
-        gvk::Mesh wallMesh;
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+
+        // TODO : Documentation
+        gvk_result(create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, gvk::math::Color::Purple, &paddle.mesh));
+        gvk_result(create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, gvk::math::Color::AntiqueWhite, &ceiling.mesh));
+        gvk_result(create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, gvk::math::Color::AntiqueWhite, &leftWall.mesh));
+        rightWall.mesh = leftWall.mesh;
+
+        // TODO : Documentation
         gvk::Mesh ballMesh;
-        gvk::Mesh brickMesh;
-        gvk::Mesh paddleMesh;
-        gvk_result(create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, gvk::math::Color::AntiqueWhite, &ceilingMesh));
-        gvk_result(create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, gvk::math::Color::AntiqueWhite, &wallMesh));
         gvk_result(create_icosphere_mesh(gfxContext, BallRadius, 3, gvk::math::Color::DodgerBlue, &ballMesh));
-        gvk_result(create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, gvk::math::Color::AntiqueWhite, &brickMesh));
-        gvk_result(create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, gvk::math::Color::AntiqueWhite, &paddleMesh));
+        for (uint32_t i = 0; i < BallCount; ++i) {
+            (void)i;
+        }
 
+        // TODO : Documentation
+        gvk::Mesh brickMesh;
+        gvk_result(create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, gvk::math::Color::OrangeRed, &brickMesh));
+        for (uint32_t i = 0; i < BrickCount; ++i) {
+            (void)i;
+        }
 
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &paddle.uniformBuffer));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &ceiling.uniformBuffer));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &leftWall.uniformBuffer));
+        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &rightWall.uniformBuffer));
 
         gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::DodgerBlue, &sphere.mesh));
         // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
@@ -419,10 +476,43 @@ fragColor = fsColor;
             &pipeline
         ));
 
+        auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
+        descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera
+        auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+        descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
+        descriptorPoolCreateInfo.poolSizeCount = 1;
+        descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+        gvk::DescriptorPool descriptorPool;
+        gvk_result(gvk::DescriptorPool::create(gfxContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+
+        const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
+        assert(descriptorSetLayouts.size() == 2);
+        const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
+        const auto& objectDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[1];
+        auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = 1;
+        descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
+        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet));
+        descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
+        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &paddle.descriptorSet));
+        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &ceiling.descriptorSet));
+        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &leftWall.descriptorSet));
+        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &rightWall.descriptorSet));
+
+        paddle.update_descriptor_set(gfxContext.get_devices()[0]);
+        ceiling.update_descriptor_set(gfxContext.get_devices()[0]);
+        leftWall.update_descriptor_set(gfxContext.get_devices()[0]);
+        rightWall.update_descriptor_set(gfxContext.get_devices()[0]);
+        
+
+
         std::vector<gvk::DescriptorSet> descriptorSets;
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
-        cameraDescriptorSet = descriptorSets[0];
+        // cameraDescriptorSet = descriptorSets[0];
         sphere.descriptorSet = descriptorSets[1];
         gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
         assert(descriptorSets.size() == 2);
@@ -435,8 +525,11 @@ fragColor = fsColor;
         auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
         cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
 
+        sphere.update_descriptor_set(gfxContext.get_devices()[0]);
+
         // Write the descriptors...
-        std::array<VkWriteDescriptorSet, 3> writeDescriptorSets {
+        std::array<VkWriteDescriptorSet, 2> writeDescriptorSets {
+#if 0
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
                 .dstSet = sphere.descriptorSet,
@@ -445,6 +538,7 @@ fragColor = fsColor;
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .pBufferInfo = &sphereUniformBufferDescriptorInfo,
             },
+#endif
             VkWriteDescriptorSet {
                 .sType = gvk::get_stype<VkWriteDescriptorSet>(),
                 .dstSet = ground.descriptorSet,
@@ -496,16 +590,21 @@ fragColor = fsColor;
 
         physicsContext.mupWorld->stepSimulation(deltaTime, 10);
 
-        auto vmaAllocator = gfxContext.get_devices()[0].get<VmaAllocator>();
-        sphere.update_uniform_buffer(vmaAllocator);
-        ground.update_uniform_buffer(vmaAllocator);
+        sphere.update_uniform_buffer(gfxContext.get_devices()[0]);
+        ground.update_uniform_buffer(gfxContext.get_devices()[0]);
+
+        paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
+        ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
+        leftWall.update_uniform_buffer(gfxContext.get_devices()[0]);
+        rightWall.update_uniform_buffer(gfxContext.get_devices()[0]);
+        
 
         CameraUniforms cameraUbo { };
         cameraUbo.view = camera.view();
         cameraUbo.projection = camera.projection();
         cameraUbo.position = camera.transform.translation;
         VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(vmaAllocator, cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
@@ -534,6 +633,11 @@ fragColor = fsColor;
                     ground.mesh.record_cmds(commandBuffer);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)sphere.descriptorSet, 0, nullptr);
                     sphere.mesh.record_cmds(commandBuffer);
+
+                    paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                 }
                 vkCmdEndRenderPass(commandBuffer);
 

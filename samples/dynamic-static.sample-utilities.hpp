@@ -61,6 +61,7 @@ public:
         auto applicationInfo = gvk::get_default<VkApplicationInfo>();
         applicationInfo.pApplicationName = pApplicationName;
         auto sysSurfaceCreateInfo = gvk::get_default<gvk::sys::Surface::CreateInfo>();
+        sysSurfaceCreateInfo.extent = { 1920, 1080 };
         auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
         debugUtilsMessengerCreateInfo.messageSeverity =
             // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -288,7 +289,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
                 descriptorPoolSizes.push_back({
                     .type = descriptorSetLayoutBinding.descriptorType,
                     .descriptorCount = descriptorSetLayoutBinding.descriptorCount
-                    });
+                });
             }
         }
 
