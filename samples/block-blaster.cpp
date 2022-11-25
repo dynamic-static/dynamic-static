@@ -233,11 +233,7 @@ public:
     void update_uniform_buffer(const VmaAllocator& vmaAllocator)
     {
         btTransform btTransform { };
-#if 0
-        upRigidBody->getMotionState()->getWorldTransform(btTransform);
-#else
         btTransform = rigidBody.get_bt_transform();
-#endif
         ObjectUniforms boxUbo { };
         btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
         VmaAllocationInfo allocationInfo { };
@@ -249,13 +245,7 @@ public:
     gvk::Mesh mesh;
     gvk::Buffer uniformBuffer;
     gvk::DescriptorSet descriptorSet;
-#if 0
-    std::unique_ptr<btMotionState> upMotionState;
-    std::unique_ptr<btRigidBody> upRigidBody;
-    std::unique_ptr<btCollisionShape> upCollisionShape;
-#else
     RigidBody rigidBody;
-#endif
 };
 
 int main(int, const char* [])
@@ -302,56 +292,19 @@ int main(int, const char* [])
 
     Object sphere;
     {
-#if 0
-        btScalar mass = 1;
-        btVector3 inertia(0, 0, 0);
-        btTransform transform { };
-        transform.setIdentity();
-        transform.setOrigin(btVector3(2, 10, 0));
-
-        sphere.upCollisionShape = std::make_unique<btSphereShape>((btScalar)1);
-        sphere.upCollisionShape->calculateLocalInertia(mass, inertia);
-        sphere.upMotionState = std::make_unique<btDefaultMotionState>(transform);
-        sphere.upRigidBody = std::make_unique<btRigidBody>(
-            btRigidBody::btRigidBodyConstructionInfo(
-                mass, sphere.upMotionState.get(), sphere.upCollisionShape.get(), inertia
-            )
-        );
-        physicsContext.mupWorld->addRigidBody(sphere.upRigidBody.get());
-#else
         RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.mass = 1;
         rigidBodyCreateInfo.initialPosition.setValue(2, 10, 0);
         rigidBodyCreateInfo.pCollisionShape = &ballCollisionShape;
         RigidBody::create(physicsContext, &rigidBodyCreateInfo, &sphere.rigidBody);
-#endif
     }
 
     Object ground;
     {
-#if 0
-        btScalar mass = 0;
-        btVector3 inertia(0, 0, 0);
-        btVector3 origin(0, -56, 0);
-        btTransform transform { };
-        transform.setIdentity();
-        transform.setOrigin(origin);
-
-        ground.upCollisionShape = std::make_unique<btBoxShape>(btVector3((btScalar)50, (btScalar)50, (btScalar)50));
-        // Skip calculateLocalInertia() to make this rigid body static
-        ground.upMotionState = std::make_unique<btDefaultMotionState>(transform);
-        ground.upRigidBody = std::make_unique<btRigidBody>(
-            btRigidBody::btRigidBodyConstructionInfo(
-                mass, ground.upMotionState.get(), ground.upCollisionShape.get(), inertia
-            )
-        );
-        physicsContext.mupWorld->addRigidBody(ground.upRigidBody.get());
-#else
         RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.initialPosition.setValue(0, -56, 0);
         rigidBodyCreateInfo.pCollisionShape = &groundCollisionShape;
         RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ground.rigidBody);
-#endif
     }
 
     gvk::math::Camera camera;
