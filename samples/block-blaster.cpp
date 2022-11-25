@@ -182,13 +182,62 @@ struct CameraUniforms
     glm::vec3 position { };
 };
 
+class RigidBody final
+{
+public:
+    struct CreateInfo
+    {
+        float mass { };
+        btVector3 initialPosition { };
+        btCollisionShape* pCollisionShape { nullptr };
+    };
+
+    static void create(dst::physics::Context& physicsContext, const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
+    {
+        assert(pCreateInfo);
+        assert(pCreateInfo->pCollisionShape);
+        assert(pRigidBody);
+
+        btTransform transform { };
+        transform.setIdentity();
+        transform.setOrigin(pCreateInfo->initialPosition);
+        pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>(transform);
+
+        btVector3 inertia { };
+        if (pCreateInfo->mass) {
+            pCreateInfo->pCollisionShape->calculateLocalInertia(pCreateInfo->mass, inertia);
+        }
+
+        pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(
+            btRigidBody::btRigidBodyConstructionInfo(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, inertia)
+        );
+
+        physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
+    }
+
+    btTransform get_bt_transform() const
+    {
+        btTransform btTransform { };
+        mupMotionState->getWorldTransform(btTransform);
+        return btTransform;
+    }
+
+private:
+    std::unique_ptr<btMotionState> mupMotionState;
+    std::unique_ptr<btRigidBody> mupRigidBody;
+};
+
 class Object final
 {
 public:
     void update_uniform_buffer(const VmaAllocator& vmaAllocator)
     {
         btTransform btTransform { };
+#if 0
         upRigidBody->getMotionState()->getWorldTransform(btTransform);
+#else
+        btTransform = rigidBody.get_bt_transform();
+#endif
         ObjectUniforms boxUbo { };
         btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
         VmaAllocationInfo allocationInfo { };
@@ -200,24 +249,60 @@ public:
     gvk::Mesh mesh;
     gvk::Buffer uniformBuffer;
     gvk::DescriptorSet descriptorSet;
+#if 0
     std::unique_ptr<btMotionState> upMotionState;
     std::unique_ptr<btRigidBody> upRigidBody;
     std::unique_ptr<btCollisionShape> upCollisionShape;
+#else
+    RigidBody rigidBody;
+#endif
 };
 
 int main(int, const char* [])
 {
+    const float CeilingWidth = 1;
+    const float CeilingHeight = 1;
+    const float CeilingDepth = 1;
+
+    const float WallWidth = 1;
+    const float WallHeight = 1;
+    const float WallDepth = 1;
+
+    const float BrickWidth = 1;
+    const float BrickHeight = 1;
+    const float BrickDepth = 1;
+    const uint32_t BrickCount = 4;
+
+    const float PaddleWidth = 1;
+    const float PaddleHeight = 1;
+    const float PaddleDepth = 1;
+
+    const float BallRadius = 1;
+    const float BallMass = 1;
+    const uint32_t BallCount = 3;
+
     dst::physics::Context physicsContext;
     dst::physics::Context::create(&physicsContext);
 
+    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth));
+    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth));
+    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth));
+    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth));
+    btSphereShape ballCollisionShape(BallRadius);
+
+    btBoxShape groundCollisionShape(btVector3(50, 50, 50));
+
+
+
     GfxContext gfxContext;
-    auto vkResult = GfxContext::create("dynamic-static - block-blaster", &gfxContext);
+    auto vkResult = GfxContext::create("dynamic-static - Block Blaster", &gfxContext);
     assert(vkResult == VK_SUCCESS);
 
     gvk::Pipeline pipeline;
 
     Object sphere;
     {
+#if 0
         btScalar mass = 1;
         btVector3 inertia(0, 0, 0);
         btTransform transform { };
@@ -233,10 +318,18 @@ int main(int, const char* [])
             )
         );
         physicsContext.mupWorld->addRigidBody(sphere.upRigidBody.get());
+#else
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.mass = 1;
+        rigidBodyCreateInfo.initialPosition.setValue(2, 10, 0);
+        rigidBodyCreateInfo.pCollisionShape = &ballCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &sphere.rigidBody);
+#endif
     }
 
     Object ground;
     {
+#if 0
         btScalar mass = 0;
         btVector3 inertia(0, 0, 0);
         btVector3 origin(0, -56, 0);
@@ -253,6 +346,12 @@ int main(int, const char* [])
             )
         );
         physicsContext.mupWorld->addRigidBody(ground.upRigidBody.get());
+#else
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialPosition.setValue(0, -56, 0);
+        rigidBodyCreateInfo.pCollisionShape = &groundCollisionShape;
+        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ground.rigidBody);
+#endif
     }
 
     gvk::math::Camera camera;
@@ -264,6 +363,19 @@ int main(int, const char* [])
 
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
     {
+        gvk::Mesh ceilingMesh;
+        gvk::Mesh wallMesh;
+        gvk::Mesh ballMesh;
+        gvk::Mesh brickMesh;
+        gvk::Mesh paddleMesh;
+        gvk_result(create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, gvk::math::Color::AntiqueWhite, &ceilingMesh));
+        gvk_result(create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, gvk::math::Color::AntiqueWhite, &wallMesh));
+        gvk_result(create_icosphere_mesh(gfxContext, BallRadius, 3, gvk::math::Color::DodgerBlue, &ballMesh));
+        gvk_result(create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, gvk::math::Color::AntiqueWhite, &brickMesh));
+        gvk_result(create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, gvk::math::Color::AntiqueWhite, &paddleMesh));
+
+
+
         gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::DodgerBlue, &sphere.mesh));
         // gvk_result(create_box_mesh(gfxContext, { 2, 2, 2 }, gvk::math::Color::OrangeRed, &boxMesh));
         gvk_result(create_box_mesh(gfxContext, { 100, 100, 100 }, gvk::math::Color::AntiqueWhite, &ground.mesh));
