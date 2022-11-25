@@ -73,7 +73,7 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
                     if (itr == edges.end()) {
                         auto v0 = vertices[edge[0]].position;
                         auto v1 = vertices[edge[1]].position;
-                        auto vertex = glm::normalize((v0 + v1) * 0.5f);
+                        auto vertex = glm::normalize(v0 + v1);
                         auto index = createVertex(vertex);
                         itr = edges.insert(itr, { edge, index });
                     }
