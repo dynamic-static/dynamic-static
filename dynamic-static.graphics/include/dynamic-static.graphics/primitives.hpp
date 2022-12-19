@@ -133,6 +133,56 @@ struct Icosahedron
     };
 };
 
+struct Cube
+{
+    static constexpr std::array<glm::vec3, 24> Vertices {
+        // Top
+        glm::vec3 { -0.5f,  0.5f, -0.5f },
+        glm::vec3 {  0.5f,  0.5f, -0.5f },
+        glm::vec3 {  0.5f,  0.5f,  0.5f },
+        glm::vec3 { -0.5f,  0.5f,  0.5f },
+        // Left
+        glm::vec3 { -0.5f,  0.5f, -0.5f },
+        glm::vec3 { -0.5f,  0.5f,  0.5f },
+        glm::vec3 { -0.5f, -0.5f,  0.5f },
+        glm::vec3 { -0.5f, -0.5f, -0.5f },
+        // Front
+        glm::vec3 { -0.5f,  0.5f,  0.5f },
+        glm::vec3 {  0.5f,  0.5f,  0.5f },
+        glm::vec3 {  0.5f, -0.5f,  0.5f },
+        glm::vec3 { -0.5f, -0.5f,  0.5f },
+        // Right
+        glm::vec3 {  0.5f,  0.5f,  0.5f },
+        glm::vec3 {  0.5f,  0.5f, -0.5f },
+        glm::vec3 {  0.5f, -0.5f, -0.5f },
+        glm::vec3 {  0.5f, -0.5f,  0.5f },
+        // Back
+        glm::vec3 {  0.5f,  0.5f, -0.5f },
+        glm::vec3 { -0.5f,  0.5f, -0.5f },
+        glm::vec3 { -0.5f, -0.5f, -0.5f },
+        glm::vec3 {  0.5f, -0.5f, -0.5f },
+        // Bottom
+        glm::vec3 { -0.5f, -0.5f,  0.5f },
+        glm::vec3 {  0.5f, -0.5f,  0.5f },
+        glm::vec3 {  0.5f, -0.5f, -0.5f },
+        glm::vec3 { -0.5f, -0.5f, -0.5f },
+    };
+    static constexpr std::array<Triangle<uint32_t>, 12> Triangles {
+        Triangle<uint32_t> {  0,  1,  2 },
+        Triangle<uint32_t> {  2,  3,  0 },
+        Triangle<uint32_t> {  4,  5,  6 },
+        Triangle<uint32_t> {  6,  7,  4 },
+        Triangle<uint32_t> {  8,  9, 10 },
+        Triangle<uint32_t> { 10, 11,  8 },
+        Triangle<uint32_t> { 12, 13, 14 },
+        Triangle<uint32_t> { 14, 15, 12 },
+        Triangle<uint32_t> { 16, 17, 18 },
+        Triangle<uint32_t> { 18, 19, 16 },
+        Triangle<uint32_t> { 20, 21, 22 },
+        Triangle<uint32_t> { 22, 23, 20 },
+    };
+};
+
 } // namespace primitive
 } // namespace gfx
 } // namespace dst

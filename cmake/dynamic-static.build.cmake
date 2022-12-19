@@ -88,7 +88,7 @@ endfunction()
 
 macro(dst_add_target_test)
     cmake_parse_arguments(args "" "target;folder" "linkLibraries;includeDirectories;includeFiles;sourceFiles;compileDefinitions" ${ARGN})
-    if(DST_TESTS_ENABLED)
+    if(DST_BUILD_TESTS)
         dst_add_executable(
             target ${args_target}.test
             folder "tests/"

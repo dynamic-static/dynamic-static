@@ -53,6 +53,12 @@ struct VertexPositionColor
     glm::vec4 color;
 };
 
+struct VertexPositionNormal
+{
+    glm::vec3 position;
+    glm::vec3 normal;
+};
+
 struct VertexPositionTexcoord
 {
     glm::vec3 position;
@@ -91,6 +97,15 @@ inline auto gvk::get_vertex_description<dst::gfx::EmptyVertex>(uint32_t binding)
 }
 
 template <>
+inline auto gvk::get_vertex_description<dst::gfx::VertexPositionNormal>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<
+        glm::vec3,
+        glm::vec3
+    >(binding);
+}
+
+template <>
 inline auto gvk::get_vertex_description<dst::gfx::VertexPositionColor>(uint32_t binding)
 {
     return gvk::get_vertex_input_attribute_descriptions<
@@ -126,4 +141,22 @@ inline auto gvk::get_vertex_description<dst::gfx::VertexPositionTexcoordColor>(u
         glm::vec2,
         glm::vec4
     >(binding);
+}
+
+template <>
+inline auto gvk::get_vertex_description<glm::vec2>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<glm::vec2>(binding);
+}
+
+template <>
+inline auto gvk::get_vertex_description<glm::vec3>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<glm::vec3>(binding);
+}
+
+template <>
+inline auto gvk::get_vertex_description<glm::vec4>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<glm::vec4>(binding);
 }

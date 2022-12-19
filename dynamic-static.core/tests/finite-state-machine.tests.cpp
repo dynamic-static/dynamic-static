@@ -24,8 +24,53 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
+#include "dynamic-static/finite-state-machine.hpp"
+
 #include "gtest/gtest.h"
 
-TEST(Placeholder, Placeholder)
+class AttractState;
+class PlayState;
+class DeathState;
+class GameOverState;
+
+class AttractState final
+    : public dst::State
 {
+public:
+
+};
+
+class PlayState final
+    : public dst::State
+{
+public:
+
+};
+
+class DeathState final
+    : public dst::State
+{
+public:
+
+};
+
+class GameOverState final
+    : public dst::State
+{
+public:
+
+};
+
+TEST(FiniteStateMachine, Placeholder)
+{
+    dst::State::Machine gameState;
+    gameState.register_state<AttractState>();
+    gameState.register_state<PlayState>();
+    gameState.register_state<DeathState>();
+    gameState.register_state<GameOverState>();
+    gameState.register_transition<AttractState, PlayState>();
+    gameState.register_transition<PlayState, DeathState>();
+    gameState.register_transition<DeathState, PlayState>();
+    gameState.register_transition<DeathState, GameOverState>();
+    gameState.register_transition<GameOverState, AttractState>();
 }

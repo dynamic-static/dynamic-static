@@ -4,9 +4,9 @@ set(CMAKE_CXX_STANDARD 20)
 project(dynamic-static)
 set(DST_IDE_FOLDER "" CACHE STRING "")
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
-    set(DST_STANDALONE TRUE)
+    set(DST_STANDALONE ON)
 else()
-    set(DST_STANDALONE FALSE)
+    set(DST_STANDALONE OFF)
 endif()
 
 ################################################################################
@@ -42,7 +42,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/dynamic-static.build.cmake")
 
 ################################################################################
 # Dependencies
-if(DST_TESTS_ENABLED)
+if(DST_BUILD_TESTS)
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/googletest.cmake")
 endif()
 if(DST_GVK_ENABLED)

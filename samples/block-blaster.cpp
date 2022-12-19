@@ -25,9 +25,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "dynamic-static.sample-utilities.hpp"
-
 #include "dynamic-static.physics/context.hpp"
 #include "dynamic-static.graphics/primitives.hpp"
+#include "dynamic-static/finite-state-machine.hpp"
 
 #include <functional>
 #include <iostream>
@@ -37,30 +37,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
-VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, const glm::vec4& color, gvk::Mesh* pMesh)
+VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
 {
-    // TODO : Documentation
-    std::vector<dst::gfx::VertexPositionNormalColor> vertices;
-    auto createVertex = [&](const glm::vec3& vertex)
-    {
-        vertices.push_back({ });
-        vertices.back().position = vertex * radius;
-        vertices.back().normal = vertex;
-        vertices.back().color = color;
-        return (uint32_t)vertices.size() - 1;
-    };
-
-    // TODO : Documentation
-    for (const auto& vertex : dst::gfx::primitive::Icosahedron::Vertices) {
-        createVertex(vertex);
-    }
-
-    // TODO : Documentation
-    const auto& icosahedronTriangles = dst::gfx::primitive::Icosahedron::Triangles;
-    std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles;
-    triangles.insert(triangles.end(), icosahedronTriangles.begin(), icosahedronTriangles.end());
-
-    // TODO : Documentation
+    std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
+    std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles(dst::gfx::primitive::Icosahedron::Triangles.begin(), dst::gfx::primitive::Icosahedron::Triangles.end());
     std::unordered_map<dst::gfx::primitive::Edge<uint32_t>, uint32_t, dst::gfx::primitive::EdgeHasher<uint32_t>> edges;
     for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
         auto triangleCount = (uint32_t)triangles.size();
@@ -71,11 +51,8 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
                 {
                     auto itr = edges.find(edge);
                     if (itr == edges.end()) {
-                        auto v0 = vertices[edge[0]].position;
-                        auto v1 = vertices[edge[1]].position;
-                        auto vertex = glm::normalize(v0 + v1);
-                        auto index = createVertex(vertex);
-                        itr = edges.insert(itr, { edge, index });
+                        vertices.push_back(glm::normalize(vertices[edge[0]] + vertices[edge[1]]) * radius);
+                        itr = edges.insert(itr, { edge, (uint32_t)vertices.size() - 1 });
                     }
                     return itr->second;
                 },
@@ -90,8 +67,6 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
             );
         }
     }
-
-    // TODO : Documentation
     return pMesh->write(
         context.get_devices()[0],
         gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
@@ -104,82 +79,36 @@ VkResult create_icosphere_mesh(const gvk::Context& context, float radius, uint32
     );
 }
 
-VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, const glm::vec4& color, gvk::Mesh* pMesh)
+VkResult create_cube_mesh(const gvk::Context& context, gvk::Mesh* pMesh)
 {
-    float w = dimensions[0] * 0.5f;
-    float h = dimensions[1] * 0.5f;
-    float d = dimensions[2] * 0.5f;
-    static const glm::vec3 UnitX { 1, 0, 0 };
-    static const glm::vec3 UnitY { 0, 1, 0 };
-    static const glm::vec3 UnitZ { 0, 0, 1 };
-    std::array<dst::gfx::VertexPositionNormalColor, 24> vertices {
-        // Top
-        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, {  UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, {  UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, {  UnitY }, { color } },
-        // Left
-        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, { -UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, { -UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, { -UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitX }, { color } },
-        // Front
-        dst::gfx::VertexPositionNormalColor { { -w,  h,  d }, {  UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, {  UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, {  UnitZ }, { color } },
-        // Right
-        dst::gfx::VertexPositionNormalColor { {  w,  h,  d }, {  UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, {  UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, {  UnitX }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, {  UnitX }, { color } },
-        // Back
-        dst::gfx::VertexPositionNormalColor { {  w,  h, -d }, { -UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w,  h, -d }, { -UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitZ }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, { -UnitZ }, { color } },
-        // Bottom
-        dst::gfx::VertexPositionNormalColor { { -w, -h,  d }, { -UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h,  d }, { -UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { {  w, -h, -d }, { -UnitY }, { color } },
-        dst::gfx::VertexPositionNormalColor { { -w, -h, -d }, { -UnitY }, { color } },
-    };
-    size_t index_i = 0;
-    size_t vertex_i = 0;
-    constexpr size_t FaceCount = 6;
-    constexpr size_t IndicesPerFace = 6;
-    std::array<uint16_t, IndicesPerFace* FaceCount> indices;
-    for (size_t face_i = 0; face_i < FaceCount; ++face_i) {
-        indices[index_i++] = (uint16_t)(vertex_i + 0);
-        indices[index_i++] = (uint16_t)(vertex_i + 1);
-        indices[index_i++] = (uint16_t)(vertex_i + 2);
-        indices[index_i++] = (uint16_t)(vertex_i + 2);
-        indices[index_i++] = (uint16_t)(vertex_i + 3);
-        indices[index_i++] = (uint16_t)(vertex_i + 0);
-        vertex_i += 4;
-    }
     return pMesh->write(
         context.get_devices()[0],
         gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
         context.get_command_buffers()[0],
         VK_NULL_HANDLE,
-        (uint32_t)vertices.size(),
-        vertices.data(),
-        (uint32_t)indices.size(),
-        indices.data()
+        (uint32_t)dst::gfx::primitive::Cube::Vertices.size(),
+        dst::gfx::primitive::Cube::Vertices.data(),
+        (uint32_t)dst::gfx::primitive::Cube::Triangles.size() * 3,
+        dst::gfx::primitive::Cube::Triangles.data()
     );
 }
 
 struct ObjectUniforms
 {
     glm::mat4 world { };
+    glm::vec3 color { };
 };
 
 struct CameraUniforms
 {
     glm::mat4 view { };
     glm::mat4 projection { };
-    glm::vec3 position { };
+};
+
+class Renderer final
+{
+public:
+
 };
 
 class RigidBody final
@@ -225,40 +154,81 @@ public:
 class Object final
 {
 public:
-    void update_descriptor_set(const gvk::Device& device)
+    void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color, const glm::vec3& scale = { 1, 1, 1 })
     {
+        mTransform.scale = scale;
+        mColor = color;
+        mMesh = mesh;
+        mDescriptorSet = descriptorSet;
+        auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(context, &mUniformBuffer);
+        assert(vkResult == VK_SUCCESS);
         auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        descriptorBufferInfo.buffer = uniformBuffer;
+        descriptorBufferInfo.buffer = mUniformBuffer;
         auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
         writeDescriptorSet.descriptorCount = 1;
         writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         writeDescriptorSet.dstSet = descriptorSet;
         writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-        vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+        vkUpdateDescriptorSets(context.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
+    }
+
+    void setup_physics_resources(dst::physics::Context& context, btCollisionShape* pBtCollisionShape, float mass, const glm::vec3& position)
+    {
+        mTransform.translation = position;;
+        RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.mass = mass;
+        rigidBodyCreateInfo.initialPosition.setValue(position.x, position.y, position.z);
+        rigidBodyCreateInfo.pCollisionShape = pBtCollisionShape;
+        RigidBody::create(context, &rigidBodyCreateInfo, &mRigidBody);
+        mRigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        mRigidBody.mupRigidBody->setActivationState(0);
     }
 
     void update_uniform_buffer(const gvk::Device& device)
     {
-        btTransform btTransform { };
-        btTransform = rigidBody.get_bt_transform();
-        ObjectUniforms boxUbo { };
-        btTransform.getOpenGLMatrix(&boxUbo.world[0][0]);
+        ObjectUniforms ubo { };
+        mRigidBody.get_bt_transform().getOpenGLMatrix(&ubo.world[0][0]);
+        ubo.color = mColor;
         VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(device.get<VmaAllocator>(), uniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        vmaGetAllocationInfo(device.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
-        memcpy(allocationInfo.pMappedData, &boxUbo, sizeof(ObjectUniforms));
+        memcpy(allocationInfo.pMappedData, &ubo, sizeof(ObjectUniforms));
     }
 
     void record_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout)
     {
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &(const VkDescriptorSet&)descriptorSet, 0, nullptr);
-        mesh.record_cmds(commandBuffer);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &(const VkDescriptorSet&)mDescriptorSet, 0, nullptr);
+        mMesh.record_cmds(commandBuffer);
     }
 
-    gvk::Mesh mesh;
-    gvk::Buffer uniformBuffer;
-    gvk::DescriptorSet descriptorSet;
-    RigidBody rigidBody;
+private:
+    gvk::math::Transform mTransform { };
+    glm::vec4 mColor { };
+    gvk::Mesh mMesh;
+    gvk::Buffer mUniformBuffer;
+    gvk::DescriptorSet mDescriptorSet;
+    RigidBody mRigidBody;
+};
+
+class Game final
+{
+public:
+    enum class State
+    {
+        Attract,
+        Intro,
+        Idle,
+        Play,
+        Win,
+        Lose,
+        GameOver,
+    };
+
+    State state { State::Attract };
+    std::vector<Object> walls;
+    std::vector<Object> balls;
+    std::vector<Object> bricks;
+    Object paddle;
 };
 
 int main(int, const char* [])
@@ -284,6 +254,10 @@ int main(int, const char* [])
     const float BallMass = 1;
     const uint32_t BallCount = 3;
 
+
+
+    Game game;
+
     dst::physics::Context physicsContext;
     dst::physics::Context::create(&physicsContext);
 
@@ -294,245 +268,195 @@ int main(int, const char* [])
     btSphereShape ballCollisionShape(BallRadius);
 
     GfxContext gfxContext;
-    auto vkResult = GfxContext::create("dynamic-static - Block Blaster", &gfxContext);
+    auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
 
+    // TODO : Documentation
+    gvk::Mesh cubeMesh;
+    vkResult = create_cube_mesh(gfxContext, &cubeMesh);
+    assert(vkResult == VK_SUCCESS);
+    gvk::Mesh sphereMesh;
+    vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &sphereMesh);
+
+    // TODO : Documentation
+    gvk::spirv::ShaderInfo vertexShaderInfo {
+        .language = gvk::spirv::ShadingLanguage::Glsl,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .lineOffset = __LINE__,
+        .source = R"(
+            #version 450
+
+            layout(set = 0, binding = 0)
+            uniform CameraUniformBuffer
+            {
+                mat4 view;
+                mat4 projection;
+            } camera;
+
+            layout(set = 1, binding = 0)
+            uniform ObjectUniformBuffer
+            {
+                mat4 world;
+                vec4 color;
+            } object;
+
+            layout(location = 0) in vec3 vsPosition;
+
+            out gl_PerVertex
+            {
+                vec4 gl_Position;
+            };
+
+            void main()
+            {
+                gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
+            }
+        )"
+    };
+
+    // TODO : Documentation
+    gvk::spirv::ShaderInfo fragmentShaderInfo {
+        .language = gvk::spirv::ShadingLanguage::Glsl,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .lineOffset = __LINE__,
+        .source = R"(
+            #version 450
+
+            layout(set = 1, binding = 0)
+            uniform ObjectUniformBuffer
+            {
+                mat4 world;
+                vec4 color;
+            } object;
+
+            layout(location = 0) out vec4 fragColor;
+
+            void main()
+            {
+                fragColor = object.color;
+            }
+        )"
+    };
     gvk::Pipeline pipeline;
+    vkResult = dst_sample_create_pipeline<glm::vec3>(
+        gfxContext.get_wsi_manager().get_render_pass(),
+        VK_CULL_MODE_BACK_BIT,
+        VK_POLYGON_MODE_LINE,
+        vertexShaderInfo,
+        fragmentShaderInfo,
+        &pipeline
+    );
+    assert(vkResult == VK_SUCCESS);
 
-    Object sphere;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.mass = 1;
-        rigidBodyCreateInfo.initialPosition.setValue(0, 12, 0);
-        rigidBodyCreateInfo.pCollisionShape = &ballCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &sphere.rigidBody);
-        sphere.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
-    }
+    // TODO : Documentation
+    auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
+    descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera
+    auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+    descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
+    descriptorPoolCreateInfo.poolSizeCount = 1;
+    descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+    gvk::DescriptorPool descriptorPool;
+    vkResult = gvk::DescriptorPool::create(gfxContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool);
+    assert(vkResult == VK_SUCCESS);
 
-    Object ceiling;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialPosition.setValue(0, 32, 0);
-        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &ceiling.rigidBody);
-    }
-
-    Object leftWall;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialPosition.setValue(16, 0, 0);
-        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &leftWall.rigidBody);
-    }
-
-    Object rightWall;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialPosition.setValue(-16, 0, 0);
-        rigidBodyCreateInfo.pCollisionShape = &wallCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &rightWall.rigidBody);
-    }
-
-    Object paddle;
-    {
-        RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialPosition.setValue(0, -32, 0);
-        rigidBodyCreateInfo.pCollisionShape = &paddleCollisionShape;
-        RigidBody::create(physicsContext, &rigidBodyCreateInfo, &paddle.rigidBody);
-    }
-
+    // TODO : Documentation
     gvk::math::Camera camera;
-    gvk::Buffer cameraUniformBuffer;
-    gvk::DescriptorSet cameraDescriptorSet;
     gvk::math::FreeCameraController cameraController;
     cameraController.set_camera(&camera);
     camera.transform.translation.z = -64;
+    gvk::Buffer cameraUniformBuffer;
+    vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer);
+    assert(vkResult == VK_SUCCESS);
+    
+    // TODO : Documentation
+    const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
+    assert(descriptorSetLayouts.size() == 2);
+    const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
+    const auto& objectDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[1];
+    auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+    descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+    descriptorSetAllocateInfo.descriptorSetCount = 1;
+    descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
+    gvk::DescriptorSet cameraDescriptorSet;
+    vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
+    assert(vkResult == VK_SUCCESS);
 
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+    // TODO : Documentation
+    auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+    descriptorBufferInfo.buffer = cameraUniformBuffer;
+    auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+    writeDescriptorSet.descriptorCount = 1;
+    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeDescriptorSet.dstSet = cameraDescriptorSet;
+    writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+    vkUpdateDescriptorSets(gfxContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
 
-        // TODO : Documentation
-        gvk_result(create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, gvk::math::Color::Purple, &paddle.mesh));
-        gvk_result(create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, gvk::math::Color::AntiqueWhite, &ceiling.mesh));
-        gvk_result(create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, gvk::math::Color::AntiqueWhite, &leftWall.mesh));
-        rightWall.mesh = leftWall.mesh;
+    // TODO : Documentation
+    descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
-        // TODO : Documentation
-        gvk::Mesh ballMesh;
-        gvk_result(create_icosphere_mesh(gfxContext, BallRadius, 3, gvk::math::Color::DodgerBlue, &ballMesh));
-        for (uint32_t i = 0; i < BallCount; ++i) {
-            (void)i;
-        }
+    // TODO : Documentation
+    Object paddle;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        paddle.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 0, { 0, 0, 16 });
+    }
 
-        // TODO : Documentation
-        gvk::Mesh brickMesh;
-        gvk_result(create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, gvk::math::Color::OrangeRed, &brickMesh));
-        for (uint32_t i = 0; i < BrickCount; ++i) {
-            (void)i;
-        }
+    // TODO : Documentation
+    Object ceiling;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        ceiling.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        ceiling.setup_physics_resources(physicsContext, &ceilingCollisionShape, 0, { 0, 32, 0 });
+    }
 
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &paddle.uniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &ceiling.uniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &leftWall.uniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &rightWall.uniformBuffer));
+    // TODO : Documentation
+    Object leftWall;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        leftWall.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        leftWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { 16, 0, 0 });
+    }
 
-        gvk_result(create_icosphere_mesh(gfxContext, 1, 3, gvk::math::Color::DodgerBlue, &sphere.mesh));
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gfxContext, &sphere.uniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer));
-        gvk::spirv::ShaderInfo vertexShaderInfo {
-            .language = gvk::spirv::ShadingLanguage::Glsl,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .lineOffset = __LINE__,
-            .source = R"(
-                #version 450
+    // TODO : Documentation
+    Object rightWall;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        rightWall.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        rightWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { 0, 0, 16 });
+    }
 
-                layout(set = 0, binding = 0)
-                uniform CameraUniformBuffer
-                {
-                    mat4 view;
-                    mat4 projection;
-                    vec3 position;
-                } camera;
+    // TODO : Documentation
+    std::array<Object, BallCount> balls;
+    for (size_t i = 0; i < balls.size(); ++i) {
+        auto& ball = balls[i];
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        ball.setup_graphics_resources(gfxContext, sphereMesh, descriptorSet, gvk::math::Color::Plum);
+        ball.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { 0, 0, 0 });
+    }
 
-                layout(set = 1, binding = 0)
-                uniform ObjectUniformBuffer
-                {
-                    mat4 world;
-                } object;
-
-                layout(location = 0) in vec3 vsPosition;
-                layout(location = 1) in vec3 vsNormal;
-                layout(location = 2) in vec4 vsColor;
-
-                layout(location = 0) out vec3 fsPosition;
-                layout(location = 1) out vec3 fsNormal;
-                layout(location = 2) out vec4 fsColor;
-                layout(location = 3) out vec3 fsCameraPosition;
-
-                out gl_PerVertex
-                {
-                    vec4 gl_Position;
-                };
-
-                void main()
-                {
-                    fsPosition = vsPosition;
-                    fsNormal = vsNormal;
-                    fsColor = vsColor;
-                    fsCameraPosition = camera.position;
-                    gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-                }
-            )"
-        };
-        gvk::spirv::ShaderInfo fragmentShaderInfo {
-            .language = gvk::spirv::ShadingLanguage::Glsl,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .lineOffset = __LINE__,
-            .source = R"(
-                #version 450
-
-                layout(location = 0) in vec3 fsPosition;
-                layout(location = 1) in vec3 fsNormal;
-                layout(location = 2) in vec4 fsColor;
-                layout(location = 3) in vec3 fsCameraPosition;
-
-                layout(location = 0) out vec4 fragColor;
-
-                void main()
-                {
-                    vec3 lightPosition = vec3(0, 100, 0);
-                    vec3 lightDirection = normalize(lightPosition - fsPosition);
-                    vec3 normal = normalize(fsNormal);
-                    vec3 ambient = fsColor.rgb * 0.25;
-                    vec3 diffuse = vec3(dot(lightDirection, normal));
-                    vec3 viewDirection = normalize(fsCameraPosition - fsPosition);
-                    vec3 reflectionDirection = reflect(-lightDirection, normal);
-                    vec3 specular = vec3(0.3) * pow(max(0, dot(viewDirection, reflectionDirection)), 8);
-                    fragColor = vec4(ambient + diffuse + specular, 1);
-fragColor = fsColor;
-                }
-            )"
-        };
-
-        gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionNormalColor>(
-            gfxContext.get_wsi_manager().get_render_pass(),
-            VK_CULL_MODE_BACK_BIT,
-            VK_POLYGON_MODE_LINE,
-            vertexShaderInfo,
-            fragmentShaderInfo,
-            &pipeline
-        ));
-
-        auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
-        descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera
-        auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
-        descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
-        descriptorPoolCreateInfo.poolSizeCount = 1;
-        descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
-        gvk::DescriptorPool descriptorPool;
-        gvk_result(gvk::DescriptorPool::create(gfxContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool));
-
-        const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
-        assert(descriptorSetLayouts.size() == 2);
-        const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
-        const auto& objectDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[1];
-        auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
-        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-        descriptorSetAllocateInfo.descriptorSetCount = 1;
-        descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
-        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet));
-        descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
-        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &paddle.descriptorSet));
-        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &ceiling.descriptorSet));
-        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &leftWall.descriptorSet));
-        gvk_result(gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &rightWall.descriptorSet));
-
-        paddle.update_descriptor_set(gfxContext.get_devices()[0]);
-        ceiling.update_descriptor_set(gfxContext.get_devices()[0]);
-        leftWall.update_descriptor_set(gfxContext.get_devices()[0]);
-        rightWall.update_descriptor_set(gfxContext.get_devices()[0]);
-        
-
-
-        std::vector<gvk::DescriptorSet> descriptorSets;
-        gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
-        assert(descriptorSets.size() == 2);
-        // cameraDescriptorSet = descriptorSets[0];
-        sphere.descriptorSet = descriptorSets[1];
-        gvk_result(dst_sample_allocate_descriptor_sets(pipeline, &descriptorSets));
-        assert(descriptorSets.size() == 2);
-
-        auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
-
-        sphere.update_descriptor_set(gfxContext.get_devices()[0]);
-
-        // Write the descriptors...
-        std::array<VkWriteDescriptorSet, 1> writeDescriptorSets {
-#if 0
-            VkWriteDescriptorSet {
-                .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = sphere.descriptorSet,
-                .dstBinding = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &sphereUniformBufferDescriptorInfo,
-            },
-#endif
-            VkWriteDescriptorSet {
-                .sType = gvk::get_stype<VkWriteDescriptorSet>(),
-                .dstSet = cameraDescriptorSet,
-                .dstBinding = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &cameraUniformBufferDescriptorInfo,
-            },
-        };
-        vkUpdateDescriptorSets(gfxContext.get_devices()[0], (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
-    } gvk_result_scope_end;
-
-    /// Do some simulation
+    // TODO : Documentation
+    std::array<Object, BrickCount> bricks;
+    for (size_t i = 0; i < bricks.size(); ++i) {
+        auto& brick = bricks[i];
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        brick.setup_graphics_resources(gfxContext, sphereMesh, descriptorSet, gvk::math::Color::Orange);
+        brick.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { 0, 0, 0 });
+    }
 
     gvk::sys::Clock clock;
     while (
@@ -561,24 +485,25 @@ fragColor = fsColor;
         }
         cameraController.update(cameraControllerUpdateInfo);
 
+        // TODO : Documentation
         physicsContext.mupWorld->stepSimulation(deltaTime, 10);
 
-        sphere.update_uniform_buffer(gfxContext.get_devices()[0]);
+        // TODO : Documentation
+        CameraUniforms cameraUbo { };
+        cameraUbo.view = camera.view();
+        cameraUbo.projection = camera.projection();
+        VmaAllocationInfo allocationInfo { };
+        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        assert(allocationInfo.pMappedData);
+        memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
         paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
         ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
         leftWall.update_uniform_buffer(gfxContext.get_devices()[0]);
         rightWall.update_uniform_buffer(gfxContext.get_devices()[0]);
-        
-
-        CameraUniforms cameraUbo { };
-        cameraUbo.view = camera.view();
-        cameraUbo.projection = camera.projection();
-        cameraUbo.position = camera.transform.translation;
-        VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-        assert(allocationInfo.pMappedData);
-        memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
+        for (auto& ball : balls) {
+            ball.update_uniform_buffer(gfxContext.get_devices()[0]);
+        }
 
         auto& wsiManager = gfxContext.get_wsi_manager();
         if (wsiManager.update()) {
@@ -588,26 +513,32 @@ fragColor = fsColor;
                 const auto& commandBuffer = wsiManager.get_command_buffers()[i];
                 vkResult = vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>());
                 assert(vkResult == VK_SUCCESS);
-
-                // Begin the gvk::RenderPass that renders into the gvk::WsiManager...
                 auto renderPassBeginInfo = wsiManager.get_render_targets()[i].get_render_pass_begin_info();
                 vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
                 {
+                    // TODO : Documentation
                     VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
                     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
                     VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
                     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                    auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+                    // TODO : Documentation
+                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-                    sphere.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    // TODO : Documentation
+                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
 
+                    // TODO : Documentation
                     paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    for (auto& ball : balls) {
+                        ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    }
+                    for (auto& brick : bricks) {
+                        brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    }
                 }
                 vkCmdEndRenderPass(commandBuffer);
 
