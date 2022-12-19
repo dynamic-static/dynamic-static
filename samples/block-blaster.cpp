@@ -440,22 +440,6 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    gvk::Mesh paddleMesh;
-    vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
-    assert(vkResult == VK_SUCCESS);
-    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
-    Object paddle;
-    {
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
-        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 });
-        paddle.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 0, 0));
-        // paddle.rigidBody.mupRigidBody->setActivationState(0);
-    }
-
-    // TODO : Documentation
     const uint32_t BrickRowCount = 6;
     const uint32_t BricksPerRow = 10;
     const std::array<glm::vec4, BrickRowCount> BrickRowColors {
@@ -501,6 +485,22 @@ int main(int, const char* [])
 
         ball.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ball.rigidBody.mupRigidBody->setActivationState(0);
+    }
+
+    // TODO : Documentation
+    gvk::Mesh paddleMesh;
+    vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
+    assert(vkResult == VK_SUCCESS);
+    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
+    Object paddle;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
+        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 });
+        paddle.rigidBody.mupRigidBody->setLinearFactor({ 1, 0, 0 });
+        paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
     }
 
     uint32_t ballIndex = 0;
