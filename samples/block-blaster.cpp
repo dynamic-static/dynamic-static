@@ -40,6 +40,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
+    for (auto& vertex : vertices) {
+        vertex *= radius;
+    }
     std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles(dst::gfx::primitive::Icosahedron::Triangles.begin(), dst::gfx::primitive::Icosahedron::Triangles.end());
     std::unordered_map<dst::gfx::primitive::Edge<uint32_t>, uint32_t, dst::gfx::primitive::EdgeHasher<uint32_t>> edges;
     for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
@@ -75,21 +78,25 @@ VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t 
         (uint32_t)vertices.size(),
         vertices.data(),
         (uint32_t)triangles.size() * 3,
-        &triangles[0][0]
+        triangles[0].data()
     );
 }
 
-VkResult create_cube_mesh(const gvk::Context& context, gvk::Mesh* pMesh)
+VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, gvk::Mesh* pMesh)
 {
+    std::vector<glm::vec3> vertices(dst::gfx::primitive::Cube::Vertices.begin(), dst::gfx::primitive::Cube::Vertices.end());
+    for (auto& vertex : vertices) {
+        vertex *= dimensions;
+    }
     return pMesh->write(
         context.get_devices()[0],
         gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
         context.get_command_buffers()[0],
         VK_NULL_HANDLE,
-        (uint32_t)dst::gfx::primitive::Cube::Vertices.size(),
-        dst::gfx::primitive::Cube::Vertices.data(),
+        (uint32_t)vertices.size(),
+        vertices.data(),
         (uint32_t)dst::gfx::primitive::Cube::Triangles.size() * 3,
-        dst::gfx::primitive::Cube::Triangles.data()
+        dst::gfx::primitive::Cube::Triangles[0].data()
     );
 }
 
@@ -140,13 +147,6 @@ public:
         physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
     }
 
-    btTransform get_bt_transform() const
-    {
-        btTransform btTransform { };
-        mupMotionState->getWorldTransform(btTransform);
-        return btTransform;
-    }
-
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
 };
@@ -154,9 +154,8 @@ public:
 class Object final
 {
 public:
-    void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color, const glm::vec3& scale = { 1, 1, 1 })
+    void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color)
     {
-        mTransform.scale = scale;
         mColor = color;
         mMesh = mesh;
         mDescriptorSet = descriptorSet;
@@ -172,22 +171,22 @@ public:
         vkUpdateDescriptorSets(context.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
     }
 
-    void setup_physics_resources(dst::physics::Context& context, btCollisionShape* pBtCollisionShape, float mass, const glm::vec3& position)
+    void setup_physics_resources(dst::physics::Context& context, btCollisionShape* pBtCollisionShape, float mass, const glm::vec3& initialPosition)
     {
-        mTransform.translation = position;;
+        mInitialPosition = initialPosition;;
         RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.mass = mass;
-        rigidBodyCreateInfo.initialPosition.setValue(position.x, position.y, position.z);
+        rigidBodyCreateInfo.initialPosition.setValue(mInitialPosition.x, mInitialPosition.y, mInitialPosition.z);
         rigidBodyCreateInfo.pCollisionShape = pBtCollisionShape;
-        RigidBody::create(context, &rigidBodyCreateInfo, &mRigidBody);
-        mRigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
-        mRigidBody.mupRigidBody->setActivationState(0);
+        RigidBody::create(context, &rigidBodyCreateInfo, &rigidBody);
     }
 
     void update_uniform_buffer(const gvk::Device& device)
     {
         ObjectUniforms ubo { };
-        mRigidBody.get_bt_transform().getOpenGLMatrix(&ubo.world[0][0]);
+        btTransform btTransform { };
+        rigidBody.mupMotionState->getWorldTransform(btTransform);
+        btTransform.getOpenGLMatrix(&ubo.world[0][0]);
         ubo.color = mColor;
         VmaAllocationInfo allocationInfo { };
         vmaGetAllocationInfo(device.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), &allocationInfo);
@@ -201,35 +200,43 @@ public:
         mMesh.record_cmds(commandBuffer);
     }
 
+    RigidBody rigidBody;
+
 private:
-    gvk::math::Transform mTransform { };
+    glm::vec3 mInitialPosition { };
     glm::vec4 mColor { };
     gvk::Mesh mMesh;
     gvk::Buffer mUniformBuffer;
     gvk::DescriptorSet mDescriptorSet;
-    RigidBody mRigidBody;
 };
 
-class Game final
+enum class State
 {
-public:
-    enum class State
-    {
-        Attract,
-        Intro,
-        Idle,
-        Play,
-        Win,
-        Lose,
-        GameOver,
-    };
-
-    State state { State::Attract };
-    std::vector<Object> walls;
-    std::vector<Object> balls;
-    std::vector<Object> bricks;
-    Object paddle;
+    Attract,
+    Intro,
+    Idle,
+    Play,
+    Win,
+    Lose,
+    GameOver,
 };
+
+static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep)
+{
+    (void)timeStep;
+    assert(pDynamicsWorld);
+    auto pDispatcher = pDynamicsWorld->getDispatcher();
+    assert(pDispatcher);
+    auto numManifolds = pDispatcher->getNumManifolds();
+    for (int i = 0; i < numManifolds; ++i) {
+        auto pManifold = pDispatcher->getManifoldByIndexInternal(i);
+        assert(pManifold);
+        auto pCollisionObject0 = pManifold->getBody0();
+        (void)pCollisionObject0;
+        auto pCollisionObject1 = pManifold->getBody1();
+        (void)pCollisionObject1;
+    }
+}
 
 int main(int, const char* [])
 {
@@ -241,42 +248,29 @@ int main(int, const char* [])
     const float WallHeight = 64;
     const float WallDepth = 1;
 
-    const float BrickWidth = 1;
+    const float BrickWidth = 2;
     const float BrickHeight = 1;
     const float BrickDepth = 1;
-    const uint32_t BrickCount = 4;
+    const float BrickMass = 1;
+    const uint32_t BrickCount = 60;
 
-    const float PaddleWidth = 4;
+    const float PaddleWidth = 6;
     const float PaddleHeight = 1;
     const float PaddleDepth = 1;
 
-    const float BallRadius = 1;
+    const float BallRadius = 0.5f;
     const float BallMass = 1;
     const uint32_t BallCount = 3;
-
-
-
-    Game game;
-
-    dst::physics::Context physicsContext;
-    dst::physics::Context::create(&physicsContext);
-
-    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
-    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
-    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
-    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
-    btSphereShape ballCollisionShape(BallRadius);
 
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
 
-    // TODO : Documentation
-    gvk::Mesh cubeMesh;
-    vkResult = create_cube_mesh(gfxContext, &cubeMesh);
-    assert(vkResult == VK_SUCCESS);
-    gvk::Mesh sphereMesh;
-    vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &sphereMesh);
+    dst::physics::Context physicsContext;
+    dst::physics::Context::create(&physicsContext);
+    auto pDynamicsWorld = physicsContext.get_dynamics_world();
+    assert(pDynamicsWorld);
+    pDynamicsWorld->setInternalTickCallback(bullet_physics_tick_callback);
 
     // TODO : Documentation
     gvk::spirv::ShaderInfo vertexShaderInfo {
@@ -341,7 +335,11 @@ int main(int, const char* [])
     vkResult = dst_sample_create_pipeline<glm::vec3>(
         gfxContext.get_wsi_manager().get_render_pass(),
         VK_CULL_MODE_BACK_BIT,
+#if 0
         VK_POLYGON_MODE_LINE,
+#else
+        VK_POLYGON_MODE_FILL,
+#endif
         vertexShaderInfo,
         fragmentShaderInfo,
         &pipeline
@@ -397,67 +395,116 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
     // TODO : Documentation
-    Object paddle;
-    {
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        paddle.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
-        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 0, { 0, 0, 16 });
-    }
-
-    // TODO : Documentation
+    gvk::Mesh ceilingMesh;
+    vkResult = create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
+    assert(vkResult == VK_SUCCESS);
+    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
     Object ceiling;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
-        ceiling.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        ceiling.setup_graphics_resources(gfxContext, ceilingMesh, descriptorSet, gvk::math::Color::White);
         ceiling.setup_physics_resources(physicsContext, &ceilingCollisionShape, 0, { 0, 32, 0 });
+
+        ceiling.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        ceiling.rigidBody.mupRigidBody->setActivationState(0);
     }
 
     // TODO : Documentation
+    gvk::Mesh wallMesh;
+    vkResult = create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, &wallMesh);
+    assert(vkResult == VK_SUCCESS);
+    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
     Object leftWall;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
-        leftWall.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
+        leftWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
         leftWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { 16, 0, 0 });
-    }
 
-    // TODO : Documentation
+        leftWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        leftWall.rigidBody.mupRigidBody->setActivationState(0);
+    }
     Object rightWall;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
-        rightWall.setup_graphics_resources(gfxContext, cubeMesh, descriptorSet, gvk::math::Color::AntiqueWhite);
-        rightWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { 0, 0, 16 });
+        rightWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
+        rightWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { -16, 0, 0 });
+
+        rightWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        rightWall.rigidBody.mupRigidBody->setActivationState(0);
     }
 
     // TODO : Documentation
+    gvk::Mesh paddleMesh;
+    vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
+    assert(vkResult == VK_SUCCESS);
+    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
+    Object paddle;
+    {
+        gvk::DescriptorSet descriptorSet;
+        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+        assert(vkResult == VK_SUCCESS);
+        paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
+        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 });
+        paddle.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 0, 0));
+        // paddle.rigidBody.mupRigidBody->setActivationState(0);
+    }
+
+    // TODO : Documentation
+    const uint32_t BrickRowCount = 6;
+    const uint32_t BricksPerRow = 10;
+    const std::array<glm::vec4, BrickRowCount> BrickRowColors {
+        gvk::math::Color::Red,
+        gvk::math::Color::Orange,
+        gvk::math::Color::Yellow,
+        gvk::math::Color::Green,
+        gvk::math::Color::DodgerBlue,
+        gvk::math::Color::Violet,
+    };
+    gvk::Mesh brickMesh;
+    vkResult = create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
+    assert(vkResult == VK_SUCCESS);
+    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
+    std::array<Object, BrickRowCount * BricksPerRow> bricks;
+    for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
+        for (size_t brick_i = 0; brick_i < BricksPerRow; ++brick_i) {
+            auto& brick = bricks[row_i * BricksPerRow + brick_i];
+            gvk::DescriptorSet descriptorSet;
+            vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
+            assert(vkResult == VK_SUCCESS);
+            brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
+            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { 0, 30.0f - row_i * BrickHeight * 2.0f, 0 });
+
+            brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+            brick.rigidBody.mupRigidBody->setActivationState(0);
+        }
+    }
+
+    // TODO : Documentation
+    gvk::Mesh ballMesh;
+    vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &ballMesh);
+    assert(vkResult == VK_SUCCESS);
+    btSphereShape ballCollisionShape(BallRadius);
     std::array<Object, BallCount> balls;
     for (size_t i = 0; i < balls.size(); ++i) {
         auto& ball = balls[i];
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
-        ball.setup_graphics_resources(gfxContext, sphereMesh, descriptorSet, gvk::math::Color::Plum);
-        ball.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { 0, 0, 0 });
+        ball.setup_graphics_resources(gfxContext, ballMesh, descriptorSet, gvk::math::Color::SlateGray);
+        ball.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { -16.0f + i * 2.0f, 34, 0 });
+
+        ball.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        ball.rigidBody.mupRigidBody->setActivationState(0);
     }
 
-    // TODO : Documentation
-    std::array<Object, BrickCount> bricks;
-    for (size_t i = 0; i < bricks.size(); ++i) {
-        auto& brick = bricks[i];
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        brick.setup_graphics_resources(gfxContext, sphereMesh, descriptorSet, gvk::math::Color::Orange);
-        brick.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { 0, 0, 0 });
-    }
-
+    uint32_t ballIndex = 0;
+    State state = State::Play;
     gvk::sys::Clock clock;
     while (
         !(gfxContext.get_sys_surface().get_input().keyboard.down(gvk::sys::Key::Escape)) &&
@@ -486,6 +533,59 @@ int main(int, const char* [])
         cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
+        const float PaddleSpeed = 1;
+        if (input.keyboard.down(gvk::sys::Key::LeftArrow)) {
+            paddle.rigidBody.mupRigidBody->activate(true);
+            paddle.rigidBody.mupRigidBody->applyImpulse(btVector3 { PaddleSpeed, 0, 0 }, { -1, 0, 0 });
+        }
+        if (input.keyboard.down(gvk::sys::Key::RightArrow)) {
+            paddle.rigidBody.mupRigidBody->activate(true);
+            paddle.rigidBody.mupRigidBody->applyImpulse(btVector3 { -PaddleSpeed, 0, 0 }, { 1, 0, 0 });
+        }
+
+        switch (state) {
+        case State::Attract:
+            {
+
+            } break;
+            case State::Intro:
+            {
+
+            } break;
+            case State::Idle:
+            {
+
+            } break;
+            case State::Play:
+            {
+                if (input.keyboard.pressed(gvk::sys::Key::SpaceBar)) {
+                    if (ballIndex < balls.size()) {
+                        auto& ball = balls[ballIndex++];
+                        auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                        transform.setOrigin({ 0, 0, 0 });
+                        ball.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
+                        ball.rigidBody.mupRigidBody->activate(true);
+                    }
+                }
+                for (auto& ball : balls) {
+                    (void)ball;
+                }
+            } break;
+            case State::Win:
+            {
+
+            } break;
+            case State::Lose:
+            {
+
+            } break;
+            case State::GameOver:
+            {
+
+            } break;
+        }
+
+        // TODO : Documentation
         physicsContext.mupWorld->stepSimulation(deltaTime, 10);
 
         // TODO : Documentation
@@ -501,6 +601,9 @@ int main(int, const char* [])
         ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
         leftWall.update_uniform_buffer(gfxContext.get_devices()[0]);
         rightWall.update_uniform_buffer(gfxContext.get_devices()[0]);
+        for (auto& brick : bricks) {
+            brick.update_uniform_buffer(gfxContext.get_devices()[0]);
+        }
         for (auto& ball : balls) {
             ball.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
@@ -533,11 +636,11 @@ int main(int, const char* [])
                     ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    for (auto& ball : balls) {
-                        ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    }
                     for (auto& brick : bricks) {
                         brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                    }
+                    for (auto& ball : balls) {
+                        ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                     }
                 }
                 vkCmdEndRenderPass(commandBuffer);

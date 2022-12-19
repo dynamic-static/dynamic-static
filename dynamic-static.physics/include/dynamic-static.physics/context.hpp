@@ -52,6 +52,11 @@ public:
         pContext->mupWorld->setGravity(btVector3(0, -9.8f, 0));
     }
 
+    inline btDiscreteDynamicsWorld* get_dynamics_world()
+    {
+        return mupWorld.get();
+    }
+
     inline void reset()
     {
         mupWorld.reset();
