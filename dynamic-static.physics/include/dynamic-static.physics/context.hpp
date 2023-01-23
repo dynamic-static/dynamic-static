@@ -37,6 +37,8 @@ class Context final
 public:
     inline static void create(Context* pContext)
     {
+        
+
         assert(pContext);
         pContext->reset();
         pContext->mupCollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();

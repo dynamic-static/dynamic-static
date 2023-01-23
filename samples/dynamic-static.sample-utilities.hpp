@@ -114,6 +114,7 @@ protected:
         auto wsiManagerCreateInfo = *pWsiManagerCreateInfo;
         wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
         wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
+        wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
         return gvk::Context::create_wsi_manager(&wsiManagerCreateInfo, pAllocator);
     }
 };

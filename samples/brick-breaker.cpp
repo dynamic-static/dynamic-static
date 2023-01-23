@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <iostream>
 #include <map>
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -144,6 +145,11 @@ public:
         pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(
             btRigidBody::btRigidBodyConstructionInfo(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, inertia)
         );
+        pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
+        btVector3 boundingSphereCenter { };
+        btScalar boundingSphereRadius = 0;
+        pCreateInfo->pCollisionShape->getBoundingSphere(boundingSphereCenter, boundingSphereRadius);
+        pRigidBody->mupRigidBody->setCcdSweptSphereRadius(boundingSphereRadius);
         physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
     }
 
@@ -225,16 +231,25 @@ static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScal
 {
     (void)timeStep;
     assert(pDynamicsWorld);
+    auto pCollisions = (std::set<std::pair<uint64_t, uint64_t>>*)pDynamicsWorld->getWorldUserInfo();
+    assert(pCollisions);
     auto pDispatcher = pDynamicsWorld->getDispatcher();
     assert(pDispatcher);
     auto numManifolds = pDispatcher->getNumManifolds();
-    for (int i = 0; i < numManifolds; ++i) {
-        auto pManifold = pDispatcher->getManifoldByIndexInternal(i);
+    for (int manifold_i = 0; manifold_i < numManifolds; ++manifold_i) {
+        auto pManifold = pDispatcher->getManifoldByIndexInternal(manifold_i);
         assert(pManifold);
-        auto pCollisionObject0 = pManifold->getBody0();
-        (void)pCollisionObject0;
-        auto pCollisionObject1 = pManifold->getBody1();
-        (void)pCollisionObject1;
+        int numContacts = pManifold->getNumContacts();
+        for (int contact_i = 0; contact_i < numContacts; ++contact_i) {
+            const auto& contactPoint = pManifold->getContactPoint(contact_i);
+            if (contactPoint.getDistance() < 0) {
+                auto collision = std::make_pair((uint64_t)pManifold->getBody0(), (uint64_t)pManifold->getBody1());
+                if (collision.second < collision.first) {
+                    std::swap(collision.first, collision.second);
+                }
+                pCollisions->insert(collision);
+            }
+        }
     }
 }
 
@@ -251,7 +266,7 @@ int main(int, const char* [])
     const float BrickWidth = 2;
     const float BrickHeight = 1;
     const float BrickDepth = 1;
-    const float BrickMass = 1;
+    const float BrickMass = 32;
     const uint32_t BrickCount = 60;
 
     const float PaddleWidth = 6;
@@ -270,7 +285,8 @@ int main(int, const char* [])
     dst::physics::Context::create(&physicsContext);
     auto pDynamicsWorld = physicsContext.get_dynamics_world();
     assert(pDynamicsWorld);
-    pDynamicsWorld->setInternalTickCallback(bullet_physics_tick_callback);
+    std::set<std::pair<uint64_t, uint64_t>> collisions;
+    pDynamicsWorld->setInternalTickCallback(bullet_physics_tick_callback, &collisions);
 
     // TODO : Documentation
     gvk::spirv::ShaderInfo vertexShaderInfo {
@@ -462,9 +478,9 @@ int main(int, const char* [])
             vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
             assert(vkResult == VK_SUCCESS);
             brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
-            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { 0, 30.0f - row_i * BrickHeight * 2.0f, 0 });
+            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { brick_i * BrickWidth * 2.0f, 30.0f - row_i * BrickHeight * 2.0f, 0 });
 
-            brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+            // brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
             brick.rigidBody.mupRigidBody->setActivationState(0);
         }
     }
@@ -503,8 +519,9 @@ int main(int, const char* [])
         paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
     }
 
-    uint32_t ballIndex = 0;
+    uint32_t ballCount = BallCount;
     State state = State::Play;
+    // double frameTimeAccumulator = 0;
     gvk::sys::Clock clock;
     while (
         !(gfxContext.get_sys_surface().get_input().keyboard.down(gvk::sys::Key::Escape)) &&
@@ -512,37 +529,19 @@ int main(int, const char* [])
         gvk::sys::Surface::update();
         clock.update();
 
-        auto deltaTime = clock.elapsed<gvk::sys::Seconds<float>>();
+        auto deltaTime = clock.elapsed<gvk::sys::Seconds<double>>();
         const auto& input = gfxContext.get_sys_surface().get_input();
-        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
-            .deltaTime = deltaTime,
-            .moveUp = input.keyboard.down(gvk::sys::Key::Q),
-            .moveDown = input.keyboard.down(gvk::sys::Key::E),
-            .moveLeft = input.keyboard.down(gvk::sys::Key::A),
-            .moveRight = input.keyboard.down(gvk::sys::Key::D),
-            .moveForward = input.keyboard.down(gvk::sys::Key::W),
-            .moveBackward = input.keyboard.down(gvk::sys::Key::S),
-            .moveSpeedMultiplier = input.keyboard.down(gvk::sys::Key::LeftShift) ? 2.0f : 1.0f,
-            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
-            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
-        };
-        cameraController.lookEnabled = input.mouse.buttons.down(gvk::sys::Mouse::Button::Left);
-        if (input.mouse.buttons.pressed(gvk::sys::Mouse::Button::Right)) {
-            camera.fieldOfView = 60.0f;
-        }
-        cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
-        const float PaddleSpeed = 1;
+        const float PaddleSpeed = 32;
         if (input.keyboard.down(gvk::sys::Key::LeftArrow)) {
             paddle.rigidBody.mupRigidBody->activate(true);
-            paddle.rigidBody.mupRigidBody->applyImpulse(btVector3 { PaddleSpeed, 0, 0 }, { -1, 0, 0 });
+            paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
         }
         if (input.keyboard.down(gvk::sys::Key::RightArrow)) {
             paddle.rigidBody.mupRigidBody->activate(true);
-            paddle.rigidBody.mupRigidBody->applyImpulse(btVector3 { -PaddleSpeed, 0, 0 }, { 1, 0, 0 });
+            paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { -PaddleSpeed, 0, 0 });
         }
-
         switch (state) {
         case State::Attract:
             {
@@ -559,16 +558,31 @@ int main(int, const char* [])
             case State::Play:
             {
                 if (input.keyboard.pressed(gvk::sys::Key::SpaceBar)) {
-                    if (ballIndex < balls.size()) {
-                        auto& ball = balls[ballIndex++];
+                    if (ballCount) {
+                        assert(ballCount <= balls.size());
+                        auto& ball = balls[ballCount - 1];
                         auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                         transform.setOrigin({ 0, 0, 0 });
                         ball.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
                         ball.rigidBody.mupRigidBody->activate(true);
+                        ballCount -= 1;
                     }
                 }
                 for (auto& ball : balls) {
-                    (void)ball;
+                    auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
+                    if (collision.second < collision.first) {
+                        std::swap(collision.first, collision.second);
+                    }
+#if 0
+                    if (collisions.count(collision)) {
+                        const auto& ballTransform = ball.rigidBody.mupRigidBody->getWorldTransform();
+                        const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getWorldTransform();
+                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                            const auto& paddleVelocity = paddle.rigidBody.mupRigidBody->getLinearVelocity();
+                            ball.rigidBody.mupRigidBody->applyCentralImpulse({ paddleVelocity.x(), 64, 0 });
+                        }
+                    }
+#endif
                 }
             } break;
             case State::Win:
@@ -585,8 +599,26 @@ int main(int, const char* [])
             } break;
         }
 
-        // TODO : Documentation
-        physicsContext.mupWorld->stepSimulation(deltaTime, 10);
+        collisions.clear();
+        physicsContext.mupWorld->stepSimulation((float)deltaTime);
+
+        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
+            .deltaTime = (float)deltaTime,
+            .moveUp = input.keyboard.down(gvk::sys::Key::Q),
+            .moveDown = input.keyboard.down(gvk::sys::Key::E),
+            .moveLeft = input.keyboard.down(gvk::sys::Key::A),
+            .moveRight = input.keyboard.down(gvk::sys::Key::D),
+            .moveForward = input.keyboard.down(gvk::sys::Key::W),
+            .moveBackward = input.keyboard.down(gvk::sys::Key::S),
+            .moveSpeedMultiplier = input.keyboard.down(gvk::sys::Key::LeftShift) ? 2.0f : 1.0f,
+            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
+            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
+        };
+        cameraController.lookEnabled = input.mouse.buttons.down(gvk::sys::Mouse::Button::Left);
+        if (input.mouse.buttons.pressed(gvk::sys::Mouse::Button::Right)) {
+            camera.fieldOfView = 60.0f;
+        }
+        cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
         CameraUniforms cameraUbo { };
@@ -656,7 +688,7 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
 
     //remove the rigidbodies from the dynamics world and delete them
-    for (int i = physicsContext.mupWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
+    for (int i = physicsContext.mupWorld->getNumCollisionObjects() - 1; 0 <= i; --i) {
         btCollisionObject* obj = physicsContext.mupWorld->getCollisionObjectArray()[i];
         // btRigidBody* body = btRigidBody::upcast(obj);
         physicsContext.mupWorld->removeCollisionObject(obj);
