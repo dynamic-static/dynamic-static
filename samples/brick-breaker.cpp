@@ -127,6 +127,7 @@ public:
         float mass { };
         btVector3 initialPosition { };
         btCollisionShape* pCollisionShape { nullptr };
+        bool ccd { false };
     };
 
     static void create(dst::physics::Context& physicsContext, const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
@@ -145,11 +146,13 @@ public:
         pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(
             btRigidBody::btRigidBodyConstructionInfo(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, inertia)
         );
-        pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
-        btVector3 boundingSphereCenter { };
-        btScalar boundingSphereRadius = 0;
-        pCreateInfo->pCollisionShape->getBoundingSphere(boundingSphereCenter, boundingSphereRadius);
-        pRigidBody->mupRigidBody->setCcdSweptSphereRadius(boundingSphereRadius);
+        // if (pCreateInfo->ccd) {
+            pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
+            // btVector3 boundingSphereCenter { };
+            // btScalar boundingSphereRadius = 0;
+            // pCreateInfo->pCollisionShape->getBoundingSphere(boundingSphereCenter, boundingSphereRadius);
+            // pRigidBody->mupRigidBody->setCcdSweptSphereRadius(boundingSphereRadius);
+        // }
         physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
     }
 
@@ -177,14 +180,16 @@ public:
         vkUpdateDescriptorSets(context.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
     }
 
-    void setup_physics_resources(dst::physics::Context& context, btCollisionShape* pBtCollisionShape, float mass, const glm::vec3& initialPosition)
+    void setup_physics_resources(dst::physics::Context& context, btCollisionShape* pBtCollisionShape, float mass, const glm::vec3& initialPosition, bool ccd = false)
     {
         mInitialPosition = initialPosition;;
         RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.mass = mass;
         rigidBodyCreateInfo.initialPosition.setValue(mInitialPosition.x, mInitialPosition.y, mInitialPosition.z);
         rigidBodyCreateInfo.pCollisionShape = pBtCollisionShape;
+        rigidBodyCreateInfo.ccd = ccd;
         RigidBody::create(context, &rigidBodyCreateInfo, &rigidBody);
+        rigidBody.mupRigidBody->setUserPointer(this);
     }
 
     void update_uniform_buffer(const gvk::Device& device)
@@ -227,6 +232,17 @@ enum class State
     GameOver,
 };
 
+enum class ObjectType
+{
+    Unknown,
+    Brick,
+    Ball,
+    Paddle,
+    Ceiling,
+    Wall,
+    Floor,
+};
+
 static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep)
 {
     (void)timeStep;
@@ -255,6 +271,10 @@ static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScal
 
 int main(int, const char* [])
 {
+    const int BrickGroup = 1;
+    const int BallGroup = 2;
+    const int PaddleGroup = 4;
+
     const float CeilingWidth = 32;
     const float CeilingHeight = 1;
     const float CeilingDepth = 1;
@@ -262,6 +282,10 @@ int main(int, const char* [])
     const float WallWidth = 1;
     const float WallHeight = 64;
     const float WallDepth = 1;
+
+    const float FloorWidth = 64;
+    const float FloorHeight = 1;
+    const float FloorDepth = 64;
 
     const float BrickWidth = 2;
     const float BrickHeight = 1;
@@ -343,6 +367,7 @@ int main(int, const char* [])
 
             void main()
             {
+                
                 fragColor = object.color;
             }
         )"
@@ -379,6 +404,7 @@ int main(int, const char* [])
     gvk::math::Camera camera;
     gvk::math::FreeCameraController cameraController;
     cameraController.set_camera(&camera);
+    camera.nearPlane = 1.0f;
     camera.transform.translation.z = -64;
     gvk::Buffer cameraUniformBuffer;
     vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer);
@@ -425,6 +451,16 @@ int main(int, const char* [])
 
         ceiling.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ceiling.rigidBody.mupRigidBody->setActivationState(0);
+        ceiling.rigidBody.mupRigidBody->setRestitution(0.6f);
+    }
+
+    // TODO : Documentation
+    btBoxShape floorCollisionShape(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
+    Object floor;
+    {
+        floor.setup_physics_resources(physicsContext, &floorCollisionShape, 0, { 0, -38, 0 });
+        floor.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+        floor.rigidBody.mupRigidBody->setActivationState(0);
     }
 
     // TODO : Documentation
@@ -442,6 +478,7 @@ int main(int, const char* [])
 
         leftWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         leftWall.rigidBody.mupRigidBody->setActivationState(0);
+        leftWall.rigidBody.mupRigidBody->setRestitution(0.6f);
     }
     Object rightWall;
     {
@@ -453,6 +490,7 @@ int main(int, const char* [])
 
         rightWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         rightWall.rigidBody.mupRigidBody->setActivationState(0);
+        rightWall.rigidBody.mupRigidBody->setRestitution(0.6f);
     }
 
     // TODO : Documentation
@@ -471,14 +509,20 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
     btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
     std::array<Object, BrickRowCount * BricksPerRow> bricks;
+    auto playAreaWidth = CeilingWidth - WallWidth;
+    auto brickAreaWidth = playAreaWidth / BricksPerRow;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
+        auto offset = -playAreaWidth * 0.5f + brickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BricksPerRow; ++brick_i) {
             auto& brick = bricks[row_i * BricksPerRow + brick_i];
             gvk::DescriptorSet descriptorSet;
             vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
             assert(vkResult == VK_SUCCESS);
             brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
-            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { brick_i * BrickWidth * 2.0f, 30.0f - row_i * BrickHeight * 2.0f, 0 });
+
+
+            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { offset, 30.0f - row_i * BrickHeight * 2.0f, 0 });
+            offset += brickAreaWidth;
 
             // brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
             brick.rigidBody.mupRigidBody->setActivationState(0);
@@ -501,6 +545,7 @@ int main(int, const char* [])
 
         ball.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ball.rigidBody.mupRigidBody->setActivationState(0);
+        ball.rigidBody.mupRigidBody->setRestitution(0.9f);
     }
 
     // TODO : Documentation
@@ -514,9 +559,10 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
-        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 });
+        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 }, true);
         paddle.rigidBody.mupRigidBody->setLinearFactor({ 1, 0, 0 });
         paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
+        paddle.rigidBody.mupRigidBody->setDamping(0.4f, 0.0f);
     }
 
     uint32_t ballCount = BallCount;
@@ -529,11 +575,10 @@ int main(int, const char* [])
         gvk::sys::Surface::update();
         clock.update();
 
-        auto deltaTime = clock.elapsed<gvk::sys::Seconds<double>>();
         const auto& input = gfxContext.get_sys_surface().get_input();
 
         // TODO : Documentation
-        const float PaddleSpeed = 32;
+        const float PaddleSpeed = 48;
         if (input.keyboard.down(gvk::sys::Key::LeftArrow)) {
             paddle.rigidBody.mupRigidBody->activate(true);
             paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
@@ -569,20 +614,39 @@ int main(int, const char* [])
                     }
                 }
                 for (auto& ball : balls) {
-                    auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
-                    if (collision.second < collision.first) {
-                        std::swap(collision.first, collision.second);
-                    }
-#if 0
-                    if (collisions.count(collision)) {
-                        const auto& ballTransform = ball.rigidBody.mupRigidBody->getWorldTransform();
-                        const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getWorldTransform();
-                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                            const auto& paddleVelocity = paddle.rigidBody.mupRigidBody->getLinearVelocity();
-                            ball.rigidBody.mupRigidBody->applyCentralImpulse({ paddleVelocity.x(), 64, 0 });
+                    for (const auto& brick : bricks) {
+                        auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)brick.rigidBody.mupRigidBody.get());
+                        if (collision.second < collision.first) {
+                            std::swap(collision.first, collision.second);
+                        }
+                        if (collisions.count(collision)) {
+                            if (paddle.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y() < brick.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y()) {
+                                btTransform transform { };
+                                brick.rigidBody.mupMotionState->getWorldTransform(transform);
+                                transform.getOrigin().setZ(2);
+                                brick.rigidBody.mupMotionState->setWorldTransform(transform);
+                                brick.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
+                                brick.rigidBody.mupRigidBody->applyTorqueImpulse({ 16, 0, 0 });
+                                brick.rigidBody.mupRigidBody->activate(true);
+                            }
                         }
                     }
-#endif
+                    {
+                        auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
+                        if (collision.second < collision.first) {
+                            std::swap(collision.first, collision.second);
+                        }
+                        if (collisions.count(collision)) {
+                            const auto& ballTransform = ball.rigidBody.mupRigidBody->getWorldTransform();
+                            const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getWorldTransform();
+                            if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                                auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                                impulse *= 64;
+                                impulse.setY(64);
+                                ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
+                            }
+                        }
+                    }
                 }
             } break;
             case State::Win:
@@ -600,10 +664,11 @@ int main(int, const char* [])
         }
 
         collisions.clear();
-        physicsContext.mupWorld->stepSimulation((float)deltaTime);
+        auto deltaTime = clock.elapsed<gvk::sys::Seconds<float>>();
+        physicsContext.mupWorld->stepSimulation(deltaTime);
 
         gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
-            .deltaTime = (float)deltaTime,
+            .deltaTime = deltaTime,
             .moveUp = input.keyboard.down(gvk::sys::Key::Q),
             .moveDown = input.keyboard.down(gvk::sys::Key::E),
             .moveLeft = input.keyboard.down(gvk::sys::Key::A),
