@@ -304,6 +304,27 @@ int main(int, const char* [])
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
+    auto gvkDevice = gfxContext.get_devices()[0];
+    auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
+
+    auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
+    systemSurfaceCreateInfo.pTitle = gfxContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
+    gvk::system::Surface systemSurface;
+    auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
+    assert(success);
+
+    auto wsiManagerCreateInfo = gvk::get_default<gvk::WsiManager::CreateInfo>();
+    auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
+    win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
+    win32SurfaceCreateInfo.hwnd = (HWND)systemSurface.get_hwnd();
+    wsiManagerCreateInfo.pWin32SurfaceCreateInfoKHR = &win32SurfaceCreateInfo;
+    wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
+    wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
+    wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+    wsiManagerCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
+    gvk::WsiManager wsiManager;
+    vkResult = gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager);
+    assert(vkResult == VK_SUCCESS);
 
     dst::physics::Context physicsContext;
     dst::physics::Context::create(&physicsContext);
@@ -374,7 +395,7 @@ int main(int, const char* [])
     };
     gvk::Pipeline pipeline;
     vkResult = dst_sample_create_pipeline<glm::vec3>(
-        gfxContext.get_wsi_manager().get_render_pass(),
+        wsiManager.get_render_pass(),
         VK_CULL_MODE_BACK_BIT,
 #if 0
         VK_POLYGON_MODE_LINE,
@@ -568,22 +589,21 @@ int main(int, const char* [])
     uint32_t ballCount = BallCount;
     State state = State::Play;
     // double frameTimeAccumulator = 0;
-    gvk::sys::Clock clock;
+    gvk::system::Clock clock;
     while (
-        !(gfxContext.get_sys_surface().get_input().keyboard.down(gvk::sys::Key::Escape)) &&
-        !(gfxContext.get_sys_surface().get_status() & gvk::sys::Surface::CloseRequested)) {
-        gvk::sys::Surface::update();
+        !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
+        !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
         clock.update();
-
-        const auto& input = gfxContext.get_sys_surface().get_input();
+        gvk::system::Surface::update();
+        const auto& input = systemSurface.get_input();
 
         // TODO : Documentation
         const float PaddleSpeed = 48;
-        if (input.keyboard.down(gvk::sys::Key::LeftArrow)) {
+        if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
             paddle.rigidBody.mupRigidBody->activate(true);
             paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
         }
-        if (input.keyboard.down(gvk::sys::Key::RightArrow)) {
+        if (input.keyboard.down(gvk::system::Key::RightArrow)) {
             paddle.rigidBody.mupRigidBody->activate(true);
             paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { -PaddleSpeed, 0, 0 });
         }
@@ -602,7 +622,7 @@ int main(int, const char* [])
             } break;
             case State::Play:
             {
-                if (input.keyboard.pressed(gvk::sys::Key::SpaceBar)) {
+                if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
                     if (ballCount) {
                         assert(ballCount <= balls.size());
                         auto& ball = balls[ballCount - 1];
@@ -664,23 +684,23 @@ int main(int, const char* [])
         }
 
         collisions.clear();
-        auto deltaTime = clock.elapsed<gvk::sys::Seconds<float>>();
+        auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
         physicsContext.mupWorld->stepSimulation(deltaTime);
 
         gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
             .deltaTime = deltaTime,
-            .moveUp = input.keyboard.down(gvk::sys::Key::Q),
-            .moveDown = input.keyboard.down(gvk::sys::Key::E),
-            .moveLeft = input.keyboard.down(gvk::sys::Key::A),
-            .moveRight = input.keyboard.down(gvk::sys::Key::D),
-            .moveForward = input.keyboard.down(gvk::sys::Key::W),
-            .moveBackward = input.keyboard.down(gvk::sys::Key::S),
-            .moveSpeedMultiplier = input.keyboard.down(gvk::sys::Key::LeftShift) ? 2.0f : 1.0f,
+            .moveUp = input.keyboard.down(gvk::system::Key::Q),
+            .moveDown = input.keyboard.down(gvk::system::Key::E),
+            .moveLeft = input.keyboard.down(gvk::system::Key::A),
+            .moveRight = input.keyboard.down(gvk::system::Key::D),
+            .moveForward = input.keyboard.down(gvk::system::Key::W),
+            .moveBackward = input.keyboard.down(gvk::system::Key::S),
+            .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
             .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
             .fieldOfViewDelta = input.mouse.scroll.delta()[1],
         };
-        cameraController.lookEnabled = input.mouse.buttons.down(gvk::sys::Mouse::Button::Left);
-        if (input.mouse.buttons.pressed(gvk::sys::Mouse::Button::Right)) {
+        cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
+        if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
             camera.fieldOfView = 60.0f;
         }
         cameraController.update(cameraControllerUpdateInfo);
@@ -705,49 +725,64 @@ int main(int, const char* [])
             ball.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
 
-        auto& wsiManager = gfxContext.get_wsi_manager();
-        if (wsiManager.update()) {
+        wsiManager.update();
+        auto swapchain = wsiManager.get_swapchain();
+        if (swapchain) {
+            uint32_t imageIndex = 0;
+            vkResult = wsiManager.acquire_next_image(UINT64_MAX, VK_NULL_HANDLE, &imageIndex);
+            assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
+
             auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
             camera.set_aspect_ratio(extent.width, extent.height);
-            for (size_t i = 0; i < wsiManager.get_command_buffers().size(); ++i) {
-                const auto& commandBuffer = wsiManager.get_command_buffers()[i];
-                vkResult = vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>());
-                assert(vkResult == VK_SUCCESS);
-                auto renderPassBeginInfo = wsiManager.get_render_targets()[i].get_render_pass_begin_info();
-                vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-                {
-                    // TODO : Documentation
-                    VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
-                    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-                    VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
-                    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                    // TODO : Documentation
-                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            const auto& vkFences = wsiManager.get_vk_fences();
+            vkResult = vkWaitForFences(gvkDevice, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX);
+            assert(vkResult == VK_SUCCESS);
+            vkResult = vkResetFences(gvkDevice, 1, &vkFences[imageIndex]);
+            assert(vkResult == VK_SUCCESS);
 
-                    // TODO : Documentation
-                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+            const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
+            vkResult = vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>());
+            assert(vkResult == VK_SUCCESS);
+            auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
+            vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            {
+                // TODO : Documentation
+                VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
+                vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+                VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
+                vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                    // TODO : Documentation
-                    paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    for (auto& brick : bricks) {
-                        brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    }
-                    for (auto& ball : balls) {
-                        ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                    }
+                // TODO : Documentation
+                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+                // TODO : Documentation
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+
+                // TODO : Documentation
+                paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                for (auto& brick : bricks) {
+                    brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                 }
-                vkCmdEndRenderPass(commandBuffer);
-
-                vkResult = vkEndCommandBuffer(commandBuffer);
-                assert(vkResult == VK_SUCCESS);
+                for (auto& ball : balls) {
+                    ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                }
             }
+            vkCmdEndRenderPass(commandBuffer);
+            vkResult = vkEndCommandBuffer(commandBuffer);
+            assert(vkResult == VK_SUCCESS);
+
+            auto submitInfo = wsiManager.get_submit_info(imageIndex);
+            vkResult = vkQueueSubmit(gvkQueue, 1, &submitInfo, vkFences[imageIndex]);
+            assert(vkResult == VK_SUCCESS);
+
+            auto presentInfo = wsiManager.get_present_info(&imageIndex);
+            vkResult = vkQueuePresentKHR(gvkQueue, &presentInfo);
+            assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
         }
-        vkResult = dst_sample_acquire_submit_present(gfxContext);
-        assert(vkResult == VK_SUCCESS);
     }
     vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
     assert(vkResult == VK_SUCCESS);

@@ -26,19 +26,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "gvk/math/camera.hpp"
-#include "gvk/math/color.hpp"
-#include "gvk/math/transform.hpp"
-#include "gvk/system/time.hpp"
-#include "gvk/context.hpp"
-#include "gvk/defaults.hpp"
-#include "gvk/format.hpp"
-#include "gvk/handles.hpp"
-#include "gvk/mesh.hpp"
-#include "gvk/render-target.hpp"
-#include "gvk/spir-v.hpp"
-#include "gvk/structures.hpp"
-#include "gvk/to-string.hpp"
+#include "gvk-defines.hpp"
+#include "gvk-format-info.hpp"
+#include "gvk-handles.hpp"
+#include "gvk-math.hpp"
+#include "gvk-runtime.hpp"
+#include "gvk-spirv.hpp"
+#include "gvk-structures.hpp"
+#include "gvk-system.hpp"
 
 namespace dst {
 namespace gfx {
@@ -89,6 +84,24 @@ struct VertexPositionNormalTexcoordColor
 
 } // namespace gfx
 } // namespace dst
+
+template <>
+inline VkFormat gvk::get_vertex_input_attribute_format<glm::vec2>()
+{
+    return VK_FORMAT_R32G32_SFLOAT;
+}
+
+template <>
+inline VkFormat gvk::get_vertex_input_attribute_format<glm::vec3>()
+{
+    return VK_FORMAT_R32G32B32_SFLOAT;
+}
+
+template <>
+inline VkFormat gvk::get_vertex_input_attribute_format<glm::vec4>()
+{
+    return VK_FORMAT_R32G32B32A32_SFLOAT;
+}
 
 template <>
 inline auto gvk::get_vertex_description<dst::gfx::EmptyVertex>(uint32_t binding)

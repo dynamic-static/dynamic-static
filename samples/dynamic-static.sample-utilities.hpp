@@ -58,6 +58,7 @@ private:
 public:
     static VkResult create(const char* pApplicationName, GfxContext* pGfxContext)
     {
+#if 0
         auto applicationInfo = gvk::get_default<VkApplicationInfo>();
         applicationInfo.pApplicationName = pApplicationName;
         auto sysSurfaceCreateInfo = gvk::get_default<gvk::sys::Surface::CreateInfo>();
@@ -77,6 +78,35 @@ public:
         contextCreateInfo.pApplicationInfo = &applicationInfo;
         contextCreateInfo.pSysSurfaceCreateInfo = &sysSurfaceCreateInfo;
         contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
+        return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
+#endif
+
+        // Setup a VkInstanceCreateInfo.
+        auto applicationInfo = gvk::get_default<VkApplicationInfo>();
+        applicationInfo.pApplicationName = pApplicationName;
+        auto instanceCreateInfo = gvk::get_default<VkInstanceCreateInfo>();
+        instanceCreateInfo.pApplicationInfo = &applicationInfo;
+
+        // Setup VkDeviceCreateInfo with desired VkPhysicalDeviceFeatures.
+        auto physicalDeviceFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
+        physicalDeviceFeatures.samplerAnisotropy = VK_TRUE;
+        auto deviceCreateInfo = gvk::get_default<VkDeviceCreateInfo>();
+        deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
+
+        // VkDebugUtilsMessengerCreateInfoEXT is an optional member of gvk::Context::CreateInfo.
+        //  Providing a VkDebugUtilsMessengerCreateInfoEXT indicates that the debug
+        //  utils extension should be loaded.
+        auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
+        debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
+
+        // Populate the gvk::Context::CreateInfo and call the base implementation.
+        auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
+        contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
+        contextCreateInfo.loadApiDumpLayer = VK_FALSE;
+        contextCreateInfo.loadValidationLayer = VK_TRUE;
+        contextCreateInfo.loadWsiExtensions = VK_TRUE;
+        contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
+        contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;
         return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
     }
 
@@ -106,16 +136,6 @@ protected:
         auto deviceCreateInfo = *pDeviceCreateInfo;
         deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
         return gvk::Context::create_devices(&deviceCreateInfo, pAllocator);
-    }
-
-    VkResult create_wsi_manager(const gvk::WsiManager::CreateInfo* pWsiManagerCreateInfo, const VkAllocationCallbacks* pAllocator) override
-    {
-        assert(pWsiManagerCreateInfo);
-        auto wsiManagerCreateInfo = *pWsiManagerCreateInfo;
-        wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
-        wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
-        wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-        return gvk::Context::create_wsi_manager(&wsiManagerCreateInfo, pAllocator);
     }
 };
 
@@ -326,7 +346,8 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Context& context, gv
     return gvk::Buffer::create(context.get_devices()[0], &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
 }
 
-VkResult dst_sample_acquire_submit_present(gvk::Context& context)
+#if 0
+VkResult dst_sample_acquire_submit_present(gvk::WsiManager& wsiManager)
 {
     gvk_result_scope_begin(VK_SUCCESS) {
         const auto& device = context.get_devices()[0];
@@ -366,3 +387,4 @@ VkResult dst_sample_acquire_submit_present(gvk::Context& context)
     } gvk_result_scope_end;
     return gvkResult;
 }
+#endif
