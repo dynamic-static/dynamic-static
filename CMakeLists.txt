@@ -14,27 +14,19 @@ endif()
 include(CMakeDependentOption)
 # Test options
 option                (DST_BUILD_TESTS            "" ${DST_STANDALONE})
-cmake_dependent_option(DST_RUN_TESTS              "" ON
-    "DST_BUILD_TESTS" OFF
-)
+cmake_dependent_option(DST_RUN_TESTS              "" ON "DST_BUILD_TESTS" OFF)
 # Dependency options
 option                (DST_GVK_ENABLED            "" ON)
 option                (DST_BULLET_ENABLED         "" ON)
 # Target options
 option                (DST_CORE_ENABLED           "" ON)
-cmake_dependent_option(DST_GRAPHICS_ENABLED       "" ON
-    "DST_CORE_ENABLED;DST_GVK_ENABLED" OFF
-)
-cmake_dependent_option(DST_PHYSICS_ENABLED        "" ON
-    "DST_CORE_ENABLED;DST_BULLET_ENABLED" OFF
-)
+cmake_dependent_option(DST_GRAPHICS_ENABLED       "" ON "DST_CORE_ENABLED;DST_GVK_ENABLED" OFF)
+cmake_dependent_option(DST_PHYSICS_ENABLED        "" ON "DST_CORE_ENABLED;DST_BULLET_ENABLED" OFF)
 # Samples options
 option                (DST_BUILD_SAMPLES          "" ${DST_STANDALONE})
 # Packaging options
 option                (DST_CREATE_SOURCE_PACKAGE  "" OFF)
-cmake_dependent_option(DST_CREATE_TEST_PACKAGE    "" OFF
-    "DST_BUILD_TESTS" OFF
-)
+cmake_dependent_option(DST_CREATE_TEST_PACKAGE    "" OFF "DST_BUILD_TESTS" OFF)
 
 ################################################################################
 # CMake utilities

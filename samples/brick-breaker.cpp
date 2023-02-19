@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.sample-utilities.hpp"
 #include "dynamic-static.physics/context.hpp"
+#include "dynamic-static.physics/collider.hpp"
 #include "dynamic-static.graphics/primitives.hpp"
 #include "dynamic-static/finite-state-machine.hpp"
 
@@ -333,6 +334,10 @@ int main(int, const char* [])
     std::set<std::pair<uint64_t, uint64_t>> collisions;
     pDynamicsWorld->setInternalTickCallback(bullet_physics_tick_callback, &collisions);
 
+    ///////////////////////////////////////////////////////////////////////////////
+    dst::physics::Collider::Pool colliderPool;
+    ///////////////////////////////////////////////////////////////////////////////
+
     // TODO : Documentation
     gvk::spirv::ShaderInfo vertexShaderInfo {
         .language = gvk::spirv::ShadingLanguage::Glsl,
@@ -461,14 +466,13 @@ int main(int, const char* [])
     gvk::Mesh ceilingMesh;
     vkResult = create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
     assert(vkResult == VK_SUCCESS);
-    btBoxShape ceilingCollisionShape(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
     Object ceiling;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         ceiling.setup_graphics_resources(gfxContext, ceilingMesh, descriptorSet, gvk::math::Color::White);
-        ceiling.setup_physics_resources(physicsContext, &ceilingCollisionShape, 0, { 0, 32, 0 });
+        ceiling.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f), 0, { 0, 32, 0 });
 
         ceiling.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ceiling.rigidBody.mupRigidBody->setActivationState(0);
@@ -476,10 +480,9 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    btBoxShape floorCollisionShape(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
     Object floor;
     {
-        floor.setup_physics_resources(physicsContext, &floorCollisionShape, 0, { 0, -38, 0 });
+        floor.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f), 0, { 0, -38, 0 });
         floor.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         floor.rigidBody.mupRigidBody->setActivationState(0);
     }
@@ -488,14 +491,13 @@ int main(int, const char* [])
     gvk::Mesh wallMesh;
     vkResult = create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, &wallMesh);
     assert(vkResult == VK_SUCCESS);
-    btBoxShape wallCollisionShape(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
     Object leftWall;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         leftWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-        leftWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { 16, 0, 0 });
+        leftWall.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { 16, 0, 0 });
 
         leftWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         leftWall.rigidBody.mupRigidBody->setActivationState(0);
@@ -507,7 +509,7 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         rightWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-        rightWall.setup_physics_resources(physicsContext, &wallCollisionShape, 0, { -16, 0, 0 });
+        rightWall.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { -16, 0, 0 });
 
         rightWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         rightWall.rigidBody.mupRigidBody->setActivationState(0);
@@ -528,7 +530,6 @@ int main(int, const char* [])
     gvk::Mesh brickMesh;
     vkResult = create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
     assert(vkResult == VK_SUCCESS);
-    btBoxShape brickCollisionShape(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
     std::array<Object, BrickRowCount * BricksPerRow> bricks;
     auto playAreaWidth = CeilingWidth - WallWidth;
     auto brickAreaWidth = playAreaWidth / BricksPerRow;
@@ -540,9 +541,7 @@ int main(int, const char* [])
             vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
             assert(vkResult == VK_SUCCESS);
             brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
-
-
-            brick.setup_physics_resources(physicsContext, &brickCollisionShape, BrickMass, { offset, 30.0f - row_i * BrickHeight * 2.0f, 0 });
+            brick.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f), BrickMass, { offset, 30.0f - row_i * BrickHeight * 2.0f, 0 });
             offset += brickAreaWidth;
 
             // brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
@@ -554,7 +553,6 @@ int main(int, const char* [])
     gvk::Mesh ballMesh;
     vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &ballMesh);
     assert(vkResult == VK_SUCCESS);
-    btSphereShape ballCollisionShape(BallRadius);
     std::array<Object, BallCount> balls;
     for (size_t i = 0; i < balls.size(); ++i) {
         auto& ball = balls[i];
@@ -562,7 +560,7 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         ball.setup_graphics_resources(gfxContext, ballMesh, descriptorSet, gvk::math::Color::SlateGray);
-        ball.setup_physics_resources(physicsContext, &ballCollisionShape, BallMass, { -16.0f + i * 2.0f, 34, 0 });
+        ball.setup_physics_resources(physicsContext, colliderPool.get_sphere_collider(BallRadius), BallMass, { -16.0f + i * 2.0f, 34, 0 });
 
         ball.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ball.rigidBody.mupRigidBody->setActivationState(0);
@@ -573,14 +571,13 @@ int main(int, const char* [])
     gvk::Mesh paddleMesh;
     vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
     assert(vkResult == VK_SUCCESS);
-    btBoxShape paddleCollisionShape(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
     Object paddle;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
-        paddle.setup_physics_resources(physicsContext, &paddleCollisionShape, 1, { 0, -28, 0 }, true);
+        paddle.setup_physics_resources(physicsContext, colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f), 1, { 0, -28, 0 }, true);
         paddle.rigidBody.mupRigidBody->setLinearFactor({ 1, 0, 0 });
         paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
         paddle.rigidBody.mupRigidBody->setDamping(0.4f, 0.0f);
