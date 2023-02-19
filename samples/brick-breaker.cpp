@@ -35,6 +35,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -120,6 +121,12 @@ public:
 
 };
 
+const int BrickGroup = 1;
+const int BallGroup = 2;
+const int PaddleGroup = 4;
+const int WallGroup = 8;
+const int AllGroup = BrickGroup | BallGroup | PaddleGroup | WallGroup;
+
 class RigidBody final
 {
 public:
@@ -154,7 +161,7 @@ public:
             // pCreateInfo->pCollisionShape->getBoundingSphere(boundingSphereCenter, boundingSphereRadius);
             // pRigidBody->mupRigidBody->setCcdSweptSphereRadius(boundingSphereRadius);
         // }
-        physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get());
+        physicsContext.mupWorld->addRigidBody(pRigidBody->mupRigidBody.get(), AllGroup, AllGroup);
     }
 
     std::unique_ptr<btMotionState> mupMotionState;
@@ -272,10 +279,6 @@ static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScal
 
 int main(int, const char* [])
 {
-    const int BrickGroup = 1;
-    const int BallGroup = 2;
-    const int PaddleGroup = 4;
-
     const float CeilingWidth = 32;
     const float CeilingHeight = 1;
     const float CeilingDepth = 1;
@@ -291,7 +294,7 @@ int main(int, const char* [])
     const float BrickWidth = 2;
     const float BrickHeight = 1;
     const float BrickDepth = 1;
-    const float BrickMass = 32;
+    const float BrickMass = 16;
     const uint32_t BrickCount = 60;
 
     const float PaddleWidth = 6;
@@ -413,6 +416,17 @@ int main(int, const char* [])
     );
     assert(vkResult == VK_SUCCESS);
 
+    bool showGui = false;
+    gvk::gui::Renderer guiRenderer;
+    vkResult = gvk::gui::Renderer::create(
+        gvkDevice,
+        gvkQueue,
+        gfxContext.get_command_buffers()[0],
+        wsiManager.get_render_pass(),
+        nullptr,
+        &guiRenderer
+    );
+
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
     descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -533,6 +547,7 @@ int main(int, const char* [])
     std::array<Object, BrickRowCount * BricksPerRow> bricks;
     auto playAreaWidth = CeilingWidth - WallWidth;
     auto brickAreaWidth = playAreaWidth / BricksPerRow;
+    std::set<uint64_t> brickAddresses;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
         auto offset = -playAreaWidth * 0.5f + brickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BricksPerRow; ++brick_i) {
@@ -546,6 +561,13 @@ int main(int, const char* [])
 
             // brick.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
             brick.rigidBody.mupRigidBody->setActivationState(0);
+
+            ///////////////////////////////////////////////////////////////////////////////
+            physicsContext.mupWorld->removeRigidBody(brick.rigidBody.mupRigidBody.get());
+            physicsContext.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
+            ///////////////////////////////////////////////////////////////////////////////
+
+            brickAddresses.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
         }
     }
 
@@ -581,7 +603,13 @@ int main(int, const char* [])
         paddle.rigidBody.mupRigidBody->setLinearFactor({ 1, 0, 0 });
         paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
         paddle.rigidBody.mupRigidBody->setDamping(0.4f, 0.0f);
+        ///////////////////////////////////////////////////////////////////////////////
+        physicsContext.mupWorld->removeRigidBody(paddle.rigidBody.mupRigidBody.get());
+        physicsContext.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get(), PaddleGroup, AllGroup & ~BrickGroup);
+        ///////////////////////////////////////////////////////////////////////////////
     }
+
+    float PaddleSpeed = 48;
 
     uint32_t ballCount = BallCount;
     State state = State::Play;
@@ -595,15 +623,16 @@ int main(int, const char* [])
         const auto& input = systemSurface.get_input();
 
         // TODO : Documentation
-        const float PaddleSpeed = 48;
-        if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
-            paddle.rigidBody.mupRigidBody->activate(true);
-            paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
-        }
-        if (input.keyboard.down(gvk::system::Key::RightArrow)) {
-            paddle.rigidBody.mupRigidBody->activate(true);
-            paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { -PaddleSpeed, 0, 0 });
-        }
+        // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
+            if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
+                paddle.rigidBody.mupRigidBody->activate(true);
+                paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
+            }
+            if (input.keyboard.down(gvk::system::Key::RightArrow)) {
+                paddle.rigidBody.mupRigidBody->activate(true);
+                paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { -PaddleSpeed, 0, 0 });
+            }
+        // }
         switch (state) {
         case State::Attract:
             {
@@ -619,18 +648,40 @@ int main(int, const char* [])
             } break;
             case State::Play:
             {
-                if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
-                    if (ballCount) {
-                        assert(ballCount <= balls.size());
-                        auto& ball = balls[ballCount - 1];
-                        auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                        transform.setOrigin({ 0, 0, 0 });
-                        ball.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
-                        ball.rigidBody.mupRigidBody->activate(true);
-                        ballCount -= 1;
+                if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
+                    if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
+                        if (ballCount) {
+                            assert(ballCount <= balls.size());
+                            auto& ball = balls[ballCount - 1];
+                            auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                            transform.setOrigin({ 0, 0, 0 });
+                            ball.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
+                            ball.rigidBody.mupRigidBody->activate(true);
+                            ballCount -= 1;
+                        }
                     }
                 }
+
+                for (const auto& collision : collisions) {
+                    for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
+                        if (brickAddresses.count(collider)) {
+                            brickAddresses.erase(collider);
+                            auto pRigidBody = (btRigidBody*)collider;
+                            physicsContext.mupWorld->removeCollisionObject(pRigidBody);
+                            physicsContext.mupWorld->addRigidBody(pRigidBody, BrickGroup, AllGroup & ~PaddleGroup);
+                            // btTransform transform { };
+                            // pRigidBody->getWorldTransform(transform);
+                            // // transform.getOrigin().setZ(2);
+                            // pRigidBody->setWorldTransform(transform);
+                            // pRigidBody->setCenterOfMassTransform(transform);
+                            // pRigidBody->applyTorqueImpulse({ 16, 0, 0 });
+                            pRigidBody->activate(true);
+                        }
+                    }
+                }
+
                 for (auto& ball : balls) {
+                    #if 0
                     for (const auto& brick : bricks) {
                         auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)brick.rigidBody.mupRigidBody.get());
                         if (collision.second < collision.first) {
@@ -638,16 +689,19 @@ int main(int, const char* [])
                         }
                         if (collisions.count(collision)) {
                             if (paddle.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y() < brick.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y()) {
-                                btTransform transform { };
-                                brick.rigidBody.mupMotionState->getWorldTransform(transform);
-                                transform.getOrigin().setZ(2);
-                                brick.rigidBody.mupMotionState->setWorldTransform(transform);
-                                brick.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
-                                brick.rigidBody.mupRigidBody->applyTorqueImpulse({ 16, 0, 0 });
+                                physicsContext.mupWorld->removeCollisionObject(brick.rigidBody.mupRigidBody.get());
+                                physicsContext.mupWorld->addRigidBody(brick.rigidBody.mupRigidBody.get(), BrickGroup, AllGroup & ~PaddleGroup);
+                                // btTransform transform { };
+                                // brick.rigidBody.mupMotionState->getWorldTransform(transform);
+                                // // transform.getOrigin().setZ(2);
+                                // brick.rigidBody.mupMotionState->setWorldTransform(transform);
+                                // brick.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
+                                // brick.rigidBody.mupRigidBody->applyTorqueImpulse({ 16, 0, 0 });
                                 brick.rigidBody.mupRigidBody->activate(true);
                             }
                         }
                     }
+                    #endif
                     {
                         auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
                         if (collision.second < collision.first) {
@@ -684,23 +738,25 @@ int main(int, const char* [])
         auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
         physicsContext.mupWorld->stepSimulation(deltaTime);
 
-        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
-            .deltaTime = deltaTime,
-            .moveUp = input.keyboard.down(gvk::system::Key::Q),
-            .moveDown = input.keyboard.down(gvk::system::Key::E),
-            .moveLeft = input.keyboard.down(gvk::system::Key::A),
-            .moveRight = input.keyboard.down(gvk::system::Key::D),
-            .moveForward = input.keyboard.down(gvk::system::Key::W),
-            .moveBackward = input.keyboard.down(gvk::system::Key::S),
-            .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
-            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
-            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
-        };
-        cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
-        if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
-            camera.fieldOfView = 60.0f;
+        if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
+            gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
+                .deltaTime = deltaTime,
+                .moveUp = input.keyboard.down(gvk::system::Key::Q),
+                .moveDown = input.keyboard.down(gvk::system::Key::E),
+                .moveLeft = input.keyboard.down(gvk::system::Key::A),
+                .moveRight = input.keyboard.down(gvk::system::Key::D),
+                .moveForward = input.keyboard.down(gvk::system::Key::W),
+                .moveBackward = input.keyboard.down(gvk::system::Key::S),
+                .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
+                .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
+                .fieldOfViewDelta = input.mouse.scroll.delta()[1],
+            };
+            cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
+            if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
+                camera.fieldOfView = 60.0f;
+            }
+            cameraController.update(cameraControllerUpdateInfo);
         }
-        cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
         CameraUniforms cameraUbo { };
@@ -733,6 +789,62 @@ int main(int, const char* [])
             camera.set_aspect_ratio(extent.width, extent.height);
 
             const auto& vkFences = wsiManager.get_vk_fences();
+
+            if (showGui) {
+                auto imguiCursor = ImGui::GetMouseCursor();
+                if (imguiCursor == ImGuiMouseCursor_None || ImGui::GetIO().MouseDrawCursor) {
+                    systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Hidden);
+                } else {
+                    switch (imguiCursor) {
+                    case ImGuiMouseCursor_Arrow: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Arrow); break;
+                    case ImGuiMouseCursor_TextInput: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::IBeam); break;
+                    case ImGuiMouseCursor_Hand: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Hand); break;
+                    case ImGuiMouseCursor_ResizeNS: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNS); break;
+                    case ImGuiMouseCursor_ResizeEW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeEW); break;
+                    case ImGuiMouseCursor_ResizeAll: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeAll); break;
+                    case ImGuiMouseCursor_ResizeNESW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNESW); break;
+                    case ImGuiMouseCursor_ResizeNWSE: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNWSE); break;
+                    case ImGuiMouseCursor_NotAllowed: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::NotAllowed); break;
+                    default: break;
+                    }
+                }
+                if (systemSurface.get_status() & gvk::system::Surface::GainedFocus) {
+                    ImGui::GetIO().AddFocusEvent(true);
+                }
+                if (systemSurface.get_status() & gvk::system::Surface::LostFocus) {
+                    ImGui::GetIO().AddFocusEvent(false);
+                }
+                const auto& textStream = systemSurface.get_text_stream();
+                auto guiRendererBeginInfo = gvk::get_default<gvk::gui::Renderer::BeginInfo>();
+                guiRendererBeginInfo.deltaTime = deltaTime;
+                guiRendererBeginInfo.extent = { (float)extent.width, (float)extent.height };
+                guiRendererBeginInfo.pInput = &input;
+                guiRendererBeginInfo.textStreamCodePointCount = (uint32_t)textStream.size();
+                guiRendererBeginInfo.pTextStreamCodePoints = !textStream.empty() ? textStream.data() : nullptr;
+                guiRenderer.begin_gui(guiRendererBeginInfo);
+                // ImGui::ShowDemoWindow();
+                ImGui::DragFloat("Paddle Speed", &PaddleSpeed, 12, 100);
+                auto paddleMass = paddle.rigidBody.mupRigidBody->getMass();
+                if (ImGui::DragFloat("Paddle Mass", &paddleMass, 0.01f, 0.01f)) {
+                    physicsContext.get_dynamics_world()->removeRigidBody(paddle.rigidBody.mupRigidBody.get());
+                    btVector3 inertia { };
+                    paddle.rigidBody.mupRigidBody->getCollisionShape()->calculateLocalInertia(paddleMass, inertia);
+                    paddle.rigidBody.mupRigidBody->setMassProps(paddleMass, inertia);
+                    physicsContext.get_dynamics_world()->addRigidBody(paddle.rigidBody.mupRigidBody.get(), PaddleGroup, AllGroup & ~BrickGroup);
+                }
+                #if 0
+                ImGui::DragFloat("anchor", &anchor, 0.01f);
+                ImGui::DragFloat("amplitude", &amplitude, 0.1f);
+                ImGui::DragFloat("frequency", &frequency, 0.1f);
+                ImGui::DragFloat("yRotation", &yRotation, 0.1f);
+                ImGui::DragFloat("zRotation", &zRotation, 0.1f);
+                ImGui::DragFloat("guiImageScale", &guiImageScale, 0.005f, 0.01f, 0.5f);
+                ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
+                ImGui::Image(guiDescriptorSets[0], guiImageExtent);
+                #endif
+                guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
+            }
+
             vkResult = vkWaitForFences(gvkDevice, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX);
             assert(vkResult == VK_SUCCESS);
             vkResult = vkResetFences(gvkDevice, 1, &vkFences[imageIndex]);
@@ -768,6 +880,11 @@ int main(int, const char* [])
                     ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
                 }
             }
+
+            if (showGui) {
+                guiRenderer.record_cmds(commandBuffer);
+            }
+
             vkCmdEndRenderPass(commandBuffer);
             vkResult = vkEndCommandBuffer(commandBuffer);
             assert(vkResult == VK_SUCCESS);
@@ -779,6 +896,10 @@ int main(int, const char* [])
             auto presentInfo = wsiManager.get_present_info(&imageIndex);
             vkResult = vkQueuePresentKHR(gvkQueue, &presentInfo);
             assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
+        }
+
+        if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
+            showGui = !showGui;
         }
     }
     vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);

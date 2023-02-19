@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "gvk-defines.hpp"
 #include "gvk-format-info.hpp"
+#include "gvk-gui.hpp"
 #include "gvk-handles.hpp"
 #include "gvk-math.hpp"
 #include "gvk-runtime.hpp"

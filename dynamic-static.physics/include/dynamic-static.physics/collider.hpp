@@ -48,6 +48,9 @@ public:
         std::map<btVector3, btBoxShape> mBoxColliders;
         std::map<btScalar, btSphereShape> mSphereColliders;
     };
+
+private:
+    std::unique_ptr<btCollisionObject> mupCollisionObject;
 };
 
 } // namespace physics
