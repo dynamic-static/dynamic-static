@@ -31,29 +31,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace dst {
 namespace physics {
 
-bool RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
+void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
 {
     assert(pCreateInfo);
     assert(pCreateInfo->pCollisionShape);
     assert(pRigidBody);
-    pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>();
-    pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape);
+    btVector3 localInertia { };
+    pCreateInfo->pCollisionShape->calculateLocalInertia(pCreateInfo->mass, localInertia);
+    pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>(pCreateInfo->initialTransform);
+    pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, localInertia);
     pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
-    return true;
-}
-
-btTransform RigidBody::get_transform() const
-{
-    assert(mupMotionState);
-    btTransform transform { };
-    mupMotionState->getWorldTransform(transform);
-    return transform;
-}
-
-void RigidBody::set_transform(const btTransform& transform)
-{
-    assert(mupMotionState);
-    mupMotionState->setWorldTransform(transform);
 }
 
 } // namespace physics

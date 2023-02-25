@@ -40,14 +40,13 @@ public:
     struct CreateInfo final
     {
         float mass { 0 };
+        btTransform initialTransform { btTransform::getIdentity() };
         btCollisionShape* pCollisionShape { nullptr };
     };
 
-    static bool create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
-    btTransform get_transform() const;
-    void set_transform(const btTransform& transform);
+    static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
 
-private:
+public:
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
     friend class World;
