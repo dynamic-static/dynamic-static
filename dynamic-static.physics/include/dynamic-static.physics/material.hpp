@@ -34,7 +34,7 @@ namespace physics {
 struct Material
 {
     btScalar friction { 0.5 };
-    btScalar restitution { 0.0 };
+    btScalar restitution { 0 };
 };
 
 } // namespace physics

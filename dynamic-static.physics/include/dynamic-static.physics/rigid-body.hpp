@@ -42,9 +42,15 @@ class RigidBody final
 public:
     struct CreateInfo final
     {
-        float mass { 0 };
+        btScalar mass { 0 };
+        Material material { };
+        btScalar linearDamping { 0 };
+        btScalar angularDamping { 0 };
+        btVector3 linearFactor { 1, 1, 1 };
+        btVector3 angularFactor { 1, 1, 1 };
         btTransform initialTransform { btTransform::getIdentity() };
         btCollisionShape* pCollisionShape { nullptr };
+        void* pUserData { nullptr };
     };
 
     static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);

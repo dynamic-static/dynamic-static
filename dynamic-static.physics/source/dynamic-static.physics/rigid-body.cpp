@@ -42,6 +42,12 @@ void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
     pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, localInertia);
     pRigidBody->mupRigidBody->setWorldTransform(pCreateInfo->initialTransform);
     pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
+    pRigidBody->mupRigidBody->setDamping(pCreateInfo->linearDamping, pCreateInfo->angularDamping);
+    pRigidBody->mupRigidBody->setLinearFactor(pCreateInfo->linearFactor);
+    pRigidBody->mupRigidBody->setAngularFactor(pCreateInfo->angularFactor);
+    pRigidBody->mupRigidBody->setFriction(pCreateInfo->material.friction);
+    pRigidBody->mupRigidBody->setRestitution(pCreateInfo->material.restitution);
+    pRigidBody->mupRigidBody->setUserPointer(pCreateInfo->pUserData);
 }
 
 } // namespace physics

@@ -41,8 +41,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
-std::map<btRigidBody*, btVector3> Positions;
-
 std::string btvecstr(const btVector3& v)
 {
     return "{" + std::to_string(v.x()) + ", " + std::to_string(v.y()) + ", " + std::to_string(v.z()) + "}";
@@ -168,33 +166,32 @@ public:
         rigidBody.mupRigidBody->setUserPointer(this);
     }
 
+    void setup_physics_resources(dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo)
+    {
+#if 0
+        mInitialPosition = initialPosition;;
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.mass = mass;
+        rigidBodyCreateInfo.initialTransform.setOrigin({ mInitialPosition.x, mInitialPosition.y, mInitialPosition.z });
+        rigidBodyCreateInfo.pCollisionShape = pBtCollisionShape;
+        dst::physics::RigidBody::create(&rigidBodyCreateInfo, &rigidBody);
+        rigidBody.mupRigidBody->setUserPointer(this);
+#else
+
+#endif
+        rigidBodyCreateInfo.pUserData = this;
+        dst::physics::RigidBody::create(&rigidBodyCreateInfo, &rigidBody);
+
+    }
+
     void update_uniform_buffer(const gvk::Device& device)
     {
         ObjectUniforms ubo { };
         btTransform transform { };
-#if 0
-        if (isDynamic) {
-            rigidBody.mupMotionState->getWorldTransform(transform);
-        } else {
-            transform = rigidBody.mupRigidBody->getWorldTransform();
-        }
-#endif
-
         if (!isDynamic) {
-            rigidBody.mupMotionState->setWorldTransform(rigidBody.mupRigidBody->getWorldTransform());
+            rigidBody.mupMotionState->setWorldTransform(rigidBody.mupRigidBody->getCenterOfMassTransform());
         }
         rigidBody.mupMotionState->getWorldTransform(transform);
-
-        auto posItr = Positions.find(rigidBody.mupRigidBody.get());
-        if (posItr != Positions.end()) {
-            auto pos = posItr->second;
-            std::cout << btvecstr(pos) << " vs " << btvecstr(transform.getOrigin());
-            if (pos != transform.getOrigin()) {
-                std::cout << " mismatch!";
-            }
-            std::cout << std::endl;
-        }
-
         transform.getOpenGLMatrix(&ubo.world[0][0]);
         ubo.color = mColor;
         VmaAllocationInfo allocationInfo { };
@@ -517,19 +514,33 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         ceiling.setup_graphics_resources(gfxContext, ceilingMesh, descriptorSet, gvk::math::Color::White);
+#if 0
         ceiling.setup_physics_resources(colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f), 0, { 0, 32, 0 });
-
         ceiling.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         ceiling.rigidBody.mupRigidBody->setRestitution(0.6f);
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        // rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
+        rigidBodyCreateInfo.material.restitution = 0.6f;
+        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
+        ceiling.setup_physics_resources(rigidBodyCreateInfo);
+
         physicsContext.mupWorld->addRigidBody(ceiling.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
     }
 
     // TODO : Documentation
     Object floor;
     {
+#if 0
         floor.setup_physics_resources(colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f), 0, { 0, -38, 0 });
-
         floor.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
+        floor.setup_physics_resources(rigidBodyCreateInfo);
+
         physicsContext.mupWorld->addRigidBody(floor.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
     }
 
@@ -543,10 +554,18 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         leftWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-        leftWall.setup_physics_resources(colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { 16, 0, 0 });
 
+#if 0
+        leftWall.setup_physics_resources(colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { 16, 0, 0 });
         leftWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
         leftWall.rigidBody.mupRigidBody->setRestitution(0.6f);
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.material.restitution = 0.6f;
+        rigidBodyCreateInfo.initialTransform.setOrigin({ 16, 0, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
+        leftWall.setup_physics_resources(rigidBodyCreateInfo);
+
         physicsContext.mupWorld->addRigidBody(leftWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
     }
     Object rightWall;
@@ -555,11 +574,17 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         rightWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-        rightWall.setup_physics_resources(colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { -16, 0, 0 });
 
+#if 0
+        rightWall.setup_physics_resources(colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f), 0, { -16, 0, 0 });
         rightWall.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
-        // rightWall.rigidBody.mupRigidBody->setActivationState(0);
         rightWall.rigidBody.mupRigidBody->setRestitution(0.6f);
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.material.restitution = 0.6f;
+        rigidBodyCreateInfo.initialTransform.setOrigin({ -16, 0, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
+        rightWall.setup_physics_resources(rigidBodyCreateInfo);
 
         physicsContext.mupWorld->addRigidBody(rightWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
     }
@@ -593,7 +618,15 @@ int main(int, const char* [])
             vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
             assert(vkResult == VK_SUCCESS);
             brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
+
+#if 0
             brick.setup_physics_resources(colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f), BrickMass, { initialPosition.x(), initialPosition.y(), initialPosition.z() });
+#endif
+            dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+            rigidBodyCreateInfo.mass = BrickMass;
+            rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
+            rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
+            brick.setup_physics_resources(rigidBodyCreateInfo);
 
 
 
@@ -609,6 +642,8 @@ int main(int, const char* [])
 
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
+
+            
         }
     }
 
@@ -627,13 +662,18 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         ball.setup_graphics_resources(gfxContext, ballMesh, descriptorSet, gvk::math::Color::SlateGray);
+#if 0
         ball.setup_physics_resources(colliderPool.get_sphere_collider(BallRadius), BallMass, { initialPosition.x(), initialPosition.y(), initialPosition.z() });
-
         ball.rigidBody.mupRigidBody->setLinearFactor(btVector3(1, 1, 0));
-        // ball.rigidBody.mupRigidBody->setActivationState(0);
         ball.rigidBody.mupRigidBody->setRestitution(0.9f);
-
-        // physicsContext.mupWorld->addRigidBody(ball.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.mass = BallMass;
+        rigidBodyCreateInfo.material.restitution = 0.9f;
+        rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
+        rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_sphere_collider(BallRadius);
+        ball.setup_physics_resources(rigidBodyCreateInfo);
 
         liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
         initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
@@ -649,18 +689,23 @@ int main(int, const char* [])
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
         paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
+#if 0
         paddle.setup_physics_resources(colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f), 1, { 0, -28, 0 });
-
-        // physicsContext.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
-
         paddle.rigidBody.mupRigidBody->setLinearFactor({ 1, 0, 0 });
         paddle.rigidBody.mupRigidBody->setAngularFactor({ 0, 0, 0 });
         paddle.rigidBody.mupRigidBody->setDamping(0.4f, 0.0f);
+#endif
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.mass = 1;
+        rigidBodyCreateInfo.linearDamping = 0.4f;
+        rigidBodyCreateInfo.linearFactor = { 1, 0, 0 };
+        rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
+        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -28, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
+        paddle.setup_physics_resources(rigidBodyCreateInfo);
+
         paddle.isDynamic = true;
-        ///////////////////////////////////////////////////////////////////////////////
-        // physicsContext.mupWorld->removeRigidBody(paddle.rigidBody.mupRigidBody.get());
-        physicsContext.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get()); //, PaddleGroup, AllGroup & ~BrickGroup);
-        ///////////////////////////////////////////////////////////////////////////////
+        physicsContext.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get());
     }
 
     float celebrationTimer = 0;
@@ -726,32 +771,11 @@ int main(int, const char* [])
                         if (ballCount) {
                             assert(ballCount <= balls.size());
                             auto& ball = balls[ballCount - 1];
-                            #if 0
-                            auto transform = ball.rigidBody.mupRigidBody->getWorldTransform();
-                            transform.setOrigin({ 0, 0, 0 });
-                            ball.rigidBody.mupRigidBody->setWorldTransform(transform);
-                            ball.rigidBody.mupRigidBody->activate(true);
-                            ballCount -= 1;
-                            #else
-                            // ball.rigidBody.mupRigidBody->setLinearVelocity({ });
                             ball.isDynamic = true;
                             ball.rigidBody.mupRigidBody->activate(true);
                             ball.rigidBody.mupRigidBody->setCenterOfMassTransform(btTransform::getIdentity());
                             physicsContext.mupWorld->addRigidBody(ball.rigidBody.mupRigidBody.get());
-
-                            // ball.rigidBody.mupRigidBody->setActivationState(1);
-
-                            // ball.rigidBody.mupRigidBody->setInterpolationLinearVelocity({ });
-                            // ball.rigidBody.mupRigidBody->setInterpolationAngularVelocity({ });
-                            // auto mass = ball.rigidBody.mupRigidBody->getMass();
-                            // btVector3 localInertia { };
-                            // ball.rigidBody.mupRigidBody->getCollisionShape()->calculateLocalInertia(mass, localInertia);
-                            // ball.rigidBody.mupRigidBody->setMassProps(mass, localInertia);
-                            // ball.rigidBody.mupRigidBody->updateInertiaTensor();
-                            
-                            // 
                             ballCount -= 1;
-                            #endif
                         }
                     }
                 }
@@ -779,7 +803,6 @@ int main(int, const char* [])
 
                                 physicsContext.mupWorld->addRigidBody(pRigidBody); // , BrickGroup, AllGroup & ~PaddleGroup);
 
-                                Positions[pRigidBody] = pRigidBody->getCenterOfMassTransform().getOrigin();
                             }
 
                             
@@ -1116,7 +1139,6 @@ int main(int, const char* [])
             showGui = !showGui;
         }
 
-        Positions.clear();
     }
     vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
     assert(vkResult == VK_SUCCESS);
