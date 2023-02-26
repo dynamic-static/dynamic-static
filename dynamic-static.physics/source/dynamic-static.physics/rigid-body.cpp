@@ -55,8 +55,40 @@ RigidBody::State RigidBody::get_state() const
     return mState;
 }
 
+const btTransform& RigidBody::get_transform() const
+{
+    return mupRigidBody->getCenterOfMassTransform();
+}
+
+void RigidBody::set_transform(const btTransform& transform)
+{
+    assert(mupRigidBody);
+    mupRigidBody->setCenterOfMassTransform(transform);
+}
+
+void RigidBody::apply_impulse(const btVector3& impulse)
+{
+    assert(mupRigidBody);
+    activate();
+    mupRigidBody->applyCentralImpulse(impulse);
+}
+
+void RigidBody::apply_force(const btVector3& force)
+{
+    assert(mupRigidBody);
+    activate();
+    mupRigidBody->applyCentralForce(force);
+}
+
+void RigidBody::activate()
+{
+    assert(mupRigidBody);
+    mupRigidBody->activate(true);
+}
+
 void RigidBody::halt()
 {
+    assert(mupRigidBody);
     mupRigidBody->clearForces();
     mupRigidBody->clearGravity();
     mupRigidBody->setLinearVelocity({ 0, 0, 0 });

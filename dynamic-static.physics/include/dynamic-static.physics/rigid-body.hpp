@@ -63,6 +63,12 @@ public:
     static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
 
     State get_state() const;
+    const btTransform& get_transform() const;
+    void set_transform(const btTransform& transform);
+
+    void apply_impulse(const btVector3& impulse);
+    void apply_force(const btVector3& force);
+    void activate();
     void halt();
 
 public:

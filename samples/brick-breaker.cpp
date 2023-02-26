@@ -42,11 +42,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
-std::string btvecstr(const btVector3& v)
-{
-    return "{" + std::to_string(v.x()) + ", " + std::to_string(v.y()) + ", " + std::to_string(v.z()) + "}";
-}
-
 VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
@@ -136,6 +131,12 @@ const int AllGroup = BrickGroup | BallGroup | PaddleGroup | WallGroup;
 
 bool useMotionState = false;
 
+class ObjectEx final
+{
+public:
+
+};
+
 class Object final
 {
 public:
@@ -189,15 +190,9 @@ public:
         mColor = color;
     }
 
-    const btVector3& get_initial_position() const
-    {
-        return mInitialPosition;
-    }
-
     dst::physics::RigidBody rigidBody;
 
 private:
-    btVector3 mInitialPosition { };
     glm::vec4 mColor { };
     gvk::Mesh mMesh;
     gvk::Buffer mUniformBuffer;
@@ -637,12 +632,10 @@ int main(int, const char* [])
         // TODO : Documentation
         // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
             if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
-                paddle.rigidBody.mupRigidBody->activate(true);
-                paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { PaddleSpeed, 0, 0 });
+                paddle.rigidBody.apply_force({ PaddleSpeed, 0, 0 });
             }
             if (input.keyboard.down(gvk::system::Key::RightArrow)) {
-                paddle.rigidBody.mupRigidBody->activate(true);
-                paddle.rigidBody.mupRigidBody->applyCentralForce(btVector3 { -PaddleSpeed, 0, 0 });
+                paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
             }
         // }
         switch (state) {
@@ -653,8 +646,8 @@ int main(int, const char* [])
                         if (ballCount) {
                             assert(ballCount <= balls.size());
                             auto& ball = balls[ballCount - 1];
-                            ball.rigidBody.mupRigidBody->activate(true);
-                            ball.rigidBody.mupRigidBody->setCenterOfMassTransform(btTransform::getIdentity());
+                            ball.rigidBody.halt();
+                            ball.rigidBody.set_transform(btTransform::getIdentity());
                             physicsWorld.make_dynamic(ball.rigidBody);
                             ballCount -= 1;
                         }
@@ -756,6 +749,8 @@ int main(int, const char* [])
             case State::Resetting:
             {
                 resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
+
+
                 if (resetTimer < resetDuration) {
                     float t = resetTimer / resetDuration;
                     for (const auto& resetState : resetStates) {
