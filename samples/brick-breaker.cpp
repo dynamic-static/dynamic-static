@@ -117,26 +117,6 @@ struct CameraUniforms
     glm::mat4 projection { };
 };
 
-class Renderer final
-{
-public:
-
-};
-
-const int BrickGroup = 1;
-const int BallGroup = 2;
-const int PaddleGroup = 4;
-const int WallGroup = 8;
-const int AllGroup = BrickGroup | BallGroup | PaddleGroup | WallGroup;
-
-bool useMotionState = false;
-
-class ObjectEx final
-{
-public:
-
-};
-
 class Object final
 {
 public:
@@ -377,6 +357,7 @@ int main(int, const char* [])
     );
     assert(vkResult == VK_SUCCESS);
 
+#if 0
     bool showGui = false;
     gvk::gui::Renderer guiRenderer;
     vkResult = gvk::gui::Renderer::create(
@@ -387,6 +368,7 @@ int main(int, const char* [])
         nullptr,
         &guiRenderer
     );
+#endif
 
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
@@ -440,6 +422,22 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
     // TODO : Documentation
+    Object floor;
+    {
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
+        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
+        floor.setup_physics_resources(rigidBodyCreateInfo);
+        physicsWorld.make_static(floor.rigidBody);
+    }
+
+    static const uint32_t BarrierCount = 3;
+    static const uint32_t CeilingIndex = 0;
+    static const uint32_t LeftWallIndex = 1;
+    static const uint32_t RightWallIndex = 2;
+    std::array<Object, BarrierCount> barriers;
+
+    // TODO : Documentation
     gvk::Mesh ceilingMesh;
     vkResult = create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
     assert(vkResult == VK_SUCCESS);
@@ -456,16 +454,6 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
         ceiling.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(ceiling.rigidBody);
-    }
-
-    // TODO : Documentation
-    Object floor;
-    {
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
-        floor.setup_physics_resources(rigidBodyCreateInfo);
-        physicsWorld.make_static(floor.rigidBody);
     }
 
     // TODO : Documentation
@@ -624,11 +612,6 @@ int main(int, const char* [])
         gvk::system::Surface::update();
         const auto& input = systemSurface.get_input();
 
-        if (input.keyboard.pressed(gvk::system::Key::One)) {
-            useMotionState = !useMotionState;
-            std::cout << "Use Motion State : " << useMotionState << std::endl;
-        }
-
         // TODO : Documentation
         // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
             if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
@@ -641,7 +624,7 @@ int main(int, const char* [])
         switch (state) {
             case State::Play:
             {
-                if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
+                // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
                     if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
                         if (ballCount) {
                             assert(ballCount <= balls.size());
@@ -652,7 +635,7 @@ int main(int, const char* [])
                             ballCount -= 1;
                         }
                     }
-                }
+                // }
 
 
                 for (const auto& collision : collisions) {
@@ -794,7 +777,7 @@ int main(int, const char* [])
         auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
         physicsWorld.mupWorld->stepSimulation(deltaTime);
 
-        if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
+        //if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
             gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
                 .deltaTime = deltaTime,
                 .moveUp = input.keyboard.down(gvk::system::Key::Q),
@@ -812,7 +795,7 @@ int main(int, const char* [])
                 camera.fieldOfView = 60.0f;
             }
             cameraController.update(cameraControllerUpdateInfo);
-        }
+        // }
 
         // TODO : Documentation
         CameraUniforms cameraUbo { };
@@ -846,6 +829,7 @@ int main(int, const char* [])
 
             const auto& vkFences = wsiManager.get_vk_fences();
 
+#if 0
             if (showGui) {
                 auto imguiCursor = ImGui::GetMouseCursor();
                 if (imguiCursor == ImGuiMouseCursor_None || ImGui::GetIO().MouseDrawCursor) {
@@ -879,6 +863,7 @@ int main(int, const char* [])
                 guiRendererBeginInfo.pTextStreamCodePoints = !textStream.empty() ? textStream.data() : nullptr;
                 guiRenderer.begin_gui(guiRendererBeginInfo);
                 ImGui::ShowDemoWindow();
+                #if 0
                 ImGui::DragFloat("Paddle Speed", &PaddleSpeed, 12, 100);
                 auto paddleMass = paddle.rigidBody.mupRigidBody->getMass();
                 if (ImGui::DragFloat("Paddle Mass", &paddleMass, 0.01f, 0.01f)) {
@@ -886,8 +871,9 @@ int main(int, const char* [])
                     btVector3 inertia { };
                     paddle.rigidBody.mupRigidBody->getCollisionShape()->calculateLocalInertia(paddleMass, inertia);
                     paddle.rigidBody.mupRigidBody->setMassProps(paddleMass, inertia);
-                    physicsWorld.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get(), PaddleGroup, AllGroup & ~BrickGroup);
+                    physicsWorld.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get());
                 }
+                #endif
                 #if 0
                 ImGui::DragFloat("anchor", &anchor, 0.01f);
                 ImGui::DragFloat("amplitude", &amplitude, 0.1f);
@@ -900,7 +886,7 @@ int main(int, const char* [])
                 #endif
                 guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
             }
-
+#endif
             vkResult = vkWaitForFences(gvkDevice, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX);
             assert(vkResult == VK_SUCCESS);
             vkResult = vkResetFences(gvkDevice, 1, &vkFences[imageIndex]);
@@ -937,9 +923,11 @@ int main(int, const char* [])
                 }
             }
 
+            #if 0
             if (showGui) {
                 guiRenderer.record_cmds(commandBuffer);
             }
+            #endif
 
             vkCmdEndRenderPass(commandBuffer);
             vkResult = vkEndCommandBuffer(commandBuffer);
@@ -954,9 +942,11 @@ int main(int, const char* [])
             assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
         }
 
+        #if 0
         if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
             showGui = !showGui;
         }
+        #endif
 
     }
     vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
