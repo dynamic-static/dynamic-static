@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.physics/collider.hpp"
 #include "dynamic-static.physics/defines.hpp"
+#include "dynamic-static.physics/material.hpp"
 
 #include <memory>
 
