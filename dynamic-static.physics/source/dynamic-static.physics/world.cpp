@@ -61,23 +61,30 @@ void World::set_gravity(const btVector3& gravity)
     mupWorld->setGravity(gravity);
 }
 
-void World::add_dynamic(RigidBody& rigidBody)
+void World::make_dynamic(RigidBody& rigidBody)
 {
     assert(mupWorld);
     mupWorld->addRigidBody(rigidBody.mupRigidBody.get());
     rigidBody.mState = RigidBody::State::Dynamic;
+    rigidBody.mupRigidBody->activate(true);
 }
 
-void World::add_static(RigidBody& rigidBody)
+void World::make_static(RigidBody& rigidBody)
 {
     assert(mupWorld);
     mupWorld->addCollisionObject(rigidBody.mupRigidBody.get());
     rigidBody.mState = RigidBody::State::Static;
 }
 
-void World::remove(RigidBody& rigidBody)
+void World::disable(RigidBody& rigidBody)
 {
     assert(mupWorld);
+#if 0
+    rigidBody.mupRigidBody->clearForces();
+    rigidBody.mupRigidBody->clearGravity();
+    rigidBody.mupRigidBody->setLinearVelocity({ 0, 0, 0 });
+    rigidBody.mupRigidBody->setAngularVelocity({ 0, 0, 0 });
+#endif
     mupWorld->removeRigidBody(rigidBody.mupRigidBody.get());
     rigidBody.mState = RigidBody::State::Disabled;
 }

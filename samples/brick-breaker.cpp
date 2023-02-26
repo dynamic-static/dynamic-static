@@ -166,7 +166,7 @@ public:
     {
         ObjectUniforms ubo { };
         btTransform transform { };
-        if (!isDynamic) {
+        if (rigidBody.get_state() != dst::physics::RigidBody::State::Dynamic) {
             rigidBody.mupMotionState->setWorldTransform(rigidBody.mupRigidBody->getCenterOfMassTransform());
         }
         rigidBody.mupMotionState->getWorldTransform(transform);
@@ -190,7 +190,6 @@ public:
     }
 
     dst::physics::RigidBody rigidBody;
-    bool isDynamic { false };
 
 private:
     glm::vec3 mInitialPosition { };
@@ -200,53 +199,12 @@ private:
     gvk::DescriptorSet mDescriptorSet;
 };
 
-class MotionState final
-    : public btMotionState
-{
-public:
-    MotionState(btRigidBody* pRigidBody)
-        : mpRigidBody { pRigidBody }
-    {
-        assert(mpRigidBody);
-    }
-
-    void getWorldTransform(btTransform& transform) const override final
-    {
-        transform = mTransform;
-    }
-
-    virtual void setWorldTransform(const btTransform& transform) override final
-    {
-        mTransform = transform;
-    }
-
-private:
-    btTransform mTransform { btTransform::getIdentity() };
-    btRigidBody* mpRigidBody { nullptr };
-};
-
 enum class State
 {
-    Attract,
-    Intro,
-    Idle,
     Play,
-    Win,
     Celebration,
-    Lose,
-    Resetting,
     GameOver,
-};
-
-enum class ObjectType
-{
-    Unknown,
-    Brick,
-    Ball,
-    Paddle,
-    Ceiling,
-    Wall,
-    Floor,
+    Resetting,
 };
 
 static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep)
@@ -501,7 +459,7 @@ int main(int, const char* [])
 #if 0
         physicsWorld.mupWorld->addRigidBody(ceiling.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
 #endif
-        physicsWorld.add_static(ceiling.rigidBody);
+        physicsWorld.make_static(ceiling.rigidBody);
     }
 
     // TODO : Documentation
@@ -515,7 +473,7 @@ int main(int, const char* [])
 #if 0
         physicsWorld.mupWorld->addRigidBody(floor.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
 #endif
-        physicsWorld.add_static(floor.rigidBody);
+        physicsWorld.make_static(floor.rigidBody);
     }
 
     // TODO : Documentation
@@ -538,7 +496,7 @@ int main(int, const char* [])
 #if 0
         physicsWorld.mupWorld->addRigidBody(leftWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
 #endif
-        physicsWorld.add_static(leftWall.rigidBody);
+        physicsWorld.make_static(leftWall.rigidBody);
     }
     Object rightWall;
     {
@@ -556,7 +514,7 @@ int main(int, const char* [])
 #if 0
         physicsWorld.mupWorld->addRigidBody(rightWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
 #endif
-        physicsWorld.add_static(rightWall.rigidBody);
+        physicsWorld.make_static(rightWall.rigidBody);
     }
 
     // TODO : Documentation
@@ -600,7 +558,7 @@ int main(int, const char* [])
 #if 0
             physicsWorld.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
 #endif
-            physicsWorld.add_static(brick.rigidBody);
+            physicsWorld.make_static(brick.rigidBody);
 
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
@@ -656,12 +614,7 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -28, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
         paddle.setup_physics_resources(rigidBodyCreateInfo);
-
-        paddle.isDynamic = true;
-#if 0
-        physicsWorld.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get());
-#endif
-        physicsWorld.add_dynamic(paddle.rigidBody);
+        physicsWorld.make_dynamic(paddle.rigidBody);
     }
 
     float celebrationTimer = 0;
@@ -708,18 +661,6 @@ int main(int, const char* [])
             }
         // }
         switch (state) {
-        case State::Attract:
-            {
-
-            } break;
-            case State::Intro:
-            {
-
-            } break;
-            case State::Idle:
-            {
-
-            } break;
             case State::Play:
             {
                 if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
@@ -727,20 +668,14 @@ int main(int, const char* [])
                         if (ballCount) {
                             assert(ballCount <= balls.size());
                             auto& ball = balls[ballCount - 1];
-                            ball.isDynamic = true;
                             ball.rigidBody.mupRigidBody->activate(true);
                             ball.rigidBody.mupRigidBody->setCenterOfMassTransform(btTransform::getIdentity());
-#if 0
-                            physicsWorld.mupWorld->addRigidBody(ball.rigidBody.mupRigidBody.get());
-#endif
-                            physicsWorld.add_dynamic(ball.rigidBody);
+                            physicsWorld.make_dynamic(ball.rigidBody);
                             ballCount -= 1;
                         }
                     }
                 }
 
-                // auto lv = balls[0].rigidBody.mupRigidBody->getLinearVelocity();
-                // std::cout << lv.x() << " : " << lv.y() << " : " << lv.z() << std::endl;
 
                 for (const auto& collision : collisions) {
                     for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
@@ -748,81 +683,30 @@ int main(int, const char* [])
                             liveBricks.erase(collider);
 
                             auto pRigidBody = (btRigidBody*)collider;
-                            if (!((Object*)pRigidBody->getUserPointer())->isDynamic) {
-                                ((Object*)pRigidBody->getUserPointer())->isDynamic = true;
-#if 0
-                                physicsWorld.mupWorld->removeRigidBody(pRigidBody);
-                                
-                                
-
-                                // pRigidBody->getMotionState()->setWorldTransform(pRigidBody->getWorldTransform());
-
-                                pRigidBody->getMotionState()->setWorldTransform(pRigidBody->getCenterOfMassTransform());
-                                pRigidBody->forceActivationState(1);
-                                pRigidBody->activate(true);
-#endif
-
-#if 0
-                                physicsWorld.mupWorld->addRigidBody(pRigidBody); // , BrickGroup, AllGroup & ~PaddleGroup);
-#endif
-                                auto pObject = (Object*)pRigidBody->getUserPointer();
-                                physicsWorld.remove(pObject->rigidBody);
-                                physicsWorld.add_dynamic(pObject->rigidBody);
-
+                            auto pObject = (Object*)pRigidBody->getUserPointer();
+                            if (pObject->rigidBody.get_state() == dst::physics::RigidBody::State::Static) {
+                                physicsWorld.disable(pObject->rigidBody);
+                                physicsWorld.make_dynamic(pObject->rigidBody);
                             }
-
-                            
-                            
-                            // btTransform transform { };
-                            // pRigidBody->getWorldTransform(transform);
-                            // // transform.getOrigin().setZ(2);
-                            // pRigidBody->setWorldTransform(transform);
-                            // pRigidBody->setCenterOfMassTransform(transform);
-                            // pRigidBody->applyTorqueImpulse({ 16, 0, 0 });
-                            // pRigidBody->activate(true);
                         }
                     }
                 }
 
                 for (auto& ball : balls) {
-                    #if 0
-                    for (const auto& brick : bricks) {
-                        auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)brick.rigidBody.mupRigidBody.get());
-                        if (collision.second < collision.first) {
-                            std::swap(collision.first, collision.second);
-                        }
-                        if (collisions.count(collision)) {
-                            if (paddle.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y() < brick.rigidBody.mupRigidBody->getWorldTransform().getOrigin().y()) {
-                                physicsContext.mupWorld->removeCollisionObject(brick.rigidBody.mupRigidBody.get());
-                                physicsContext.mupWorld->addRigidBody(brick.rigidBody.mupRigidBody.get(), BrickGroup, AllGroup & ~PaddleGroup);
-                                // btTransform transform { };
-                                // brick.rigidBody.mupMotionState->getWorldTransform(transform);
-                                // // transform.getOrigin().setZ(2);
-                                // brick.rigidBody.mupMotionState->setWorldTransform(transform);
-                                // brick.rigidBody.mupRigidBody->setCenterOfMassTransform(transform);
-                                // brick.rigidBody.mupRigidBody->applyTorqueImpulse({ 16, 0, 0 });
-                                brick.rigidBody.mupRigidBody->activate(true);
-                            }
+                    auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
+                    if (collision.second < collision.first) {
+                        std::swap(collision.first, collision.second);
+                    }
+                    if (collisions.count(collision)) {
+                        const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                        const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                            auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                            impulse *= 64;
+                            impulse.setY(64);
+                            ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
                         }
                     }
-                    #endif
-                    {
-                        auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
-                        if (collision.second < collision.first) {
-                            std::swap(collision.first, collision.second);
-                        }
-                        if (collisions.count(collision)) {
-                            const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                            const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                            if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                                auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
-                                impulse *= 64;
-                                impulse.setY(64);
-                                ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
-                            }
-                        }
-                    }
-
                     auto paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     auto ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     auto floorTransform = floor.rigidBody.mupRigidBody->getCenterOfMassTransform();
@@ -832,15 +716,11 @@ int main(int, const char* [])
                 }
 
                 if (liveBricks.empty()) {
-                    state = State::Win;
+                    celebrationTimer = 0;
+                    state = State::Celebration;
                 } else if (liveBalls.empty()) {
-                    state = State::Lose;
+                    state = State::GameOver;
                 }
-            } break;
-            case State::Win:
-            {
-                celebrationTimer = 0;
-                state = State::Celebration;
             } break;
             case State::Celebration:
             {
@@ -852,13 +732,13 @@ int main(int, const char* [])
                     rightWall.set_color(color);
                     ceiling.set_color(color);
                 } else {
-                    state = State::Lose;
+                    state = State::GameOver;
                     leftWall.set_color(gvk::math::Color::White);
                     rightWall.set_color(gvk::math::Color::White);
                     ceiling.set_color(gvk::math::Color::White);
                 }
             } break;
-            case State::Lose:
+            case State::GameOver:
             {
                 resetTimer = 0;
                 resetStates.clear();
@@ -867,11 +747,8 @@ int main(int, const char* [])
                     liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
                     brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                     brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-#if 0
-                    physicsWorld.mupWorld->removeRigidBody(brick.rigidBody.mupRigidBody.get());
-#endif
-                    physicsWorld.remove(brick.rigidBody);
-                    brick.isDynamic = false;
+
+                    physicsWorld.disable(brick.rigidBody);
                     auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     ResetState resetState { };
                     resetState.rotation = transform.getRotation();
@@ -882,11 +759,8 @@ int main(int, const char* [])
                     liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
                     ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                     ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-#if 0
-                    physicsWorld.mupWorld->removeRigidBody(ball.rigidBody.mupRigidBody.get());
-#endif
-                    physicsWorld.remove(ball.rigidBody);
-                    ball.isDynamic = false;
+
+                    physicsWorld.disable(ball.rigidBody);
                     auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     ResetState resetState { };
                     resetState.rotation = transform.getRotation();
@@ -923,26 +797,16 @@ int main(int, const char* [])
                     for (auto& brick : bricks) {
                         liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
                         brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
-#if 0
-                        physicsWorld.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
-#endif
-                        physicsWorld.add_static(brick.rigidBody);
-                        // brick.rigidBody.mupRigidBody->setActivationState(0);
+                        physicsWorld.make_static(brick.rigidBody);
                     }
                     for (const auto& ball : balls) {
                         ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
                         liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
-                        // physicsContext.mupWorld->addRigidBody(ball.rigidBody.mupRigidBody.get());
-                        // ball.rigidBody.mupRigidBody->setActivationState(0);
                     }
                     resetStates.clear();
                     ballCount = 3;
                     state = State::Play;
                 }
-            } break;
-            case State::GameOver:
-            {
-
             } break;
         }
 

@@ -55,5 +55,13 @@ RigidBody::State RigidBody::get_state() const
     return mState;
 }
 
+void RigidBody::halt()
+{
+    mupRigidBody->clearForces();
+    mupRigidBody->clearGravity();
+    mupRigidBody->setLinearVelocity({ 0, 0, 0 });
+    mupRigidBody->setAngularVelocity({ 0, 0, 0 });
+}
+
 } // namespace physics
 } // namespace dst

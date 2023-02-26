@@ -27,13 +27,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "dynamic-static.physics/defines.hpp"
+#include "dynamic-static.physics/rigid-body.hpp"
 
 #include <memory>
 
 namespace dst {
 namespace physics {
-
-class RigidBody;
 
 class World final
 {
@@ -47,9 +46,9 @@ public:
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
 
-    void add_dynamic(RigidBody& rigidBody);
-    void add_static(RigidBody& rigidBody);
-    void remove(RigidBody& rigidBody);
+    void make_dynamic(RigidBody& rigidBody);
+    void make_static(RigidBody& rigidBody);
+    void disable(RigidBody& rigidBody);
     void update(btScalar deltaTime);
 
 public:

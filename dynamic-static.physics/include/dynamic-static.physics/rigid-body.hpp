@@ -63,6 +63,7 @@ public:
     static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
 
     State get_state() const;
+    void halt();
 
 public:
     std::unique_ptr<btMotionState> mupMotionState;
