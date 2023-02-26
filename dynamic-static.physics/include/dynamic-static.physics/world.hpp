@@ -41,8 +41,12 @@ public:
     static bool create(World* pWorld);
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
-    void add_rigid_body(const RigidBody& rigidBody);
-    void remove_rigid_body(const RigidBody& rigidBody);
+#if 0
+    void add_dynamic_rigid_body(RigidBody& rigidBody);
+    void add_static_rigid_body(RigidBody& rigidBody);
+    void add_kinemtic_rigid_body(RigidBody& rigidBody);
+    void remove_rigid_body(RigidBody& rigidBody);
+#endif
     void update(btScalar deltaTime);
 
 private:

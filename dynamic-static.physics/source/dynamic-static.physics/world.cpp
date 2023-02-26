@@ -61,15 +61,18 @@ void World::set_gravity(const btVector3& gravity)
     mupWorld->setGravity(gravity);
 }
 
-void World::add_rigid_body(const RigidBody& rigidBody)
+#if 0
+void World::add_rigid_body(RigidBody& rigidBody)
 {
     (void)rigidBody;
+
 }
 
-void World::remove_rigid_body(const RigidBody& rigidBody)
+void World::remove_rigid_body(RigidBody& rigidBody)
 {
     (void)rigidBody;
 }
+#endif
 
 void World::update(btScalar deltaTime)
 {

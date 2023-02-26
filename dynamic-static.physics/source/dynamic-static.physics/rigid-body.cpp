@@ -40,6 +40,7 @@ void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
     pCreateInfo->pCollisionShape->calculateLocalInertia(pCreateInfo->mass, localInertia);
     pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>(pCreateInfo->initialTransform);
     pRigidBody->mupRigidBody = std::make_unique<btRigidBody>(pCreateInfo->mass, pRigidBody->mupMotionState.get(), pCreateInfo->pCollisionShape, localInertia);
+    pRigidBody->mupRigidBody->setWorldTransform(pCreateInfo->initialTransform);
     pRigidBody->mupRigidBody->setCcdMotionThreshold((float)1e-7);
 }
 
