@@ -47,10 +47,9 @@ public:
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
 
-    void disable(RigidBody& rigidBody);
-    void make_dynamic(RigidBody& rigidBody);
-    void make_static(RigidBody& rigidBody);
-    void make_kinematic(RigidBody& rigidBody);
+    void add_dynamic(RigidBody& rigidBody);
+    void add_static(RigidBody& rigidBody);
+    void remove(RigidBody& rigidBody);
     void update(btScalar deltaTime);
 
 public:

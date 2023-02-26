@@ -498,7 +498,10 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
         ceiling.setup_physics_resources(rigidBodyCreateInfo);
 
+#if 0
         physicsWorld.mupWorld->addRigidBody(ceiling.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
+#endif
+        physicsWorld.add_static(ceiling.rigidBody);
     }
 
     // TODO : Documentation
@@ -509,7 +512,10 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
         floor.setup_physics_resources(rigidBodyCreateInfo);
 
+#if 0
         physicsWorld.mupWorld->addRigidBody(floor.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
+#endif
+        physicsWorld.add_static(floor.rigidBody);
     }
 
     // TODO : Documentation
@@ -529,7 +535,10 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         leftWall.setup_physics_resources(rigidBodyCreateInfo);
 
+#if 0
         physicsWorld.mupWorld->addRigidBody(leftWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
+#endif
+        physicsWorld.add_static(leftWall.rigidBody);
     }
     Object rightWall;
     {
@@ -544,7 +553,10 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         rightWall.setup_physics_resources(rigidBodyCreateInfo);
 
+#if 0
         physicsWorld.mupWorld->addRigidBody(rightWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
+#endif
+        physicsWorld.add_static(rightWall.rigidBody);
     }
 
     // TODO : Documentation
@@ -585,7 +597,10 @@ int main(int, const char* [])
 
             offset += brickAreaWidth;
 
+#if 0
             physicsWorld.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
+#endif
+            physicsWorld.add_static(brick.rigidBody);
 
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
@@ -643,7 +658,10 @@ int main(int, const char* [])
         paddle.setup_physics_resources(rigidBodyCreateInfo);
 
         paddle.isDynamic = true;
+#if 0
         physicsWorld.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get());
+#endif
+        physicsWorld.add_dynamic(paddle.rigidBody);
     }
 
     float celebrationTimer = 0;
@@ -712,7 +730,10 @@ int main(int, const char* [])
                             ball.isDynamic = true;
                             ball.rigidBody.mupRigidBody->activate(true);
                             ball.rigidBody.mupRigidBody->setCenterOfMassTransform(btTransform::getIdentity());
+#if 0
                             physicsWorld.mupWorld->addRigidBody(ball.rigidBody.mupRigidBody.get());
+#endif
+                            physicsWorld.add_dynamic(ball.rigidBody);
                             ballCount -= 1;
                         }
                     }
@@ -739,7 +760,11 @@ int main(int, const char* [])
                                 pRigidBody->forceActivationState(1);
                                 pRigidBody->activate(true);
 
+#if 0
                                 physicsWorld.mupWorld->addRigidBody(pRigidBody); // , BrickGroup, AllGroup & ~PaddleGroup);
+#endif
+                                auto pObject = (Object*)pRigidBody->getUserPointer();
+                                physicsWorld.add_dynamic(pObject->rigidBody);
 
                             }
 
@@ -839,7 +864,10 @@ int main(int, const char* [])
                     liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
                     brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                     brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+#if 0
                     physicsWorld.mupWorld->removeRigidBody(brick.rigidBody.mupRigidBody.get());
+#endif
+                    physicsWorld.remove(brick.rigidBody);
                     brick.isDynamic = false;
                     auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     ResetState resetState { };
@@ -851,7 +879,10 @@ int main(int, const char* [])
                     liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
                     ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                     ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+#if 0
                     physicsWorld.mupWorld->removeRigidBody(ball.rigidBody.mupRigidBody.get());
+#endif
+                    physicsWorld.remove(ball.rigidBody);
                     ball.isDynamic = false;
                     auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     ResetState resetState { };
@@ -886,10 +917,13 @@ int main(int, const char* [])
                         transform.setRotation(btQuaternion::getIdentity());
                         pRigidBody->setCenterOfMassTransform(transform);
                     }
-                    for (const auto& brick : bricks) {
+                    for (auto& brick : bricks) {
                         liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
                         brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
+#if 0
                         physicsWorld.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
+#endif
+                        physicsWorld.add_static(brick.rigidBody);
                         // brick.rigidBody.mupRigidBody->setActivationState(0);
                     }
                     for (const auto& ball : balls) {

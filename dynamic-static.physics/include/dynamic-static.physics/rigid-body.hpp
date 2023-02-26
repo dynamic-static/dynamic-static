@@ -45,7 +45,6 @@ public:
         Disabled = 0,
         Dynamic,
         Static,
-        Kinematic,
     };
 
     struct CreateInfo final
