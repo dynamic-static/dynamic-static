@@ -50,5 +50,10 @@ void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
     pRigidBody->mupRigidBody->setUserPointer(pCreateInfo->pUserData);
 }
 
+RigidBody::State RigidBody::get_state() const
+{
+    return mState;
+}
+
 } // namespace physics
 } // namespace dst

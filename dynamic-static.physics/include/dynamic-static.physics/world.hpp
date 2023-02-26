@@ -38,18 +38,22 @@ class RigidBody;
 class World final
 {
 public:
-    static bool create(World* pWorld);
+    struct CreateInfo final
+    {
+    };
+
+    static void create(const CreateInfo* pCreateInfo, World* pWorld);
+
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
-#if 0
-    void add_dynamic_rigid_body(RigidBody& rigidBody);
-    void add_static_rigid_body(RigidBody& rigidBody);
-    void add_kinemtic_rigid_body(RigidBody& rigidBody);
-    void remove_rigid_body(RigidBody& rigidBody);
-#endif
+
+    void disable(RigidBody& rigidBody);
+    void make_dynamic(RigidBody& rigidBody);
+    void make_static(RigidBody& rigidBody);
+    void make_kinematic(RigidBody& rigidBody);
     void update(btScalar deltaTime);
 
-private:
+public:
     std::unique_ptr<btCollisionConfiguration> mupCollisionConfiguration;
     std::unique_ptr<btCollisionDispatcher> mupDispatcher;
     std::unique_ptr<btBroadphaseInterface> mupBroadPhaseInterface;

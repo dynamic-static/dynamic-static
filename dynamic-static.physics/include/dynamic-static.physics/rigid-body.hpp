@@ -40,6 +40,14 @@ class World;
 class RigidBody final
 {
 public:
+    enum class State
+    {
+        Disabled = 0,
+        Dynamic,
+        Static,
+        Kinematic,
+    };
+
     struct CreateInfo final
     {
         btScalar mass { 0 };
@@ -55,9 +63,12 @@ public:
 
     static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
 
+    State get_state() const;
+
 public:
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
+    State mState { State::Disabled };
     friend class World;
 };
 

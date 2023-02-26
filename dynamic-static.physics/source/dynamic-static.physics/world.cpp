@@ -32,8 +32,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace dst {
 namespace physics {
 
-bool World::create(World* pWorld)
+void World::create(const CreateInfo* pCreateInfo, World* pWorld)
 {
+    assert(pCreateInfo);
     assert(pWorld);
     pWorld->mupCollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
     pWorld->mupDispatcher = std::make_unique<btCollisionDispatcher>(pWorld->mupCollisionConfiguration.get());
@@ -46,7 +47,6 @@ bool World::create(World* pWorld)
         pWorld->mupCollisionConfiguration.get()
     );
     pWorld->set_gravity(btVector3(0, -9.8f, 0));
-    return true;
 }
 
 btVector3 World::get_gravity() const
@@ -73,6 +73,26 @@ void World::remove_rigid_body(RigidBody& rigidBody)
     (void)rigidBody;
 }
 #endif
+
+void World::disable(RigidBody& rigidBody)
+{
+    (void)rigidBody;
+}
+
+void World::make_dynamic(RigidBody& rigidBody)
+{
+    (void)rigidBody;
+}
+
+void World::make_static(RigidBody& rigidBody)
+{
+    (void)rigidBody;
+}
+
+void World::make_kinematic(RigidBody& rigidBody)
+{
+    (void)rigidBody;
+}
 
 void World::update(btScalar deltaTime)
 {
