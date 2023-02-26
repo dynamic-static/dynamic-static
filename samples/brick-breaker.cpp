@@ -540,7 +540,7 @@ int main(int, const char* [])
     vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &ballMesh);
     assert(vkResult == VK_SUCCESS);
     std::array<Object, BallCount> balls;
-    std::set<uint64_t> liveBalls;
+    std::set<Object*> liveBalls;
     for (size_t i = 0; i < balls.size(); ++i) {
         auto& ball = balls[i];
 
@@ -559,7 +559,7 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_sphere_collider(BallRadius);
         ball.setup_physics_resources(rigidBodyCreateInfo);
 
-        liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
+        liveBalls.insert(&ball);
         initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
     }
 
@@ -613,189 +613,184 @@ int main(int, const char* [])
         const auto& input = systemSurface.get_input();
 
         // TODO : Documentation
-        // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
-            if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
-                paddle.rigidBody.apply_force({ PaddleSpeed, 0, 0 });
-            }
-            if (input.keyboard.down(gvk::system::Key::RightArrow)) {
-                paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
-            }
-        // }
+        if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
+            paddle.rigidBody.apply_force({ PaddleSpeed, 0, 0 });
+        }
+        if (input.keyboard.down(gvk::system::Key::RightArrow)) {
+            paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
+        }
+
+        // TODO : Documentation
         switch (state) {
-            case State::Play:
-            {
-                // if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
-                    if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
-                        if (ballCount) {
-                            assert(ballCount <= balls.size());
-                            auto& ball = balls[ballCount - 1];
-                            ball.rigidBody.halt();
-                            ball.rigidBody.set_transform(btTransform::getIdentity());
-                            physicsWorld.make_dynamic(ball.rigidBody);
-                            ballCount -= 1;
-                        }
-                    }
-                // }
+        case State::Play:
+        {
+            if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
+                if (ballCount) {
+                    assert(ballCount <= balls.size());
+                    auto& ball = balls[ballCount - 1];
+                    ball.rigidBody.halt();
+                    ball.rigidBody.set_transform(btTransform::getIdentity());
+                    physicsWorld.make_dynamic(ball.rigidBody);
+                    ballCount -= 1;
+                }
+            }
+            for (const auto& collision : collisions) {
+                for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
+                    if (liveBricks.count(collider)) {
+                        liveBricks.erase(collider);
 
-
-                for (const auto& collision : collisions) {
-                    for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
-                        if (liveBricks.count(collider)) {
-                            liveBricks.erase(collider);
-
-                            auto pRigidBody = (btRigidBody*)collider;
-                            auto pObject = (Object*)pRigidBody->getUserPointer();
-                            if (pObject->rigidBody.get_state() == dst::physics::RigidBody::State::Static) {
-                                physicsWorld.disable(pObject->rigidBody);
-                                physicsWorld.make_dynamic(pObject->rigidBody);
-                            }
+                        auto pRigidBody = (btRigidBody*)collider;
+                        auto pObject = (Object*)pRigidBody->getUserPointer();
+                        if (pObject->rigidBody.get_state() == dst::physics::RigidBody::State::Static) {
+                            physicsWorld.disable(pObject->rigidBody);
+                            physicsWorld.make_dynamic(pObject->rigidBody);
                         }
                     }
                 }
+            }
 
-                for (auto& ball : balls) {
-                    auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
-                    if (collision.second < collision.first) {
-                        std::swap(collision.first, collision.second);
-                    }
-                    if (collisions.count(collision)) {
-                        const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                        const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                            auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
-                            impulse *= 64;
-                            impulse.setY(64);
-                            ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
-                        }
-                    }
-                    auto paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    auto ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    auto floorTransform = floor.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    if (ballTransform.getOrigin().y() <= (paddleTransform.getOrigin().y() + floorTransform.getOrigin().y()) * 0.5f) {
-                        liveBalls.erase((uint64_t)ball.rigidBody.mupRigidBody.get());
+            for (auto& ball : balls) {
+                auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
+                if (collision.second < collision.first) {
+                    std::swap(collision.first, collision.second);
+                }
+                if (collisions.count(collision)) {
+                    const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                    const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                    if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                        auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                        impulse *= 64;
+                        impulse.setY(64);
+                        ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
                     }
                 }
+                auto paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                auto ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                auto floorTransform = floor.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                if (ballTransform.getOrigin().y() <= (paddleTransform.getOrigin().y() + floorTransform.getOrigin().y()) * 0.5f) {
+                    liveBalls.erase(&ball);
+                }
+            }
 
-                if (liveBricks.empty()) {
-                    celebrationTimer = 0;
-                    state = State::Celebration;
-                } else if (liveBalls.empty()) {
-                    state = State::GameOver;
+            if (liveBricks.empty()) {
+                celebrationTimer = 0;
+                state = State::Celebration;
+            } else if (liveBalls.empty()) {
+                state = State::GameOver;
+            }
+        } break;
+        case State::Celebration:
+        {
+            celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
+            if (celebrationTimer < celebrationDuration) {
+                auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
+                auto color = celebrationColors[index];
+                leftWall.set_color(color);
+                rightWall.set_color(color);
+                ceiling.set_color(color);
+            } else {
+                state = State::GameOver;
+                leftWall.set_color(gvk::math::Color::White);
+                rightWall.set_color(gvk::math::Color::White);
+                ceiling.set_color(gvk::math::Color::White);
+            }
+        } break;
+        case State::GameOver:
+        {
+            resetTimer = 0;
+            resetStates.clear();
+            state = State::Resetting;
+            for (auto& brick : bricks) {
+                liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+                brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
+                brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+
+                physicsWorld.disable(brick.rigidBody);
+                auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                ResetState resetState { };
+                resetState.rotation = transform.getRotation();
+                resetState.translation = transform.getOrigin();
+                resetStates.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), resetState });
+            }
+            for (auto& ball : balls) {
+                liveBalls.insert(&ball);
+                ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
+                ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+
+                physicsWorld.disable(ball.rigidBody);
+                auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                ResetState resetState { };
+                resetState.rotation = transform.getRotation();
+                resetState.translation = transform.getOrigin();
+                resetStates.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), resetState });
+            }
+        } break;
+        case State::Resetting:
+        {
+            resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
+
+
+            if (resetTimer < resetDuration) {
+                float t = resetTimer / resetDuration;
+                for (const auto& resetState : resetStates) {
+                    auto pRigidBody = (btRigidBody*)resetState.first;
+                    btTransform transform { };
+                    transform = pRigidBody->getCenterOfMassTransform();
+                    auto initialiPositionItr = initialPositions.find(resetState.first);
+                    assert(initialiPositionItr != initialPositions.end());
+                    transform.setOrigin(resetState.second.translation.lerp(initialiPositionItr->second, t));
+                    transform.setRotation(resetState.second.rotation.slerp(btQuaternion::getIdentity(), t));
+                    pRigidBody->setCenterOfMassTransform(transform);
                 }
-            } break;
-            case State::Celebration:
-            {
-                celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
-                if (celebrationTimer < celebrationDuration) {
-                    auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
-                    auto color = celebrationColors[index];
-                    leftWall.set_color(color);
-                    rightWall.set_color(color);
-                    ceiling.set_color(color);
-                } else {
-                    state = State::GameOver;
-                    leftWall.set_color(gvk::math::Color::White);
-                    rightWall.set_color(gvk::math::Color::White);
-                    ceiling.set_color(gvk::math::Color::White);
+            } else {
+                for (const auto& resetState : resetStates) {
+                    auto pRigidBody = (btRigidBody*)resetState.first;
+                    btTransform transform { };
+                    transform = pRigidBody->getCenterOfMassTransform();
+                    auto initialiPositionItr = initialPositions.find(resetState.first);
+                    assert(initialiPositionItr != initialPositions.end());
+                    transform.setOrigin(initialiPositionItr->second);
+                    transform.setRotation(btQuaternion::getIdentity());
+                    pRigidBody->setCenterOfMassTransform(transform);
                 }
-            } break;
-            case State::GameOver:
-            {
-                resetTimer = 0;
-                resetStates.clear();
-                state = State::Resetting;
                 for (auto& brick : bricks) {
                     liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
-                    brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
-                    brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-
-                    physicsWorld.disable(brick.rigidBody);
-                    auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    ResetState resetState { };
-                    resetState.rotation = transform.getRotation();
-                    resetState.translation = transform.getOrigin();
-                    resetStates.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), resetState });
+                    brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
+                    physicsWorld.make_static(brick.rigidBody);
                 }
                 for (auto& ball : balls) {
-                    liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
-                    ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
-                    ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-
-                    physicsWorld.disable(ball.rigidBody);
-                    auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    ResetState resetState { };
-                    resetState.rotation = transform.getRotation();
-                    resetState.translation = transform.getOrigin();
-                    resetStates.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), resetState });
+                    ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
+                    liveBalls.insert(&ball);
                 }
-            } break;
-            case State::Resetting:
-            {
-                resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
-
-
-                if (resetTimer < resetDuration) {
-                    float t = resetTimer / resetDuration;
-                    for (const auto& resetState : resetStates) {
-                        auto pRigidBody = (btRigidBody*)resetState.first;
-                        btTransform transform { };
-                        transform = pRigidBody->getCenterOfMassTransform();
-                        auto initialiPositionItr = initialPositions.find(resetState.first);
-                        assert(initialiPositionItr != initialPositions.end());
-                        transform.setOrigin(resetState.second.translation.lerp(initialiPositionItr->second, t));
-                        transform.setRotation(resetState.second.rotation.slerp(btQuaternion::getIdentity(), t));
-                        pRigidBody->setCenterOfMassTransform(transform);
-                    }
-                } else {
-                    for (const auto& resetState : resetStates) {
-                        auto pRigidBody = (btRigidBody*)resetState.first;
-                        btTransform transform { };
-                        transform = pRigidBody->getCenterOfMassTransform();
-                        auto initialiPositionItr = initialPositions.find(resetState.first);
-                        assert(initialiPositionItr != initialPositions.end());
-                        transform.setOrigin(initialiPositionItr->second);
-                        transform.setRotation(btQuaternion::getIdentity());
-                        pRigidBody->setCenterOfMassTransform(transform);
-                    }
-                    for (auto& brick : bricks) {
-                        liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
-                        brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
-                        physicsWorld.make_static(brick.rigidBody);
-                    }
-                    for (const auto& ball : balls) {
-                        ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
-                        liveBalls.insert((uint64_t)ball.rigidBody.mupRigidBody.get());
-                    }
-                    resetStates.clear();
-                    ballCount = 3;
-                    state = State::Play;
-                }
-            } break;
+                resetStates.clear();
+                ballCount = 3;
+                state = State::Play;
+            }
+        } break;
         }
 
         collisions.clear();
         auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
-        physicsWorld.mupWorld->stepSimulation(deltaTime);
+        physicsWorld.update(deltaTime);
 
-        //if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
-            gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
-                .deltaTime = deltaTime,
-                .moveUp = input.keyboard.down(gvk::system::Key::Q),
-                .moveDown = input.keyboard.down(gvk::system::Key::E),
-                .moveLeft = input.keyboard.down(gvk::system::Key::A),
-                .moveRight = input.keyboard.down(gvk::system::Key::D),
-                .moveForward = input.keyboard.down(gvk::system::Key::W),
-                .moveBackward = input.keyboard.down(gvk::system::Key::S),
-                .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
-                .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
-                .fieldOfViewDelta = input.mouse.scroll.delta()[1],
-            };
-            cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
-            if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
-                camera.fieldOfView = 60.0f;
-            }
-            cameraController.update(cameraControllerUpdateInfo);
-        // }
+        // TODO : Documentation
+        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
+            .deltaTime = deltaTime,
+            .moveUp = input.keyboard.down(gvk::system::Key::Q),
+            .moveDown = input.keyboard.down(gvk::system::Key::E),
+            .moveLeft = input.keyboard.down(gvk::system::Key::A),
+            .moveRight = input.keyboard.down(gvk::system::Key::D),
+            .moveForward = input.keyboard.down(gvk::system::Key::W),
+            .moveBackward = input.keyboard.down(gvk::system::Key::S),
+            .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
+            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
+            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
+        };
+        cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
+        if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
+            camera.fieldOfView = 60.0f;
+        }
+        cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
         CameraUniforms cameraUbo { };
@@ -817,146 +812,80 @@ int main(int, const char* [])
             ball.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
 
+        // TODO : Documentation
         wsiManager.update();
         auto swapchain = wsiManager.get_swapchain();
         if (swapchain) {
+            // TODO : Documentation
             uint32_t imageIndex = 0;
             vkResult = wsiManager.acquire_next_image(UINT64_MAX, VK_NULL_HANDLE, &imageIndex);
             assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
 
+            // TODO : Documentation
             auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
             camera.set_aspect_ratio(extent.width, extent.height);
 
+            // TODO : Documentation
             const auto& vkFences = wsiManager.get_vk_fences();
-
-#if 0
-            if (showGui) {
-                auto imguiCursor = ImGui::GetMouseCursor();
-                if (imguiCursor == ImGuiMouseCursor_None || ImGui::GetIO().MouseDrawCursor) {
-                    systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Hidden);
-                } else {
-                    switch (imguiCursor) {
-                    case ImGuiMouseCursor_Arrow: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Arrow); break;
-                    case ImGuiMouseCursor_TextInput: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::IBeam); break;
-                    case ImGuiMouseCursor_Hand: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Hand); break;
-                    case ImGuiMouseCursor_ResizeNS: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNS); break;
-                    case ImGuiMouseCursor_ResizeEW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeEW); break;
-                    case ImGuiMouseCursor_ResizeAll: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeAll); break;
-                    case ImGuiMouseCursor_ResizeNESW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNESW); break;
-                    case ImGuiMouseCursor_ResizeNWSE: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNWSE); break;
-                    case ImGuiMouseCursor_NotAllowed: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::NotAllowed); break;
-                    default: break;
-                    }
-                }
-                if (systemSurface.get_status() & gvk::system::Surface::GainedFocus) {
-                    ImGui::GetIO().AddFocusEvent(true);
-                }
-                if (systemSurface.get_status() & gvk::system::Surface::LostFocus) {
-                    ImGui::GetIO().AddFocusEvent(false);
-                }
-                const auto& textStream = systemSurface.get_text_stream();
-                auto guiRendererBeginInfo = gvk::get_default<gvk::gui::Renderer::BeginInfo>();
-                guiRendererBeginInfo.deltaTime = deltaTime;
-                guiRendererBeginInfo.extent = { (float)extent.width, (float)extent.height };
-                guiRendererBeginInfo.pInput = &input;
-                guiRendererBeginInfo.textStreamCodePointCount = (uint32_t)textStream.size();
-                guiRendererBeginInfo.pTextStreamCodePoints = !textStream.empty() ? textStream.data() : nullptr;
-                guiRenderer.begin_gui(guiRendererBeginInfo);
-                ImGui::ShowDemoWindow();
-                #if 0
-                ImGui::DragFloat("Paddle Speed", &PaddleSpeed, 12, 100);
-                auto paddleMass = paddle.rigidBody.mupRigidBody->getMass();
-                if (ImGui::DragFloat("Paddle Mass", &paddleMass, 0.01f, 0.01f)) {
-                    physicsWorld.mupWorld->removeRigidBody(paddle.rigidBody.mupRigidBody.get());
-                    btVector3 inertia { };
-                    paddle.rigidBody.mupRigidBody->getCollisionShape()->calculateLocalInertia(paddleMass, inertia);
-                    paddle.rigidBody.mupRigidBody->setMassProps(paddleMass, inertia);
-                    physicsWorld.mupWorld->addRigidBody(paddle.rigidBody.mupRigidBody.get());
-                }
-                #endif
-                #if 0
-                ImGui::DragFloat("anchor", &anchor, 0.01f);
-                ImGui::DragFloat("amplitude", &amplitude, 0.1f);
-                ImGui::DragFloat("frequency", &frequency, 0.1f);
-                ImGui::DragFloat("yRotation", &yRotation, 0.1f);
-                ImGui::DragFloat("zRotation", &zRotation, 0.1f);
-                ImGui::DragFloat("guiImageScale", &guiImageScale, 0.005f, 0.01f, 0.5f);
-                ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
-                ImGui::Image(guiDescriptorSets[0], guiImageExtent);
-                #endif
-                guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
-            }
-#endif
             vkResult = vkWaitForFences(gvkDevice, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX);
             assert(vkResult == VK_SUCCESS);
             vkResult = vkResetFences(gvkDevice, 1, &vkFences[imageIndex]);
             assert(vkResult == VK_SUCCESS);
 
+            // TODO : Documentation
             const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
             vkResult = vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>());
             assert(vkResult == VK_SUCCESS);
             auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
             vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-            {
-                // TODO : Documentation
-                VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
-                vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-                VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
-                vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                // TODO : Documentation
-                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            // TODO : Documentation
+            VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+            VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-                // TODO : Documentation
-                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+            // TODO : Documentation
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-                // TODO : Documentation
-                paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                for (auto& brick : bricks) {
-                    brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                }
-                for (auto& ball : balls) {
-                    ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-                }
+            // TODO : Documentation
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+
+            // TODO : Documentation
+            paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            for (auto& brick : bricks) {
+                brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            }
+            for (auto& ball : balls) {
+                ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
             }
 
-            #if 0
-            if (showGui) {
-                guiRenderer.record_cmds(commandBuffer);
-            }
-            #endif
-
+            // TODO : Documentation
             vkCmdEndRenderPass(commandBuffer);
             vkResult = vkEndCommandBuffer(commandBuffer);
             assert(vkResult == VK_SUCCESS);
 
+            // TODO : Documentation
             auto submitInfo = wsiManager.get_submit_info(imageIndex);
             vkResult = vkQueueSubmit(gvkQueue, 1, &submitInfo, vkFences[imageIndex]);
             assert(vkResult == VK_SUCCESS);
 
+            // TODO : Documentation
             auto presentInfo = wsiManager.get_present_info(&imageIndex);
             vkResult = vkQueuePresentKHR(gvkQueue, &presentInfo);
             assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
         }
-
-        #if 0
-        if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
-            showGui = !showGui;
-        }
-        #endif
-
     }
+
+    // TODO : Documentation
     vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
     assert(vkResult == VK_SUCCESS);
 
-    //remove the rigidbodies from the dynamics world and delete them
-    for (int i = physicsWorld.mupWorld->getNumCollisionObjects() - 1; 0 <= i; --i) {
-        btCollisionObject* obj = physicsWorld.mupWorld->getCollisionObjectArray()[i];
-        // btRigidBody* body = btRigidBody::upcast(obj);
-        physicsWorld.mupWorld->removeCollisionObject(obj);
-    }
+    // TODO : Documentation
+    physicsWorld.reset();
+
     return 0;
 }

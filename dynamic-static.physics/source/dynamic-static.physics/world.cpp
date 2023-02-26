@@ -47,6 +47,17 @@ void World::create(const CreateInfo* pCreateInfo, World* pWorld)
         pWorld->mupCollisionConfiguration.get()
     );
     pWorld->set_gravity(btVector3(0, -9.8f, 0));
+    pWorld->mupWorld->setWorldUserInfo(pWorld);
+}
+
+World::~World()
+{
+    reset();
+}
+
+const std::set<std::pair<uint64_t, uint64_t>>& World::get_collisions() const
+{
+    return mCollisions;
 }
 
 btVector3 World::get_gravity() const
@@ -79,12 +90,6 @@ void World::make_static(RigidBody& rigidBody)
 void World::disable(RigidBody& rigidBody)
 {
     assert(mupWorld);
-#if 0
-    rigidBody.mupRigidBody->clearForces();
-    rigidBody.mupRigidBody->clearGravity();
-    rigidBody.mupRigidBody->setLinearVelocity({ 0, 0, 0 });
-    rigidBody.mupRigidBody->setAngularVelocity({ 0, 0, 0 });
-#endif
     mupWorld->removeRigidBody(rigidBody.mupRigidBody.get());
     rigidBody.mState = RigidBody::State::Disabled;
 }
@@ -92,7 +97,54 @@ void World::disable(RigidBody& rigidBody)
 void World::update(btScalar deltaTime)
 {
     assert(mupWorld);
+    mCollisions.clear();
     mupWorld->stepSimulation(deltaTime);
+}
+
+void World::clear()
+{
+    if (mupWorld) {
+        mCollisions.clear();
+        for (int i = mupWorld->getNumCollisionObjects() - 1; 0 <= i; --i) {
+            auto pCollisionObject = mupWorld->getCollisionObjectArray()[i];
+            mupWorld->removeCollisionObject(pCollisionObject);
+        }
+    }
+}
+
+void World::reset()
+{
+    clear();
+    mupCollisionConfiguration.reset();
+    mupDispatcher.reset();
+    mupBroadPhaseInterface.reset();
+    mupSolver.reset();
+    mupWorld.reset();
+    mCollisions.clear();
+}
+
+void World::bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar)
+{
+    assert(pDynamicsWorld);
+    auto pWorld = (World*)pDynamicsWorld->getWorldUserInfo();
+    assert(pWorld);
+    auto& collisions = pWorld->mCollisions;
+    auto pDispatcher = pDynamicsWorld->getDispatcher();
+    assert(pDispatcher);
+    auto numManifolds = pDispatcher->getNumManifolds();
+    for (int manifold_i = 0; manifold_i < numManifolds; ++manifold_i) {
+        auto pManifold = pDispatcher->getManifoldByIndexInternal(manifold_i);
+        assert(pManifold);
+        for (int contact_i = 0; contact_i < pManifold->getNumContacts(); ++contact_i) {
+            if (pManifold->getContactPoint(contact_i).getDistance() < 0) {
+                auto collision = std::make_pair((uint64_t)pManifold->getBody0(), (uint64_t)pManifold->getBody1());
+                if (collision.second < collision.first) {
+                    std::swap(collision.first, collision.second);
+                }
+                collisions.insert(collision);
+            }
+        }
+    }
 }
 
 } // namespace physics

@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.physics/rigid-body.hpp"
 
 #include <memory>
+#include <set>
 
 namespace dst {
 namespace physics {
@@ -43,6 +44,9 @@ public:
 
     static void create(const CreateInfo* pCreateInfo, World* pWorld);
 
+    ~World();
+
+    const std::set<std::pair<uint64_t, uint64_t>>& get_collisions() const;
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
 
@@ -50,13 +54,18 @@ public:
     void make_static(RigidBody& rigidBody);
     void disable(RigidBody& rigidBody);
     void update(btScalar deltaTime);
+    void clear();
+    void reset();
 
 public:
+    static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep);
+
     std::unique_ptr<btCollisionConfiguration> mupCollisionConfiguration;
     std::unique_ptr<btCollisionDispatcher> mupDispatcher;
     std::unique_ptr<btBroadphaseInterface> mupBroadPhaseInterface;
     std::unique_ptr<btSequentialImpulseConstraintSolver> mupSolver;
     std::unique_ptr<btDiscreteDynamicsWorld> mupWorld;
+    std::set<std::pair<uint64_t, uint64_t>> mCollisions;
 };
 
 } // namespace physics
