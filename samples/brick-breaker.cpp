@@ -750,6 +750,7 @@ int main(int, const char* [])
                             auto pRigidBody = (btRigidBody*)collider;
                             if (!((Object*)pRigidBody->getUserPointer())->isDynamic) {
                                 ((Object*)pRigidBody->getUserPointer())->isDynamic = true;
+#if 0
                                 physicsWorld.mupWorld->removeRigidBody(pRigidBody);
                                 
                                 
@@ -759,11 +760,13 @@ int main(int, const char* [])
                                 pRigidBody->getMotionState()->setWorldTransform(pRigidBody->getCenterOfMassTransform());
                                 pRigidBody->forceActivationState(1);
                                 pRigidBody->activate(true);
+#endif
 
 #if 0
                                 physicsWorld.mupWorld->addRigidBody(pRigidBody); // , BrickGroup, AllGroup & ~PaddleGroup);
 #endif
                                 auto pObject = (Object*)pRigidBody->getUserPointer();
+                                physicsWorld.remove(pObject->rigidBody);
                                 physicsWorld.add_dynamic(pObject->rigidBody);
 
                             }
