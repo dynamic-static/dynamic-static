@@ -189,10 +189,15 @@ public:
         mColor = color;
     }
 
+    const btVector3& get_initial_position() const
+    {
+        return mInitialPosition;
+    }
+
     dst::physics::RigidBody rigidBody;
 
 private:
-    glm::vec3 mInitialPosition { };
+    btVector3 mInitialPosition { };
     glm::vec4 mColor { };
     gvk::Mesh mMesh;
     gvk::Buffer mUniformBuffer;
@@ -455,10 +460,6 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
         ceiling.setup_physics_resources(rigidBodyCreateInfo);
-
-#if 0
-        physicsWorld.mupWorld->addRigidBody(ceiling.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
-#endif
         physicsWorld.make_static(ceiling.rigidBody);
     }
 
@@ -469,10 +470,6 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
         floor.setup_physics_resources(rigidBodyCreateInfo);
-
-#if 0
-        physicsWorld.mupWorld->addRigidBody(floor.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
-#endif
         physicsWorld.make_static(floor.rigidBody);
     }
 
@@ -492,10 +489,6 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ 16, 0, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         leftWall.setup_physics_resources(rigidBodyCreateInfo);
-
-#if 0
-        physicsWorld.mupWorld->addRigidBody(leftWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
-#endif
         physicsWorld.make_static(leftWall.rigidBody);
     }
     Object rightWall;
@@ -510,10 +503,6 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ -16, 0, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         rightWall.setup_physics_resources(rigidBodyCreateInfo);
-
-#if 0
-        physicsWorld.mupWorld->addRigidBody(rightWall.rigidBody.mupRigidBody.get(), AllGroup, AllGroup);
-#endif
         physicsWorld.make_static(rightWall.rigidBody);
     }
 
@@ -555,15 +544,11 @@ int main(int, const char* [])
 
             offset += brickAreaWidth;
 
-#if 0
-            physicsWorld.mupWorld->addCollisionObject(brick.rigidBody.mupRigidBody.get());
-#endif
             physicsWorld.make_static(brick.rigidBody);
 
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
 
-            
         }
     }
 
