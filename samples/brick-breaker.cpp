@@ -117,9 +117,52 @@ struct CameraUniforms
     glm::mat4 projection { };
 };
 
-class Object final
+class GameObject final
 {
 public:
+    class Factory final
+    {
+    public:
+        Factory(const gvk::Device& device, uint32_t objectCount)
+            : mDevice { device }
+        {
+            assert(mDevice);
+
+            // TODO : Documentation
+            auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
+            descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorPoolSize.descriptorCount = objectCount;
+            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+            descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
+            descriptorPoolCreateInfo.poolSizeCount = 1;
+            descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+            gvk::DescriptorPool descriptorPool;
+            auto vkResult = gvk::DescriptorPool::create(mDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool);
+            assert(vkResult == VK_SUCCESS);
+        }
+
+        void create_box(const dst::physics::RigidBody::CreateInfo& createInfo, const btVector3& extents, GameObject* pObject)
+        {
+            (void)createInfo;
+            (void)extents;
+            (void)pObject;
+            assert(pObject);
+        }
+
+        void create_sphere(const dst::physics::RigidBody::CreateInfo& createInfo, btScalar radius, GameObject* pObject)
+        {
+            (void)createInfo;
+            (void)radius;
+            (void)pObject;
+            assert(pObject);
+        }
+
+    private:
+        gvk::Device mDevice;
+        gvk::DescriptorPool mDescriptorPool;
+    };
+
     void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color)
     {
         mColor = color;
@@ -221,10 +264,6 @@ struct ResetState
 
 int main(int, const char* [])
 {
-    const float CeilingWidth = 32;
-    const float CeilingHeight = 1;
-    const float CeilingDepth = 1;
-
     const float WallWidth = 1;
     const float WallHeight = 64;
     const float WallDepth = 1;
@@ -409,7 +448,7 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
     // TODO : Documentation
-    Object floor;
+    GameObject floor;
     {
         dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
@@ -422,13 +461,17 @@ int main(int, const char* [])
     static const uint32_t CeilingIndex = 0;
     static const uint32_t LeftWallIndex = 1;
     static const uint32_t RightWallIndex = 2;
-    std::array<Object, BarrierCount> barriers;
+    std::array<GameObject, BarrierCount> barriers;
 
     // TODO : Documentation
+    const float CeilingWidth = 32;
+    const float CeilingHeight = 1;
+    const float CeilingDepth = 1;
+    const btVector3 CeilingPosition = { 0, 32, 0 };
     gvk::Mesh ceilingMesh;
     vkResult = create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
     assert(vkResult == VK_SUCCESS);
-    Object ceiling;
+    GameObject ceiling;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
@@ -447,7 +490,7 @@ int main(int, const char* [])
     gvk::Mesh wallMesh;
     vkResult = create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, &wallMesh);
     assert(vkResult == VK_SUCCESS);
-    Object leftWall;
+    GameObject leftWall;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
@@ -461,7 +504,7 @@ int main(int, const char* [])
         leftWall.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(leftWall.rigidBody);
     }
-    Object rightWall;
+    GameObject rightWall;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
@@ -490,7 +533,7 @@ int main(int, const char* [])
     gvk::Mesh brickMesh;
     vkResult = create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
     assert(vkResult == VK_SUCCESS);
-    std::array<Object, BrickRowCount * BricksPerRow> bricks;
+    std::array<GameObject, BrickRowCount * BricksPerRow> bricks;
     auto playAreaWidth = CeilingWidth - WallWidth;
     auto brickAreaWidth = playAreaWidth / BricksPerRow;
     std::set<uint64_t> liveBricks;
@@ -526,8 +569,8 @@ int main(int, const char* [])
     gvk::Mesh ballMesh;
     vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &ballMesh);
     assert(vkResult == VK_SUCCESS);
-    std::array<Object, BallCount> balls;
-    std::set<Object*> liveBalls;
+    std::array<GameObject, BallCount> balls;
+    std::set<GameObject*> liveBalls;
     for (size_t i = 0; i < balls.size(); ++i) {
         auto& ball = balls[i];
 
@@ -554,7 +597,7 @@ int main(int, const char* [])
     gvk::Mesh paddleMesh;
     vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
     assert(vkResult == VK_SUCCESS);
-    Object paddle;
+    GameObject paddle;
     {
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
@@ -627,7 +670,7 @@ int main(int, const char* [])
                         liveBricks.erase(collider);
 
                         auto pRigidBody = (btRigidBody*)collider;
-                        auto pObject = (Object*)pRigidBody->getUserPointer();
+                        auto pObject = (GameObject*)pRigidBody->getUserPointer();
                         if (pObject->rigidBody.get_state() == dst::physics::RigidBody::State::Static) {
                             physicsWorld.disable(pObject->rigidBody);
                             physicsWorld.make_dynamic(pObject->rigidBody);
