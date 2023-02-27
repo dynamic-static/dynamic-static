@@ -42,7 +42,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 
-VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
+VkResult create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
     for (auto& vertex : vertices) {
@@ -76,9 +76,9 @@ VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t 
         }
     }
     return pMesh->write(
-        context.get_devices()[0],
-        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
-        context.get_command_buffers()[0],
+        commandBuffer.get<gvk::Device>(),
+        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
+        commandBuffer,
         VK_NULL_HANDLE,
         (uint32_t)vertices.size(),
         vertices.data(),
@@ -87,16 +87,16 @@ VkResult create_sphere_mesh(const gvk::Context& context, float radius, uint32_t 
     );
 }
 
-VkResult create_box_mesh(const gvk::Context& context, const glm::vec3& dimensions, gvk::Mesh* pMesh)
+VkResult create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec3& dimensions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Cube::Vertices.begin(), dst::gfx::primitive::Cube::Vertices.end());
     for (auto& vertex : vertices) {
         vertex *= dimensions;
     }
     return pMesh->write(
-        context.get_devices()[0],
-        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
-        context.get_command_buffers()[0],
+        commandBuffer.get<gvk::Device>(),
+        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
+        commandBuffer,
         VK_NULL_HANDLE,
         (uint32_t)vertices.size(),
         vertices.data(),
@@ -145,20 +145,24 @@ public:
         void create_box(const dst::physics::RigidBody::CreateInfo& createInfo, const btVector3& extents, GameObject* pGameObject)
         {
             (void)createInfo;
-            (void)extents;
-            (void)pGameObject;
             assert(pGameObject);
+            create_descriptor_resources(pGameObject);
+            auto itr = mBoxResources.find(extents);
+            if (itr == mBoxResources.end()) {
+                gvk::Mesh mesh;
+                itr = mBoxResources.insert({ extents, { btBoxShape(extents * 0.5f), mesh } }).first;
+            }
         }
 
         void create_sphere(const dst::physics::RigidBody::CreateInfo& createInfo, btScalar radius, GameObject* pGameObject)
         {
             (void)createInfo;
-            (void)radius;
-            (void)pGameObject;
             assert(pGameObject);
+            create_descriptor_resources(pGameObject);
             auto itr = mSphereResources.find(radius);
             if (itr == mSphereResources.end()) {
-
+                gvk::Mesh mesh;
+                itr = mSphereResources.insert({ radius, { btSphereShape(radius), mesh } }).first;
             }
         }
 
@@ -512,7 +516,7 @@ int main(int, const char* [])
     const float CeilingDepth = 1;
     const btVector3 CeilingPosition = { 0, 32, 0 };
     gvk::Mesh ceilingMesh;
-    vkResult = create_box_mesh(gfxContext, { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
+    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
     assert(vkResult == VK_SUCCESS);
     GameObject ceiling;
     {
@@ -531,7 +535,7 @@ int main(int, const char* [])
 
     // TODO : Documentation
     gvk::Mesh wallMesh;
-    vkResult = create_box_mesh(gfxContext, { WallWidth, WallHeight, WallDepth }, &wallMesh);
+    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { WallWidth, WallHeight, WallDepth }, &wallMesh);
     assert(vkResult == VK_SUCCESS);
     GameObject leftWall;
     {
@@ -574,7 +578,7 @@ int main(int, const char* [])
         gvk::math::Color::Violet,
     };
     gvk::Mesh brickMesh;
-    vkResult = create_box_mesh(gfxContext, { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
+    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
     assert(vkResult == VK_SUCCESS);
     std::array<GameObject, BrickRowCount * BricksPerRow> bricks;
     auto playAreaWidth = CeilingWidth - WallWidth;
@@ -610,7 +614,7 @@ int main(int, const char* [])
 
     // TODO : Documentation
     gvk::Mesh ballMesh;
-    vkResult = create_sphere_mesh(gfxContext, BallRadius, 3, &ballMesh);
+    vkResult = create_sphere_mesh(gfxContext.get_command_buffers()[0], BallRadius, 3, &ballMesh);
     assert(vkResult == VK_SUCCESS);
     std::array<GameObject, BallCount> balls;
     std::set<GameObject*> liveBalls;
@@ -638,7 +642,7 @@ int main(int, const char* [])
 
     // TODO : Documentation
     gvk::Mesh paddleMesh;
-    vkResult = create_box_mesh(gfxContext, { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
+    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
     assert(vkResult == VK_SUCCESS);
     GameObject paddle;
     {
