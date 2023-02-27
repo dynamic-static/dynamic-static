@@ -105,16 +105,83 @@ VkResult create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec
     );
 }
 
-struct ObjectUniforms
+VkResult create_pipeline(const gvk::RenderPass& renderPass, VkPolygonMode polygonMode, gvk::Pipeline* pPipeline)
 {
-    glm::mat4 world { };
-    glm::vec3 color { };
-};
+    assert(renderPass);
+    assert(pPipeline);
+
+    // TODO : Documentation
+    gvk::spirv::ShaderInfo vertexShaderInfo {
+        .language = gvk::spirv::ShadingLanguage::Glsl,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .lineOffset = __LINE__,
+        .source = R"(
+            #version 450
+
+            layout(set = 0, binding = 0)
+            uniform CameraUniforms
+            {
+                mat4 view;
+                mat4 projection;
+            } camera;
+
+            layout(set = 1, binding = 0)
+            uniform ObjectUniforms
+            {
+                mat4 world;
+                vec4 color;
+            } object;
+
+            layout(location = 0) in vec3 vsPosition;
+
+            out gl_PerVertex
+            {
+                vec4 gl_Position;
+            };
+
+            void main()
+            {
+                gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
+            }
+        )"
+    };
+
+    // TODO : Documentation
+    gvk::spirv::ShaderInfo fragmentShaderInfo {
+        .language = gvk::spirv::ShadingLanguage::Glsl,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .lineOffset = __LINE__,
+        .source = R"(
+            #version 450
+
+            layout(set = 1, binding = 0)
+            uniform ObjectUniforms
+            {
+                mat4 world;
+                vec4 color;
+            } object;
+
+            layout(location = 0) out vec4 fragColor;
+
+            void main()
+            {
+                fragColor = object.color;
+            }
+        )"
+    };
+    return dst_sample_create_pipeline<glm::vec3>(renderPass, VK_CULL_MODE_BACK_BIT, polygonMode, vertexShaderInfo, fragmentShaderInfo, pPipeline);
+}
 
 struct CameraUniforms
 {
     glm::mat4 view { };
     glm::mat4 projection { };
+};
+
+struct ObjectUniforms
+{
+    glm::mat4 world { };
+    glm::vec4 color { };
 };
 
 class GameObject final
@@ -344,24 +411,6 @@ struct ResetState
 
 int main(int, const char* [])
 {
-    const float FloorWidth = 1024;
-    const float FloorHeight = 1;
-    const float FloorDepth = 1024;
-
-    const float BrickWidth = 2;
-    const float BrickHeight = 1;
-    const float BrickDepth = 1;
-    const float BrickMass = 8;
-    const uint32_t BrickCount = 60;
-
-    const float PaddleWidth = 6;
-    const float PaddleHeight = 1;
-    const float PaddleDepth = 0.1f;
-
-    const float BallRadius = 0.5f;
-    const float BallMass = 1;
-    const uint32_t BallCount = 3;
-
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
@@ -398,80 +447,31 @@ int main(int, const char* [])
     dst::physics::Collider::Pool colliderPool;
     ///////////////////////////////////////////////////////////////////////////////
 
-    // TODO : Documentation
-    gvk::spirv::ShaderInfo vertexShaderInfo {
-        .language = gvk::spirv::ShadingLanguage::Glsl,
-        .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .lineOffset = __LINE__,
-        .source = R"(
-            #version 450
-
-            layout(set = 0, binding = 0)
-            uniform CameraUniformBuffer
-            {
-                mat4 view;
-                mat4 projection;
-            } camera;
-
-            layout(set = 1, binding = 0)
-            uniform ObjectUniformBuffer
-            {
-                mat4 world;
-                vec4 color;
-            } object;
-
-            layout(location = 0) in vec3 vsPosition;
-
-            out gl_PerVertex
-            {
-                vec4 gl_Position;
-            };
-
-            void main()
-            {
-                gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-            }
-        )"
-    };
-
-    // TODO : Documentation
-    gvk::spirv::ShaderInfo fragmentShaderInfo {
-        .language = gvk::spirv::ShadingLanguage::Glsl,
-        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .lineOffset = __LINE__,
-        .source = R"(
-            #version 450
-
-            layout(set = 1, binding = 0)
-            uniform ObjectUniformBuffer
-            {
-                mat4 world;
-                vec4 color;
-            } object;
-
-            layout(location = 0) out vec4 fragColor;
-
-            void main()
-            {
-                
-                fragColor = object.color;
-            }
-        )"
-    };
-    gvk::Pipeline pipeline;
-    vkResult = dst_sample_create_pipeline<glm::vec3>(
-        wsiManager.get_render_pass(),
-        VK_CULL_MODE_BACK_BIT,
-#if 0
-        VK_POLYGON_MODE_LINE,
-#else
-        VK_POLYGON_MODE_FILL,
-#endif
-        vertexShaderInfo,
-        fragmentShaderInfo,
-        &pipeline
-    );
+    gvk::Pipeline polygonPipeline;
+    vkResult = create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_FILL, &polygonPipeline);
     assert(vkResult == VK_SUCCESS);
+    gvk::Pipeline wireframePipeline;
+    vkResult = create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_LINE, &wireframePipeline);
+    assert(vkResult == VK_SUCCESS);
+    auto pipeline = polygonPipeline;
+
+    const float FloorWidth = 1024;
+    const float FloorHeight = 1;
+    const float FloorDepth = 1024;
+
+    const float BrickWidth = 2;
+    const float BrickHeight = 1;
+    const float BrickDepth = 1;
+    const float BrickMass = 8;
+    const uint32_t BrickCount = 60;
+
+    const float PaddleWidth = 6;
+    const float PaddleHeight = 1;
+    const float PaddleDepth = 0.1f;
+
+    const float BallRadius = 0.5f;
+    const float BallMass = 1;
+    const uint32_t BallCount = 3;
 
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
@@ -487,16 +487,6 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
 
     // TODO : Documentation
-    gvk::math::Camera camera;
-    gvk::math::FreeCameraController cameraController;
-    cameraController.set_camera(&camera);
-    camera.nearPlane = 1.0f;
-    camera.transform.translation.z = -64;
-    gvk::Buffer cameraUniformBuffer;
-    vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gvkDevice, &cameraUniformBuffer);
-    assert(vkResult == VK_SUCCESS);
-    
-    // TODO : Documentation
     const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
     assert(descriptorSetLayouts.size() == 2);
     const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
@@ -507,6 +497,16 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
     gvk::DescriptorSet cameraDescriptorSet;
     vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
+    assert(vkResult == VK_SUCCESS);
+
+    // TODO : Documentation
+    gvk::math::Camera camera;
+    gvk::math::FreeCameraController cameraController;
+    cameraController.set_camera(&camera);
+    camera.nearPlane = 1.0f;
+    camera.transform.translation.z = -64;
+    gvk::Buffer cameraUniformBuffer;
+    vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gvkDevice, &cameraUniformBuffer);
     assert(vkResult == VK_SUCCESS);
 
     // TODO : Documentation
@@ -534,13 +534,7 @@ int main(int, const char* [])
         physicsWorld.make_static(floor.rigidBody);
     }
 
-    static const uint32_t BarrierCount = 3;
-    static const uint32_t CeilingIndex = 0;
-    static const uint32_t LeftWallIndex = 1;
-    static const uint32_t RightWallIndex = 2;
-    std::array<GameObject, BarrierCount> barriers;
-
-    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 4); // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls
+    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 4); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
     const uint32_t WallCount = 3;
@@ -572,51 +566,6 @@ int main(int, const char* [])
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &walls[i]);
         physicsWorld.make_static(walls[i].rigidBody);
     }
-
-#if 0
-    const btScalar CeilingWidth = 32;
-    const btScalar CeilingHeight = 1;
-    const btScalar CeilingDepth = 1;
-    const btVector3 CeilingPosition = { 0, 32, 0 };
-    GameObject ceiling;
-    {
-        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = { CeilingWidth, CeilingHeight, CeilingDepth };
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(CeilingPosition);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ceiling);
-        physicsWorld.make_static(ceiling.rigidBody);
-    }
-    const btScalar WallWidth = 1;
-    const btScalar WallHeight = 64;
-    const btScalar WallDepth = 1;
-    const btVector3 LeftWallPosition = { 16, 0, 0 };
-    GameObject leftWall;
-    {
-        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(LeftWallPosition);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &leftWall);
-        physicsWorld.make_static(leftWall.rigidBody);
-    }
-    const btVector3 RightWallPosition = { -16, 0, 0 };
-    GameObject rightWall;
-    {
-        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(RightWallPosition);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &rightWall);
-        physicsWorld.make_static(rightWall.rigidBody);
-    }
-#endif
 
     // TODO : Documentation
     const uint32_t BrickRowCount = 6;
@@ -741,6 +690,14 @@ int main(int, const char* [])
         gvk::system::Surface::update();
         const auto& input = systemSurface.get_input();
 
+        if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
+            if (pipeline == polygonPipeline) {
+                pipeline = wireframePipeline;
+            } else {
+                pipeline = polygonPipeline;
+            }
+        }
+
         // TODO : Documentation
         if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
             paddle.rigidBody.apply_force({ PaddleSpeed, 0, 0 });
@@ -814,21 +771,11 @@ int main(int, const char* [])
             if (celebrationTimer < celebrationDuration) {
                 auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
                 auto color = celebrationColors[index];
-#if 0
-                leftWall.set_color(color);
-                rightWall.set_color(color);
-                ceiling.set_color(color);
-#endif
                 for (auto& wall : walls) {
                     wall.set_color(color);
                 }
             } else {
                 state = State::GameOver;
-#if 0
-                leftWall.set_color(gvk::math::Color::White);
-                rightWall.set_color(gvk::math::Color::White);
-                ceiling.set_color(gvk::math::Color::White);
-#endif
                 for (auto& wall : walls) {
                     wall.set_color(gvk::math::Color::White);
                 }
@@ -941,11 +888,6 @@ int main(int, const char* [])
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
         paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
-#if 0
-        ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
-        leftWall.update_uniform_buffer(gfxContext.get_devices()[0]);
-        rightWall.update_uniform_buffer(gfxContext.get_devices()[0]);
-#endif
         for (auto& wall : walls) {
             wall.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
@@ -997,11 +939,6 @@ int main(int, const char* [])
 
             // TODO : Documentation
             paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-#if 0
-            ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-            leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-            rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
-#endif
             for (auto& wall : walls) {
                 wall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
             }
