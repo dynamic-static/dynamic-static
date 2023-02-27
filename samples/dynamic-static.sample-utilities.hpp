@@ -298,8 +298,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
 {
     assert(pipeline);
     assert(pDescriptorSets);
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED)
-    {
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
         std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
         for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
@@ -345,46 +344,3 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk:
     vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
     return gvk::Buffer::create(device, &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
 }
-
-#if 0
-VkResult dst_sample_acquire_submit_present(gvk::WsiManager& wsiManager)
-{
-    gvk_result_scope_begin(VK_SUCCESS) {
-        const auto& device = context.get_devices()[0];
-        const auto& queue = gvk::get_queue_family(device, 0).queues[0];
-        auto& wsiManager = context.get_wsi_manager();
-        if (wsiManager.is_enabled()) {
-            // If the gvk::WsiManager is enabled, we need to acquire the next gvk::Image to
-            //  render to...this method may return VK_SUBOPTIMAL_KHR...the gvk::WsiManager
-            //  will update itself when this occurs, so we don't want to bail from the
-            //  gvk_result_scope when this happens...
-            uint32_t imageIndex = 0;
-            auto vkResult = wsiManager.acquire_next_image(UINT64_MAX, VK_NULL_HANDLE, &imageIndex);
-            gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
-
-            // Once we have the gvk::Image acquired, we need to make sure that we wait on
-            //  the associated gvk::Fence...this ensures that we're not trying to reuse the
-            //  gvk::Image while it's in flight...
-            const auto& fence = wsiManager.get_fences()[imageIndex];
-            gvk_result(vkWaitForFences(device, 1, &(const VkFence&)fence, VK_TRUE, UINT64_MAX));
-
-            // Reset the gvk::Fence because we're going to use it again right away...
-            gvk_result(vkResetFences(device, 1, &(const VkFence&)fence));
-
-            // Submit...
-            //  When this submission finishes, the associated gvk::Fence will be signaled
-            //  so we know this gvk::Image is ready to be used again...
-            auto submitInfo = wsiManager.get_submit_info(imageIndex);
-            gvk_result(vkQueueSubmit(queue, 1, &submitInfo, fence));
-
-            // Present...
-            // Like acquire_next_image(), VK_SUBOPTIMAL_KHR is ok and will be handled by
-            //  the gvk::WsiManager...
-            auto presentInfo = wsiManager.get_present_info(&imageIndex);
-            vkResult = vkQueuePresentKHR(queue, &presentInfo);
-            gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
-        }
-    } gvk_result_scope_end;
-    return gvkResult;
-}
-#endif

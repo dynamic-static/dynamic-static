@@ -120,92 +120,125 @@ struct CameraUniforms
 class GameObject final
 {
 public:
+    struct BoxCreateInfo
+    {
+        btVector3 extents { 1, 1, 1 };
+    };
+
+    struct SphereCreateInfo
+    {
+        btScalar radius { 1 };
+    };
+
+    struct CreateInfo
+    {
+        const BoxCreateInfo* pBoxCreateInfo { nullptr };
+        const SphereCreateInfo* pSphereCreateInfo { nullptr };
+        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+    };
+
     class Factory final
     {
     public:
-        Factory(const gvk::Device& device, uint32_t objectCount)
-            : mDevice { device }
+        Factory(const gvk::DescriptorSetLayout& descriptorSetLayout, uint32_t objectCount)
+            : mDescriptorSetLayout { descriptorSetLayout }
         {
-            assert(mDevice);
+            assert(mDescriptorSetLayout);
 
             // TODO : Documentation
-            auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
-            descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorPoolSize.descriptorCount = objectCount;
+            std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
+            auto descriptorSetLayoutCreateInfo = mDescriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
+            for (uint32_t binding_i = 0; binding_i < descriptorSetLayoutCreateInfo.bindingCount; ++binding_i) {
+                const auto& binding = descriptorSetLayoutCreateInfo.pBindings[binding_i];
+                descriptorPoolSizes.push_back({ binding.descriptorType, binding.descriptorCount * objectCount });
+            }
             auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
             descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
-            descriptorPoolCreateInfo.poolSizeCount = 1;
-            descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
-            gvk::DescriptorPool descriptorPool;
-            auto vkResult = gvk::DescriptorPool::create(mDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool);
+            descriptorPoolCreateInfo.maxSets = objectCount;
+            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
+            descriptorPoolCreateInfo.pPoolSizes = !descriptorPoolSizes.empty() ? descriptorPoolSizes.data() : nullptr;
+            auto vkResult = gvk::DescriptorPool::create(mDescriptorSetLayout.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &mDescriptorPool);
             assert(vkResult == VK_SUCCESS);
+            (void)vkResult;
         }
 
-        void create_box(const dst::physics::RigidBody::CreateInfo& createInfo, const btVector3& extents, GameObject* pGameObject)
+        void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
         {
-            (void)createInfo;
+            // TODO : Documentation
+            assert(commandBuffer);
+            assert(!createInfo.pBoxCreateInfo != !createInfo.pSphereCreateInfo);
             assert(pGameObject);
-            create_descriptor_resources(pGameObject);
-            auto itr = mBoxResources.find(extents);
-            if (itr == mBoxResources.end()) {
-                gvk::Mesh mesh;
-                itr = mBoxResources.insert({ extents, { btBoxShape(extents * 0.5f), mesh } }).first;
+            std::pair<btCollisionShape*, gvk::Mesh> resources;
+            if (createInfo.pBoxCreateInfo) {
+                resources = get_box_resources(commandBuffer, *createInfo.pBoxCreateInfo);
+            } else {
+                resources = get_sphere_resources(commandBuffer, *createInfo.pSphereCreateInfo);
             }
-        }
-
-        void create_sphere(const dst::physics::RigidBody::CreateInfo& createInfo, btScalar radius, GameObject* pGameObject)
-        {
-            (void)createInfo;
-            assert(pGameObject);
+            pGameObject->mMesh = resources.second;
+            createInfo.rigidBodyCreateInfo.pCollisionShape = resources.first;
+            createInfo.rigidBodyCreateInfo.pUserData = this;
+            dst::physics::RigidBody::create(&createInfo.rigidBodyCreateInfo, &pGameObject->rigidBody);
             create_descriptor_resources(pGameObject);
-            auto itr = mSphereResources.find(radius);
-            if (itr == mSphereResources.end()) {
-                gvk::Mesh mesh;
-                itr = mSphereResources.insert({ radius, { btSphereShape(radius), mesh } }).first;
-            }
         }
 
     private:
+        std::pair<btCollisionShape*, gvk::Mesh> get_box_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::BoxCreateInfo& boxCreateInfo)
+        {
+            auto itr = mBoxResources.find(boxCreateInfo.extents);
+            if (itr == mBoxResources.end()) {
+                gvk::Mesh mesh;
+                auto vkResult = create_box_mesh(commandBuffer, { boxCreateInfo.extents.x(), boxCreateInfo.extents.y(), boxCreateInfo.extents.z() }, &mesh);
+                assert(vkResult == VK_SUCCESS);
+                (void)vkResult;
+                itr = mBoxResources.insert({ boxCreateInfo.extents, { btBoxShape(boxCreateInfo.extents * 0.5f), mesh } }).first;
+            }
+            return { &itr->second.first, itr->second.second };
+        }
+
+        std::pair<btCollisionShape*, gvk::Mesh> get_sphere_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::SphereCreateInfo& sphereCreateInfo)
+        {
+            auto itr = mSphereResources.find(sphereCreateInfo.radius);
+            if (itr == mSphereResources.end()) {
+                gvk::Mesh mesh;
+                auto vkResult = create_sphere_mesh(commandBuffer, sphereCreateInfo.radius, 3, &mesh);
+                assert(vkResult == VK_SUCCESS);
+                (void)vkResult;
+                itr = mSphereResources.insert({ sphereCreateInfo.radius, { btSphereShape(sphereCreateInfo.radius), mesh } }).first;
+            }
+            return { &itr->second.first, itr->second.second };
+        }
+
         void create_descriptor_resources(GameObject* pGameObject)
         {
             assert(pGameObject);
-            auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(mDevice, &pGameObject->mUniformBuffer);
-            (void)vkResult;
-            assert(vkResult == VK_SUCCESS);
-#if 0
+
             // TODO : Documentation
-            const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
-            assert(descriptorSetLayouts.size() == 2);
-            const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
-            const auto& objectDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[1];
-            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
-            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-            descriptorSetAllocateInfo.descriptorSetCount = 1;
-            descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
-            gvk::DescriptorSet cameraDescriptorSet;
-            vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
+            auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(mDescriptorSetLayout.get<gvk::Device>(), &pGameObject->mUniformBuffer);
             assert(vkResult == VK_SUCCESS);
+            (void)vkResult;
+
+            // TODO : Documentation
+            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.descriptorPool = mDescriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = 1;
+            descriptorSetAllocateInfo.pSetLayouts = &mDescriptorSetLayout.get<const VkDescriptorSetLayout&>();
+            vkResult = gvk::DescriptorSet::allocate(mDescriptorPool.get<gvk::Device>(), &descriptorSetAllocateInfo, &pGameObject->mDescriptorSet);
+            assert(vkResult == VK_SUCCESS);
+            (void)vkResult;
 
             // TODO : Documentation
             auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
-            descriptorBufferInfo.buffer = cameraUniformBuffer;
+            descriptorBufferInfo.buffer = pGameObject->mUniformBuffer;
             auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
             writeDescriptorSet.descriptorCount = 1;
             writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSet.dstSet = cameraDescriptorSet;
+            writeDescriptorSet.dstSet = pGameObject->mDescriptorSet;
             writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-            vkUpdateDescriptorSets(gfxContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
-
-            std::map<uint64_t, btVector3> initialPositions;
-
-            // TODO : Documentation
-            descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
-#endif
+            vkUpdateDescriptorSets(mDescriptorPool.get<gvk::Device>(), 1, &writeDescriptorSet, 0, nullptr);
         }
 
-        gvk::Device mDevice;
         gvk::DescriptorPool mDescriptorPool;
+        gvk::DescriptorSetLayout mDescriptorSetLayout;
         std::map<btVector3, std::pair<btBoxShape, gvk::Mesh>> mBoxResources;
         std::map<btScalar, std::pair<btSphereShape, gvk::Mesh>> mSphereResources;
     };
@@ -263,7 +296,7 @@ public:
     dst::physics::RigidBody rigidBody;
 
 private:
-    glm::vec4 mColor { };
+    glm::vec4 mColor { gvk::math::Color::White };
     gvk::Mesh mMesh;
     gvk::Buffer mUniformBuffer;
     gvk::DescriptorSet mDescriptorSet;
@@ -510,6 +543,8 @@ int main(int, const char* [])
     static const uint32_t RightWallIndex = 2;
     std::array<GameObject, BarrierCount> barriers;
 
+    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 4); // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls
+
     // TODO : Documentation
     const float CeilingWidth = 32;
     const float CeilingHeight = 1;
@@ -520,6 +555,7 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
     GameObject ceiling;
     {
+#if 0
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
@@ -531,6 +567,17 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
         ceiling.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(ceiling.rigidBody);
+#else
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { CeilingWidth, CeilingHeight, CeilingDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ceiling);
+        physicsWorld.make_static(ceiling.rigidBody);
+        // ceiling.set_color(gvk::math::Color::White);
+#endif
     }
 
     // TODO : Documentation
