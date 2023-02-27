@@ -357,19 +357,6 @@ int main(int, const char* [])
     );
     assert(vkResult == VK_SUCCESS);
 
-#if 0
-    bool showGui = false;
-    gvk::gui::Renderer guiRenderer;
-    vkResult = gvk::gui::Renderer::create(
-        gvkDevice,
-        gvkQueue,
-        gfxContext.get_command_buffers()[0],
-        wsiManager.get_render_pass(),
-        nullptr,
-        &guiRenderer
-    );
-#endif
-
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
     descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
