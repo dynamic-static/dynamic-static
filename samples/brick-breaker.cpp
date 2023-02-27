@@ -142,25 +142,68 @@ public:
             assert(vkResult == VK_SUCCESS);
         }
 
-        void create_box(const dst::physics::RigidBody::CreateInfo& createInfo, const btVector3& extents, GameObject* pObject)
+        void create_box(const dst::physics::RigidBody::CreateInfo& createInfo, const btVector3& extents, GameObject* pGameObject)
         {
             (void)createInfo;
             (void)extents;
-            (void)pObject;
-            assert(pObject);
+            (void)pGameObject;
+            assert(pGameObject);
         }
 
-        void create_sphere(const dst::physics::RigidBody::CreateInfo& createInfo, btScalar radius, GameObject* pObject)
+        void create_sphere(const dst::physics::RigidBody::CreateInfo& createInfo, btScalar radius, GameObject* pGameObject)
         {
             (void)createInfo;
             (void)radius;
-            (void)pObject;
-            assert(pObject);
+            (void)pGameObject;
+            assert(pGameObject);
+            auto itr = mSphereResources.find(radius);
+            if (itr == mSphereResources.end()) {
+
+            }
         }
 
     private:
+        void create_descriptor_resources(GameObject* pGameObject)
+        {
+            assert(pGameObject);
+            auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(mDevice, &pGameObject->mUniformBuffer);
+            (void)vkResult;
+            assert(vkResult == VK_SUCCESS);
+#if 0
+            // TODO : Documentation
+            const auto& descriptorSetLayouts = pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>();
+            assert(descriptorSetLayouts.size() == 2);
+            const auto& cameraDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[0];
+            const auto& objectDescriptorSetLayout = (VkDescriptorSetLayout)descriptorSetLayouts[1];
+            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = 1;
+            descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
+            gvk::DescriptorSet cameraDescriptorSet;
+            vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
+            assert(vkResult == VK_SUCCESS);
+
+            // TODO : Documentation
+            auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+            descriptorBufferInfo.buffer = cameraUniformBuffer;
+            auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+            writeDescriptorSet.descriptorCount = 1;
+            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            writeDescriptorSet.dstSet = cameraDescriptorSet;
+            writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+            vkUpdateDescriptorSets(gfxContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
+
+            std::map<uint64_t, btVector3> initialPositions;
+
+            // TODO : Documentation
+            descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
+#endif
+        }
+
         gvk::Device mDevice;
         gvk::DescriptorPool mDescriptorPool;
+        std::map<btVector3, std::pair<btBoxShape, gvk::Mesh>> mBoxResources;
+        std::map<btScalar, std::pair<btSphereShape, gvk::Mesh>> mSphereResources;
     };
 
     void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color)
@@ -168,7 +211,7 @@ public:
         mColor = color;
         mMesh = mesh;
         mDescriptorSet = descriptorSet;
-        auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(context, &mUniformBuffer);
+        auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(context.get_devices()[0], &mUniformBuffer);
         assert(vkResult == VK_SUCCESS);
         auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
         descriptorBufferInfo.buffer = mUniformBuffer;
@@ -416,7 +459,7 @@ int main(int, const char* [])
     camera.nearPlane = 1.0f;
     camera.transform.translation.z = -64;
     gvk::Buffer cameraUniformBuffer;
-    vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gfxContext, &cameraUniformBuffer);
+    vkResult = dst_sample_create_uniform_buffer<CameraUniforms>(gvkDevice, &cameraUniformBuffer);
     assert(vkResult == VK_SUCCESS);
     
     // TODO : Documentation

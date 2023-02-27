@@ -333,7 +333,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
 }
 
 template <typename UniformBufferObjectType>
-inline VkResult dst_sample_create_uniform_buffer(const gvk::Context& context, gvk::Buffer* pUniformBuffer)
+inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk::Buffer* pUniformBuffer)
 {
     assert(pUniformBuffer);
     // Creates a persistently mapped gvk::Buffer for writing uniform buffer data...
@@ -343,7 +343,7 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Context& context, gv
     VmaAllocationCreateInfo vmaAllocationCreateInfo { };
     vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    return gvk::Buffer::create(context.get_devices()[0], &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
+    return gvk::Buffer::create(device, &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
 }
 
 #if 0
