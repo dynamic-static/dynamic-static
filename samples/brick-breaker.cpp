@@ -344,10 +344,6 @@ struct ResetState
 
 int main(int, const char* [])
 {
-    const float WallWidth = 1;
-    const float WallHeight = 64;
-    const float WallDepth = 1;
-
     const float FloorWidth = 1024;
     const float FloorHeight = 1;
     const float FloorDepth = 1024;
@@ -547,97 +543,80 @@ int main(int, const char* [])
     GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 4); // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls
 
     // TODO : Documentation
-    const float CeilingWidth = 32;
-    const float CeilingHeight = 1;
-    const float CeilingDepth = 1;
-    const btVector3 CeilingPosition = { 0, 32, 0 };
+    const uint32_t WallCount = 3;
+    const btScalar CeilingWidth  = 32;
+    const btScalar CeilingHeight = 1;
+    const btScalar CeilingDepth  = 1;
+    const btScalar WallWidth     = 1;
+    const btScalar WallHeight    = 64;
+    const btScalar WallDepth     = 1;
+    const std::array<btVector3, WallCount> WallExtents {
+        btVector3(CeilingWidth, CeilingHeight, CeilingDepth), // Ceiling
+        btVector3(WallWidth,    WallHeight,    WallDepth),    // Left wall
+        btVector3(WallWidth,    WallHeight,    WallDepth),    // Right wall
+    };
+    const std::array<btVector3, WallCount> WallPositions {
+        btVector3(  0, 32, 0), // Ceiling
+        btVector3( 16,  0, 0), // Left wall
+        btVector3(-16,  0, 0), // Right wall
+    };
+    const btScalar WallRestitution = 0.6f;
+    std::array<GameObject, WallCount> walls;
+    for (size_t i = 0; i < walls.size(); ++i) {
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = WallExtents[i];
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(WallPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &walls[i]);
+        physicsWorld.make_static(walls[i].rigidBody);
+    }
+
 #if 0
-    gvk::Mesh ceilingMesh;
-    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
-    assert(vkResult == VK_SUCCESS);
-#endif
+    const btScalar CeilingWidth = 32;
+    const btScalar CeilingHeight = 1;
+    const btScalar CeilingDepth = 1;
+    const btVector3 CeilingPosition = { 0, 32, 0 };
     GameObject ceiling;
     {
-#if 0
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        ceiling.setup_graphics_resources(gfxContext, ceilingMesh, descriptorSet, gvk::math::Color::White);
-
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.material.restitution = 0.6f;
-        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(CeilingWidth, CeilingHeight, CeilingDepth) * 0.5f);
-        ceiling.setup_physics_resources(rigidBodyCreateInfo);
-        physicsWorld.make_static(ceiling.rigidBody);
-#else
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { CeilingWidth, CeilingHeight, CeilingDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(CeilingPosition);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ceiling);
         physicsWorld.make_static(ceiling.rigidBody);
-#endif
     }
-
-    // TODO : Documentation
-#if 0
-    gvk::Mesh wallMesh;
-    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { WallWidth, WallHeight, WallDepth }, &wallMesh);
-    assert(vkResult == VK_SUCCESS);
-#endif
+    const btScalar WallWidth = 1;
+    const btScalar WallHeight = 64;
+    const btScalar WallDepth = 1;
+    const btVector3 LeftWallPosition = { 16, 0, 0 };
     GameObject leftWall;
     {
-#if 0
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        leftWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.material.restitution = 0.6f;
-        rigidBodyCreateInfo.initialTransform.setOrigin({ 16, 0, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
-        leftWall.setup_physics_resources(rigidBodyCreateInfo);
-        physicsWorld.make_static(leftWall.rigidBody);
-#else
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 16, 0, 0 });
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(LeftWallPosition);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &leftWall);
         physicsWorld.make_static(leftWall.rigidBody);
-#endif
     }
+    const btVector3 RightWallPosition = { -16, 0, 0 };
     GameObject rightWall;
     {
-#if 0
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        rightWall.setup_graphics_resources(gfxContext, wallMesh, descriptorSet, gvk::math::Color::White);
-
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.material.restitution = 0.6f;
-        rigidBodyCreateInfo.initialTransform.setOrigin({ -16, 0, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
-        rightWall.setup_physics_resources(rigidBodyCreateInfo);
-        physicsWorld.make_static(rightWall.rigidBody);
-#else
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ -16, 0, 0 });
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(RightWallPosition);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &rightWall);
         physicsWorld.make_static(rightWall.rigidBody);
-#endif
     }
+#endif
 
     // TODO : Documentation
     const uint32_t BrickRowCount = 6;
@@ -835,14 +814,24 @@ int main(int, const char* [])
             if (celebrationTimer < celebrationDuration) {
                 auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
                 auto color = celebrationColors[index];
+#if 0
                 leftWall.set_color(color);
                 rightWall.set_color(color);
                 ceiling.set_color(color);
+#endif
+                for (auto& wall : walls) {
+                    wall.set_color(color);
+                }
             } else {
                 state = State::GameOver;
+#if 0
                 leftWall.set_color(gvk::math::Color::White);
                 rightWall.set_color(gvk::math::Color::White);
                 ceiling.set_color(gvk::math::Color::White);
+#endif
+                for (auto& wall : walls) {
+                    wall.set_color(gvk::math::Color::White);
+                }
             }
         } break;
         case State::GameOver:
@@ -952,9 +941,14 @@ int main(int, const char* [])
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
         paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
+#if 0
         ceiling.update_uniform_buffer(gfxContext.get_devices()[0]);
         leftWall.update_uniform_buffer(gfxContext.get_devices()[0]);
         rightWall.update_uniform_buffer(gfxContext.get_devices()[0]);
+#endif
+        for (auto& wall : walls) {
+            wall.update_uniform_buffer(gfxContext.get_devices()[0]);
+        }
         for (auto& brick : bricks) {
             brick.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
@@ -1003,9 +997,14 @@ int main(int, const char* [])
 
             // TODO : Documentation
             paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+#if 0
             ceiling.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
             leftWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
             rightWall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+#endif
+            for (auto& wall : walls) {
+                wall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            }
             for (auto& brick : bricks) {
                 brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
             }
