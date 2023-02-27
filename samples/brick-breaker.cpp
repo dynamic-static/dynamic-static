@@ -374,6 +374,7 @@ int main(int, const char* [])
 
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
     systemSurfaceCreateInfo.pTitle = gfxContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
+    systemSurfaceCreateInfo.extent = { 1920, 1080 };
     gvk::system::Surface systemSurface;
     auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
     assert(success);
@@ -550,9 +551,11 @@ int main(int, const char* [])
     const float CeilingHeight = 1;
     const float CeilingDepth = 1;
     const btVector3 CeilingPosition = { 0, 32, 0 };
+#if 0
     gvk::Mesh ceilingMesh;
     vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { CeilingWidth, CeilingHeight, CeilingDepth }, &ceilingMesh);
     assert(vkResult == VK_SUCCESS);
+#endif
     GameObject ceiling;
     {
 #if 0
@@ -576,16 +579,18 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, 32, 0 });
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ceiling);
         physicsWorld.make_static(ceiling.rigidBody);
-        // ceiling.set_color(gvk::math::Color::White);
 #endif
     }
 
     // TODO : Documentation
+#if 0
     gvk::Mesh wallMesh;
     vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { WallWidth, WallHeight, WallDepth }, &wallMesh);
     assert(vkResult == VK_SUCCESS);
+#endif
     GameObject leftWall;
     {
+#if 0
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
@@ -597,9 +602,20 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         leftWall.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(leftWall.rigidBody);
+#else
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 16, 0, 0 });
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &leftWall);
+        physicsWorld.make_static(leftWall.rigidBody);
+#endif
     }
     GameObject rightWall;
     {
+#if 0
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
@@ -611,6 +627,16 @@ int main(int, const char* [])
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(WallWidth, WallHeight, WallDepth) * 0.5f);
         rightWall.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(rightWall.rigidBody);
+#else
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { WallWidth, WallHeight, WallDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.6f;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ -16, 0, 0 });
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &rightWall);
+        physicsWorld.make_static(rightWall.rigidBody);
+#endif
     }
 
     // TODO : Documentation
