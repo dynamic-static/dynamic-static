@@ -459,10 +459,7 @@ int main(int, const char* [])
     const float FloorHeight = 1;
     const float FloorDepth = 1024;
 
-    const float BrickWidth = 2;
-    const float BrickHeight = 1;
-    const float BrickDepth = 1;
-    const float BrickMass = 8;
+
     const uint32_t BrickCount = 60;
 
     const float PaddleWidth = 6;
@@ -568,8 +565,12 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    const uint32_t BrickRowCount = 6;
-    const uint32_t BricksPerRow = 10;
+    const uint32_t BrickRowCount   = 6;
+    const uint32_t BrickColumCount = 10;
+    const btScalar BrickMass       = 8;
+    const btScalar BrickWidth      = 2;
+    const btScalar BrickHeight     = 1;
+    const btScalar BrickDepth      = 1;
     const std::array<glm::vec4, BrickRowCount> BrickRowColors {
         gvk::math::Color::Red,
         gvk::math::Color::Orange,
@@ -578,18 +579,22 @@ int main(int, const char* [])
         gvk::math::Color::DodgerBlue,
         gvk::math::Color::Violet,
     };
+
+#if 1
     gvk::Mesh brickMesh;
     vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
     assert(vkResult == VK_SUCCESS);
-    std::array<GameObject, BrickRowCount * BricksPerRow> bricks;
+#endif
+
+    std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
     auto playAreaWidth = CeilingWidth - WallWidth;
-    auto brickAreaWidth = playAreaWidth / BricksPerRow;
+    auto brickAreaWidth = playAreaWidth / BrickColumCount;
     std::set<uint64_t> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
         auto offset = -playAreaWidth * 0.5f + brickAreaWidth * 0.5f;
-        for (size_t brick_i = 0; brick_i < BricksPerRow; ++brick_i) {
-            auto& brick = bricks[row_i * BricksPerRow + brick_i];
-
+        for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
+            auto& brick = bricks[row_i * BrickColumCount + brick_i];
+#if 1
             btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
 
             gvk::DescriptorSet descriptorSet;
@@ -609,6 +614,21 @@ int main(int, const char* [])
 
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
+#else
+            btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
+            GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+            gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
+            GameObject::CreateInfo gameObjectCreateInfo { };
+            gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+            gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
+            gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
+            gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &brick);
+            physicsWorld.make_static(brick.rigidBody);
+            brick.set_color(BrickRowColors[row_i]);
+            offset += brickAreaWidth;
+            liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+            initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
+#endif
 
         }
     }
@@ -624,6 +644,7 @@ int main(int, const char* [])
 
         btVector3 initialPosition(-16.0f + i * 2.0f, 34, 0);
 
+#if 0
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
@@ -636,6 +657,18 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_sphere_collider(BallRadius);
         ball.setup_physics_resources(rigidBodyCreateInfo);
+#else
+        GameObject::SphereCreateInfo gameObjectSphereCreateInfo { };
+        gameObjectSphereCreateInfo.radius = BallRadius;
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pSphereCreateInfo = &gameObjectSphereCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.mass = BallMass;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.9f;
+        gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ball);
+        ball.set_color(gvk::math::Color::SlateGray);
+#endif
 
         liveBalls.insert(&ball);
         initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
