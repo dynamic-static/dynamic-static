@@ -242,7 +242,9 @@ public:
                 resources = get_sphere_resources(commandBuffer, *createInfo.pSphereCreateInfo);
             }
             pGameObject->mMesh = resources.second;
-            createInfo.rigidBodyCreateInfo.pCollisionShape = resources.first;
+            if (!createInfo.rigidBodyCreateInfo.pCollisionShape) {
+                createInfo.rigidBodyCreateInfo.pCollisionShape = resources.first;
+            }
             createInfo.rigidBodyCreateInfo.pUserData = this;
             dst::physics::RigidBody::create(&createInfo.rigidBodyCreateInfo, &pGameObject->rigidBody);
             create_descriptor_resources(pGameObject);
@@ -594,8 +596,9 @@ int main(int, const char* [])
         auto offset = -playAreaWidth * 0.5f + brickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
             auto& brick = bricks[row_i * BrickColumCount + brick_i];
-#if 1
             btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
+#if 1
+            
 
             gvk::DescriptorSet descriptorSet;
             vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
@@ -608,14 +611,9 @@ int main(int, const char* [])
             rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
             brick.setup_physics_resources(rigidBodyCreateInfo);
 
-            offset += brickAreaWidth;
 
-            physicsWorld.make_static(brick.rigidBody);
 
-            liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
-            initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
 #else
-            btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
             GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
             gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
             GameObject::CreateInfo gameObjectCreateInfo { };
@@ -623,13 +621,19 @@ int main(int, const char* [])
             gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
             gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
             gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &brick);
-            physicsWorld.make_static(brick.rigidBody);
             brick.set_color(BrickRowColors[row_i]);
-            offset += brickAreaWidth;
-            liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
-            initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
+
+            // dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
+            // rigidBodyCreateInfo.mass = BrickMass;
+            // rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
+            // gameObjectCreateInfo.rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
+            // brick.setup_physics_resources(gameObjectCreateInfo.rigidBodyCreateInfo);
 #endif
 
+            offset += brickAreaWidth;
+            physicsWorld.make_static(brick.rigidBody);
+            liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+            initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
         }
     }
 
