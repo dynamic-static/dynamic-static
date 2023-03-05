@@ -138,7 +138,7 @@ public:
     class Factory final
     {
     public:
-        Factory(const gvk::DescriptorPool& descriptorPool, const gvk::DescriptorSetLayout& descriptorSetLayout)
+        inline Factory(const gvk::DescriptorPool& descriptorPool, const gvk::DescriptorSetLayout& descriptorSetLayout)
             : mDescriptorPool { descriptorPool }
             , mDescriptorSetLayout { descriptorSetLayout }
         {
@@ -146,7 +146,7 @@ public:
             assert(mDescriptorSetLayout);
         }
 
-        void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
+        inline void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
         {
             assert(commandBuffer);
             assert(!createInfo.pBoxCreateInfo != !createInfo.pSphereCreateInfo);
@@ -165,7 +165,7 @@ public:
         }
 
     private:
-        std::pair<btCollisionShape*, gvk::Mesh> get_box_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::BoxCreateInfo& boxCreateInfo)
+        inline std::pair<btCollisionShape*, gvk::Mesh> get_box_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::BoxCreateInfo& boxCreateInfo)
         {
             // Check if a btCollisionShape and gvk::Mesh have already been created for a
             //  box with the given extents.  If so return the existing resources, otherwise
@@ -179,7 +179,7 @@ public:
             return { &itr->second.first, itr->second.second };
         }
 
-        std::pair<btCollisionShape*, gvk::Mesh> get_sphere_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::SphereCreateInfo& sphereCreateInfo)
+        inline std::pair<btCollisionShape*, gvk::Mesh> get_sphere_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::SphereCreateInfo& sphereCreateInfo)
         {
             // Check if a btCollisionShape and gvk::Mesh have already been created for a
             //  sphere with the given radius.  If so return the existing resources,
@@ -193,7 +193,7 @@ public:
             return { &itr->second.first, itr->second.second };
         }
 
-        void create_descriptor_resources(GameObject* pGameObject)
+        inline void create_descriptor_resources(GameObject* pGameObject)
         {
             assert(pGameObject);
 
@@ -246,7 +246,7 @@ public:
         return *this;
     }
 
-    void update_uniform_buffer(const gvk::Device& device) const
+    inline void update_uniform_buffer(const gvk::Device& device) const
     {
         // Write this GameObject's ObjectUniforms data into the uniform Buffer.
         ObjectUniforms ubo { };
@@ -258,7 +258,7 @@ public:
         memcpy(allocationInfo.pMappedData, &ubo, sizeof(ObjectUniforms));
     }
 
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout) const
+    inline void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout) const
     {
         // Bind this GameObject's DescriptorSet (which references the uniform Buffer)
         //  then record the gvk::Mesh's draw cmds.
