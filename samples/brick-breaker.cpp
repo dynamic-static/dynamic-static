@@ -501,24 +501,6 @@ int main(int, const char* [])
         physicsWorld.make_static(backStops[i].rigidBody);
     }
 
-#if 0
-    // TODO : Documentation
-    GameObject floor;
-    {
-        float y = -38;
-        y = -((WallHeight + WallHeight * 0.18f) * 0.5f);
-        std::cout << y << std::endl;
-        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = { FloorWidth, FloorHeight, FloorDepth };
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        // gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, y, 0 });
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &floor);
-        physicsWorld.make_static(floor.rigidBody);
-    }
-#endif
-
     // TODO : Documentation
     const uint32_t BrickRowCount   = 6;
     const uint32_t BrickColumCount = 10;
