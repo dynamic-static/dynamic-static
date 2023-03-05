@@ -88,7 +88,7 @@ inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk:
     auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
     debugUtilsMessengerCreateInfo.pfnUserCallback = dst_sample_debug_utils_messenger_callback;
 
-    // Populate the gvk::Context::CreateInfo and call the base implementation.
+    // Populate the gvk::Context::CreateInfo and call gvk::Context::create().
     auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
     contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
     contextCreateInfo.loadApiDumpLayer = VK_FALSE;
@@ -178,7 +178,7 @@ inline VkResult dst_sample_create_pipeline(
         fragmentPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragmentPipelineShaderStageCreateInfo.module = fragmentShaderModule;
 
-        // Create an array of VkPipelineShaderStageCreateInfo for the shaders used in
+        // Create an array of VkPipelineShaderStageCreateInfos for the shaders used in
         //  this gvk::Pipeline.
         std::array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
             vertexPipelineShaderStageCreateInfo,
