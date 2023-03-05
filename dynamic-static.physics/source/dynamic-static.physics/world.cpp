@@ -40,6 +40,7 @@ Collision make_collision(const RigidBody* pRigidBody0, const RigidBody* pRigidBo
 
 void World::create(const CreateInfo* pCreateInfo, World* pWorld)
 {
+    (void)pCreateInfo;
     assert(pCreateInfo);
     assert(pWorld);
     pWorld->mupCollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();

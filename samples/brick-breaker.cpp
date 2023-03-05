@@ -149,9 +149,7 @@ public:
             descriptorPoolCreateInfo.maxSets = objectCount;
             descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
             descriptorPoolCreateInfo.pPoolSizes = !descriptorPoolSizes.empty() ? descriptorPoolSizes.data() : nullptr;
-            auto vkResult = gvk::DescriptorPool::create(mDescriptorSetLayout.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &mDescriptorPool);
-            assert(vkResult == VK_SUCCESS);
-            (void)vkResult;
+            dst_vk_result(gvk::DescriptorPool::create(mDescriptorSetLayout.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &mDescriptorPool));
         }
 
         void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
@@ -181,9 +179,7 @@ public:
             auto itr = mBoxResources.find(boxCreateInfo.extents);
             if (itr == mBoxResources.end()) {
                 gvk::Mesh mesh;
-                auto vkResult = dst_sample_create_box_mesh(commandBuffer, { boxCreateInfo.extents.x(), boxCreateInfo.extents.y(), boxCreateInfo.extents.z() }, &mesh);
-                assert(vkResult == VK_SUCCESS);
-                (void)vkResult;
+                dst_vk_result(dst_sample_create_box_mesh(commandBuffer, { boxCreateInfo.extents.x(), boxCreateInfo.extents.y(), boxCreateInfo.extents.z() }, &mesh));
                 itr = mBoxResources.insert({ boxCreateInfo.extents, { btBoxShape(boxCreateInfo.extents * 0.5f), mesh } }).first;
             }
             return { &itr->second.first, itr->second.second };
@@ -330,10 +326,11 @@ int main(int, const char* [])
 
     // TOOD : Documentation
     gvk::Context gvkContext;
-    auto vkResult = dst_sample_create_gvk_context("dynamic-static - Brick Breaker", &gvkContext);
-    assert(vkResult == VK_SUCCESS);
+    dst_vk_result(dst_sample_create_gvk_context("dynamic-static - Brick Breaker", &gvkContext));
     auto gvkDevice = gvkContext.get_devices()[0];
     auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
+
+    auto vkResult = VK_SUCCESS;
 
     // TOOD : Documentation
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
@@ -341,6 +338,7 @@ int main(int, const char* [])
     systemSurfaceCreateInfo.extent = { 1280, 720 };
     gvk::system::Surface systemSurface;
     auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
+    (void)success;
     assert(success);
 
     // TOOD : Documentation
@@ -356,12 +354,6 @@ int main(int, const char* [])
     gvk::WsiManager wsiManager;
     vkResult = gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager);
     assert(vkResult == VK_SUCCESS);
-
-    // TOOD : Documentation
-    dst::physics::World::CreateInfo physicsWorldCreateInfo { };
-    dst::physics::World physicsWorld;
-    dst::physics::World::create(&physicsWorldCreateInfo, &physicsWorld);
-    // dst::physics::Collider::Pool colliderPool;
 
     gvk::Pipeline polygonPipeline;
     vkResult = create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_FILL, &polygonPipeline);
@@ -423,6 +415,12 @@ int main(int, const char* [])
     // TODO : Documentation
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
+    // TOOD : Documentation
+    dst::physics::World::CreateInfo physicsWorldCreateInfo { };
+    dst::physics::World physicsWorld;
+    dst::physics::World::create(&physicsWorldCreateInfo, &physicsWorld);
+
+    // TODO : Documentation
     GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], 1000); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
@@ -456,7 +454,7 @@ int main(int, const char* [])
     // TODO : Documentation
     constexpr btScalar ContainerWidth        = PlayFieldWidth + PlayFieldWidth * 0.5f;
     constexpr btScalar ContainerHeight       = PlayFieldHeight + PlayFieldHeight * 0.18f;
-    constexpr btScalar ContainerDepth        = 32;
+    constexpr btScalar ContainerDepth        = 16;
     constexpr uint32_t ContainerBarrierCount = 5;
     const std::array<btVector3, ContainerBarrierCount> ContainerBarrierExtents {
         btVector3(ContainerWidth,   ContainerHeight,  BarrierThickness), // Back

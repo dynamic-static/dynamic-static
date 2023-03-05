@@ -34,9 +34,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.physics/world.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+
+#ifdef _DEBUG
+#define dst_vk_result(VK_CALL)                        \
+{                                                     \
+    auto VK_CALL_result = VK_CALL;                    \
+    assert(VK_CALL_result == VK_SUCCESS && #VK_CALL); \
+}
+#else
+#define dst_vk_result(VK_CALL) VK_CALL;
+#endif
 
 static VkBool32 dst_sample_debug_utils_messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -81,7 +92,7 @@ inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk:
     auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
     contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
     contextCreateInfo.loadApiDumpLayer = VK_FALSE;
-    contextCreateInfo.loadValidationLayer = VK_TRUE;
+    contextCreateInfo.loadValidationLayer = VK_FALSE;
     contextCreateInfo.loadWsiExtensions = VK_TRUE;
     contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
     contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;
