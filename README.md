@@ -21,4 +21,4 @@ cd dynamic-static/
 cmake -G "Visual Studio 16 2019" -A x64 -B ./build .
 cmake --build ./build
 ```
-Open `gitrepos/dynamic-static/dynamic-static/build/dynamic-static.sln` in Visual Studio, navigate to `samples/brick-breaker`, right click and select "Set as Startup Project", run.
+Open `gitrepos/dynamic-static/dynamic-static/build/dynamic-static.sln` in Visual Studio, navigate to `samples/brick-breaker`, right click and select "Set as Startup Project", run (green play arrow button [> Local Windows Debugger]).
