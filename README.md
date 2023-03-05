@@ -3,7 +3,7 @@
 
 TODO : More README
 
-# Getting started
+# Getting Started
 
 Ensure the following tools are installed...
  - [CMake](https://cmake.org/download/) v3.3+ (Make sure to select "Add to PATH" when prompted)
