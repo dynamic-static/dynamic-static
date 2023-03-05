@@ -307,7 +307,7 @@ int main(int, const char* [])
     std::cout << "    dynamic-static - Brick Breaker                                              " << std::endl;
     std::cout << "--------------------------------------------------------------------------------" << std::endl;
     std::cout << "                                                                                " << std::endl;
-    std::cout << "    Break out all of the bricks to win!                                         " << std::endl;
+    std::cout << "    Break out all the bricks to win!                                            " << std::endl;
     std::cout << "                                                                                " << std::endl;
     std::cout << "    Controls                                                                    " << std::endl;
     std::cout << "        [Space] : Fire a ball, multiple balls may be in play                    " << std::endl;
@@ -551,6 +551,7 @@ int main(int, const char* [])
         gameObjectBoxCreateInfo.extents = { PaddleWidth, PaddleHeight, PaddleDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.rigidBodyCreateInfo.mass = PaddleMass;
+        gameObjectCreateInfo.rigidBodyCreateInfo.linearDamping = 0.4f;
         gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 0, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PaddlePosition);
@@ -610,8 +611,8 @@ int main(int, const char* [])
 
         // TODO : Documentation
         switch (state) {
-        case State::Play:
-        {
+        case State::Play: {
+            // TODO : Documentation
             if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
                 if (ballCount) {
                     assert(ballCount <= balls.size());
@@ -623,6 +624,7 @@ int main(int, const char* [])
                 }
             }
 
+            // TODO : Documentation
             for (auto brickItr = liveBricks.begin(); brickItr != liveBricks.end();) {
                 auto& rigidBody = (*brickItr)->rigidBody;
                 if (physicsWorld.get_collided_rigid_bodies().count(&rigidBody)) {
@@ -634,23 +636,7 @@ int main(int, const char* [])
                 }
             }
 
-#if 0
-            for (const auto& collision : physicsWorld.get_collisions()) {
-                for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
-                    if (liveBricks.count(collider)) {
-                        liveBricks.erase(collider);
-
-                        auto pRigidBody = (btRigidBody*)collider;
-                        auto pObject = (GameObject*)pRigidBody->getUserPointer();
-                        if (pObject->rigidBody.get_state() == dst::physics::RigidBody::State::Static) {
-                            physicsWorld.disable(pObject->rigidBody);
-                            physicsWorld.make_dynamic(pObject->rigidBody);
-                        }
-                    }
-                }
-            }
-#endif
-
+            // TODO : Documentation
             bool liveBall = false;
             const auto& paddleTransform = paddle.rigidBody.get_transform();
             const auto& floorTransform = floor.rigidBody.get_transform();
@@ -668,31 +654,7 @@ int main(int, const char* [])
                 }
             }
 
-#if 0
-            for (auto& ball : balls) {
-                auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
-                if (collision.second < collision.first) {
-                    std::swap(collision.first, collision.second);
-                }
-                if (physicsWorld.get_collisions().count(collision)) {
-                    const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                    if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                        auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
-                        impulse *= 64;
-                        impulse.setY(64);
-                        ball.rigidBody.mupRigidBody->applyCentralImpulse(impulse);
-                    }
-                }
-                auto paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                auto ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                auto floorTransform = floor.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                if (ballTransform.getOrigin().y() <= (paddleTransform.getOrigin().y() + floorTransform.getOrigin().y()) * 0.5f) {
-                    liveBalls.erase(&ball);
-                }
-            }
-#endif
-
+            // TODO : Documentation
             if (liveBricks.empty()) {
                 celebrationTimer = 0;
                 state = State::Celebration;
