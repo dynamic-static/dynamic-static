@@ -267,7 +267,7 @@ public:
             auto itr = mSphereResources.find(sphereCreateInfo.radius);
             if (itr == mSphereResources.end()) {
                 gvk::Mesh mesh;
-                auto vkResult = create_sphere_mesh(commandBuffer, sphereCreateInfo.radius, 3, &mesh);
+                auto vkResult = create_sphere_mesh(commandBuffer, sphereCreateInfo.radius, 1, &mesh);
                 assert(vkResult == VK_SUCCESS);
                 (void)vkResult;
                 itr = mSphereResources.insert({ sphereCreateInfo.radius, { btSphereShape(sphereCreateInfo.radius), mesh } }).first;
@@ -411,6 +411,28 @@ struct ResetState
 
 int main(int, const char* [])
 {
+    std::cout <<                                                                                       std::endl;
+    std::cout << "================================================================================" << std::endl;
+    std::cout << "    dynamic-static - Brick Breaker                                              " << std::endl;
+    std::cout << "--------------------------------------------------------------------------------" << std::endl;
+    std::cout << "                                                                                " << std::endl;
+    std::cout << "    Break out all of the bricks to win!                                         " << std::endl;
+    std::cout << "                                                                                " << std::endl;
+    std::cout << "    Controls                                                                    " << std::endl;
+    std::cout << "        [Space] : Fire a ball, multiple balls may be in play                    " << std::endl;
+    std::cout << "        [<][>]  : Move the paddle                                               " << std::endl;
+    std::cout << "        [Esc]   : Quit                                                          " << std::endl;
+    std::cout << "                                                                                " << std::endl;
+    std::cout << "    Debug                                                                       " << std::endl;
+    std::cout << "        [~]          : Toggle wireframe                                         " << std::endl;
+    std::cout << "        [Q][W][E]                                                               " << std::endl;
+    std::cout << "        [A][S][D]    : Move camera                                              " << std::endl;
+    std::cout << "        [Left Shift] : Hold to enable camera move speed multiplier              " << std::endl;
+    std::cout << "        [Left Mouse] : Hold to enable mouse look                                " << std::endl;
+    std::cout << "                                                                                " << std::endl;
+    std::cout << "================================================================================" << std::endl;
+    std::cout <<                                                                                       std::endl;
+
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
@@ -499,6 +521,7 @@ int main(int, const char* [])
     // TODO : Documentation
     gvk::math::Camera camera;
     gvk::math::FreeCameraController cameraController;
+    cameraController.moveSpeed = 12.4f;
     cameraController.set_camera(&camera);
     camera.nearPlane = 1.0f;
     camera.transform.translation.z = -64;
@@ -677,11 +700,14 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
+    const btScalar PaddleMass = 1;
+    const btVector3 PaddlePosition = { 0, -28, 0 };
     gvk::Mesh paddleMesh;
     vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
     assert(vkResult == VK_SUCCESS);
     GameObject paddle;
     {
+#if 0
         gvk::DescriptorSet descriptorSet;
         vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
         assert(vkResult == VK_SUCCESS);
@@ -695,6 +721,18 @@ int main(int, const char* [])
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -28, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
         paddle.setup_physics_resources(rigidBodyCreateInfo);
+#else
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { PaddleWidth, PaddleHeight, PaddleDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.rigidBodyCreateInfo.mass = PaddleMass;
+        gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 0, 0 };
+        gameObjectCreateInfo.rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PaddlePosition);
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
+        paddle.set_color(gvk::math::Color::Brown);
+#endif
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
 
@@ -740,16 +778,6 @@ int main(int, const char* [])
         if (input.keyboard.down(gvk::system::Key::RightArrow)) {
             paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
         }
-
-        static float minX;
-        static float maxX;
-        auto x = paddle.rigidBody.get_transform().getOrigin().x();
-        minX = std::min(minX, x);
-        maxX = std::max(x, maxX);
-        std::cout << minX << " : " << x << " : " << maxX << std::endl;
-
-        auto thing = WallPositions[1].x() - WallWidth * 0.5f - PaddleWidth * 0.5f;
-        std::cout << thing << std::endl;
 
         // TODO : Documentation
         switch (state) {
