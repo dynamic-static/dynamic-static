@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#if 0
+
 #include "dynamic-static.physics/defines.hpp"
 
 #include <map>
@@ -55,3 +57,4 @@ private:
 
 } // namespace physics
 } // namespace dst
+#endif

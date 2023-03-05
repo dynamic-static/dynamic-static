@@ -136,6 +136,8 @@ public:
             : mDescriptorSetLayout { descriptorSetLayout }
         {
             assert(mDescriptorSetLayout);
+
+            // TOOD : Documentation
             std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
             auto descriptorSetLayoutCreateInfo = mDescriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
             for (uint32_t binding_i = 0; binding_i < descriptorSetLayoutCreateInfo.bindingCount; ++binding_i) {
@@ -157,6 +159,8 @@ public:
             assert(commandBuffer);
             assert(!createInfo.pBoxCreateInfo != !createInfo.pSphereCreateInfo);
             assert(pGameObject);
+
+            // TOOD : Documentation
             std::pair<btCollisionShape*, gvk::Mesh> resources;
             if (createInfo.pBoxCreateInfo) {
                 resources = get_box_resources(commandBuffer, *createInfo.pBoxCreateInfo);
@@ -173,6 +177,7 @@ public:
     private:
         std::pair<btCollisionShape*, gvk::Mesh> get_box_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::BoxCreateInfo& boxCreateInfo)
         {
+            // TOOD : Documentation
             auto itr = mBoxResources.find(boxCreateInfo.extents);
             if (itr == mBoxResources.end()) {
                 gvk::Mesh mesh;
@@ -186,6 +191,7 @@ public:
 
         std::pair<btCollisionShape*, gvk::Mesh> get_sphere_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::SphereCreateInfo& sphereCreateInfo)
         {
+            // TOOD : Documentation
             auto itr = mSphereResources.find(sphereCreateInfo.radius);
             if (itr == mSphereResources.end()) {
                 gvk::Mesh mesh;
@@ -254,6 +260,7 @@ public:
 
     void update_uniform_buffer(const gvk::Device& device)
     {
+        // TOOD : Documentation
         ObjectUniforms ubo { };
         btTransform transform { };
         if (rigidBody.get_state() != dst::physics::RigidBody::State::Dynamic) {
@@ -321,12 +328,14 @@ int main(int, const char* [])
     std::cout << "================================================================================" << std::endl;
     std::cout <<                                                                                       std::endl;
 
+    // TOOD : Documentation
     GfxContext gfxContext;
     auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
     assert(vkResult == VK_SUCCESS);
     auto gvkDevice = gfxContext.get_devices()[0];
     auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
 
+    // TOOD : Documentation
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
     systemSurfaceCreateInfo.pTitle = gfxContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
     systemSurfaceCreateInfo.extent = { 1280, 720 };
@@ -334,6 +343,7 @@ int main(int, const char* [])
     auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
     assert(success);
 
+    // TOOD : Documentation
     auto wsiManagerCreateInfo = gvk::get_default<gvk::WsiManager::CreateInfo>();
     auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
     win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
@@ -347,13 +357,11 @@ int main(int, const char* [])
     vkResult = gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager);
     assert(vkResult == VK_SUCCESS);
 
+    // TOOD : Documentation
     dst::physics::World::CreateInfo physicsWorldCreateInfo { };
     dst::physics::World physicsWorld;
     dst::physics::World::create(&physicsWorldCreateInfo, &physicsWorld);
-
-    ///////////////////////////////////////////////////////////////////////////////
-    dst::physics::Collider::Pool colliderPool;
-    ///////////////////////////////////////////////////////////////////////////////
+    // dst::physics::Collider::Pool colliderPool;
 
     gvk::Pipeline polygonPipeline;
     vkResult = create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_FILL, &polygonPipeline);
@@ -587,9 +595,8 @@ int main(int, const char* [])
     float resetTimer = 0;
     std::map<uint64_t, ResetState> resetStates;
 
-    uint32_t ballCount = BallCount;
+    // TODO : Documentation
     State state = State::Play;
-    // double frameTimeAccumulator = 0;
     gvk::system::Clock clock;
     while (
         !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
@@ -654,17 +661,6 @@ int main(int, const char* [])
                         break;
                     }
                 }
-
-#if 0
-                if (ballCount) {
-                    assert(ballCount <= balls.size());
-                    auto& ball = balls[ballCount - 1];
-                    ball.rigidBody.halt();
-                    ball.rigidBody.set_transform(btTransform::getIdentity());
-                    physicsWorld.make_dynamic(ball.rigidBody);
-                    ballCount -= 1;
-                }
-#endif
             }
 
             // TODO : Documentation
@@ -718,9 +714,9 @@ int main(int, const char* [])
             };
             celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
             if (celebrationTimer < CelebrationDuration) {
-                auto index = (size_t)std::round(celebrationTimer / CelebrationColorDuration) % celebrationColors.size();
+                auto colorIndex = (size_t)std::round(celebrationTimer / CelebrationColorDuration) % celebrationColors.size();
                 for (auto& wall : playFieldBarriers) {
-                    wall.color = celebrationColors[index];
+                    wall.color = celebrationColors[colorIndex];
                 }
             } else {
                 state = State::GameOver;
@@ -796,7 +792,6 @@ int main(int, const char* [])
                     // liveBalls.insert(&ball);
                 }
                 resetStates.clear();
-                ballCount = 3;
                 state = State::Play;
             }
         } break;
@@ -819,7 +814,6 @@ int main(int, const char* [])
         cameraUbo.projection = camera.projection();
         VmaAllocationInfo allocationInfo { };
         vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-        assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
         // TODO : Documentation
