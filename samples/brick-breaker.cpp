@@ -559,29 +559,6 @@ int main(int, const char* [])
         initialPositions.insert({ (uint64_t)balls[i].rigidBody.mupRigidBody.get(), BallPositions[i] });
     }
 
-#if 0
-    std::array<GameObject, BallCount> balls;
-    std::unordered_set<GameObject*> liveBalls;
-    for (size_t i = 0; i < balls.size(); ++i) {
-        auto& ball = balls[i];
-        btVector3 initialPosition(-16.0f + i * 2.0f, 34, 0);
-
-        GameObject::SphereCreateInfo gameObjectSphereCreateInfo { };
-        gameObjectSphereCreateInfo.radius = BallRadius;
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pSphereCreateInfo = &gameObjectSphereCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.mass = BallMass;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = 0.9f;
-        gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ball);
-        ball.color = gvk::math::Color::SlateGray;
-
-        liveBalls.insert(&ball);
-        initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
-    }
-#endif
-
     // TODO : Documentation
     constexpr btScalar PaddleWidth  = 6;
     constexpr btScalar PaddleHeight = 1;
@@ -603,21 +580,12 @@ int main(int, const char* [])
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
 
+    // TODO : Documentation
     float celebrationTimer = 0;
-    float celebrationDuration = 4.5f;
-    float celebrationColorDuration = 0.01f;
-    std::vector<glm::vec4> celebrationColors {
-        gvk::math::Color::Red,
-        gvk::math::Color::White,
-        gvk::math::Color::Blue,
-        gvk::math::Color::Yellow
-    };
 
+    // TODO : Documentation
     float resetTimer = 0;
-    float resetDuration = 2.5f;
     std::map<uint64_t, ResetState> resetStates;
-
-    float PaddleSpeed = 48;
 
     uint32_t ballCount = BallCount;
     State state = State::Play;
@@ -664,11 +632,12 @@ int main(int, const char* [])
         cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
+        constexpr btScalar PaddleForce = 48;
         if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
-            paddle.rigidBody.apply_force({ PaddleSpeed, 0, 0 });
+            paddle.rigidBody.apply_force({ PaddleForce, 0, 0 });
         }
         if (input.keyboard.down(gvk::system::Key::RightArrow)) {
-            paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
+            paddle.rigidBody.apply_force({ -PaddleForce, 0, 0 });
         }
 
         // TODO : Documentation
@@ -676,6 +645,17 @@ int main(int, const char* [])
         case State::Play: {
             // TODO : Documentation
             if (input.keyboard.pressed(gvk::system::Key::SpaceBar)) {
+                for (auto ritr = balls.rbegin(); ritr != balls.rend(); ++ritr) {
+                    auto& rigidBody = ritr->rigidBody;
+                    if (rigidBody.get_state() == dst::physics::RigidBody::State::Disabled) {
+                        rigidBody.halt();
+                        rigidBody.set_transform(btTransform::getIdentity());
+                        physicsWorld.make_dynamic(rigidBody);
+                        break;
+                    }
+                }
+
+#if 0
                 if (ballCount) {
                     assert(ballCount <= balls.size());
                     auto& ball = balls[ballCount - 1];
@@ -684,17 +664,18 @@ int main(int, const char* [])
                     physicsWorld.make_dynamic(ball.rigidBody);
                     ballCount -= 1;
                 }
+#endif
             }
 
             // TODO : Documentation
-            for (auto brickItr = liveBricks.begin(); brickItr != liveBricks.end();) {
-                auto& rigidBody = (*brickItr)->rigidBody;
+            for (auto itr = liveBricks.begin(); itr != liveBricks.end();) {
+                auto& rigidBody = (*itr)->rigidBody;
                 if (physicsWorld.get_collided_rigid_bodies().count(&rigidBody)) {
                     physicsWorld.disable(rigidBody);
                     physicsWorld.make_dynamic(rigidBody);
-                    liveBricks.erase(brickItr++);
+                    liveBricks.erase(itr++);
                 } else {
-                    ++brickItr;
+                    ++itr;
                 }
             }
 
@@ -726,9 +707,18 @@ int main(int, const char* [])
             }
         } break;
         case State::Celebration: {
+            // TODO : Documentation
+            constexpr float CelebrationDuration = 4.5f;
+            constexpr float CelebrationColorDuration = 0.01f;
+            std::vector<glm::vec4> celebrationColors {
+                gvk::math::Color::Red,
+                gvk::math::Color::White,
+                gvk::math::Color::Blue,
+                gvk::math::Color::Yellow
+            };
             celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
-            if (celebrationTimer < celebrationDuration) {
-                auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
+            if (celebrationTimer < CelebrationDuration) {
+                auto index = (size_t)std::round(celebrationTimer / CelebrationColorDuration) % celebrationColors.size();
                 for (auto& wall : playFieldBarriers) {
                     wall.color = celebrationColors[index];
                 }
@@ -740,6 +730,7 @@ int main(int, const char* [])
             }
         } break;
         case State::GameOver: {
+            // TODO : Documentation
             resetTimer = 0;
             resetStates.clear();
             state = State::Resetting;
@@ -769,9 +760,11 @@ int main(int, const char* [])
             }
         } break;
         case State::Resetting: {
+            // TODO : Documentation
+            constexpr float ResetDuration = 2.5f;
             resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
-            if (resetTimer < resetDuration) {
-                float t = resetTimer / resetDuration;
+            if (resetTimer < ResetDuration) {
+                float t = resetTimer / ResetDuration;
                 for (const auto& resetState : resetStates) {
                     auto pRigidBody = (btRigidBody*)resetState.first;
                     btTransform transform { };
