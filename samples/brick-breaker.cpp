@@ -242,9 +242,7 @@ public:
                 resources = get_sphere_resources(commandBuffer, *createInfo.pSphereCreateInfo);
             }
             pGameObject->mMesh = resources.second;
-            if (!createInfo.rigidBodyCreateInfo.pCollisionShape) {
-                createInfo.rigidBodyCreateInfo.pCollisionShape = resources.first;
-            }
+            createInfo.rigidBodyCreateInfo.pCollisionShape = resources.first;
             createInfo.rigidBodyCreateInfo.pUserData = this;
             dst::physics::RigidBody::create(&createInfo.rigidBodyCreateInfo, &pGameObject->rigidBody);
             create_descriptor_resources(pGameObject);
@@ -589,11 +587,11 @@ int main(int, const char* [])
 #endif
 
     std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
-    auto playAreaWidth = CeilingWidth - WallWidth;
-    auto brickAreaWidth = playAreaWidth / BrickColumCount;
+    const auto PlayAreaWidth = CeilingWidth - WallWidth;
+    const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
     std::set<uint64_t> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
-        auto offset = -playAreaWidth * 0.5f + brickAreaWidth * 0.5f;
+        auto offset = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
             auto& brick = bricks[row_i * BrickColumCount + brick_i];
             btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
@@ -630,7 +628,7 @@ int main(int, const char* [])
             // brick.setup_physics_resources(gameObjectCreateInfo.rigidBodyCreateInfo);
 #endif
 
-            offset += brickAreaWidth;
+            offset += BrickAreaWidth;
             physicsWorld.make_static(brick.rigidBody);
             liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
@@ -742,6 +740,16 @@ int main(int, const char* [])
         if (input.keyboard.down(gvk::system::Key::RightArrow)) {
             paddle.rigidBody.apply_force({ -PaddleSpeed, 0, 0 });
         }
+
+        static float minX;
+        static float maxX;
+        auto x = paddle.rigidBody.get_transform().getOrigin().x();
+        minX = std::min(minX, x);
+        maxX = std::max(x, maxX);
+        std::cout << minX << " : " << x << " : " << maxX << std::endl;
+
+        auto thing = WallPositions[1].x() - WallWidth * 0.5f - PaddleWidth * 0.5f;
+        std::cout << thing << std::endl;
 
         // TODO : Documentation
         switch (state) {
@@ -891,6 +899,13 @@ int main(int, const char* [])
             }
         } break;
         }
+
+        auto paddleTransform = paddle.rigidBody.get_transform();
+        auto paddleX = paddleTransform.getOrigin().x();
+        auto xMax = CeilingWidth * 0.5f - PaddleWidth * 0.5f;
+        auto xMin = -xMax;
+        paddleTransform.getOrigin().setX(glm::clamp(paddleX, xMin, xMax));
+        paddle.rigidBody.set_transform(paddleTransform);
 
         collisions.clear();
         auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
