@@ -710,9 +710,10 @@ int main(int, const char* [])
                 gvk::math::Color::Blue,
                 gvk::math::Color::Yellow
             };
-            celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
+            celebrationTimer += deltaTime;
             if (celebrationTimer < CelebrationDuration) {
-                auto colorIndex = (size_t)std::round(celebrationTimer / CelebrationColorDuration) % celebrationColors.size();
+                float t = celebrationTimer / CelebrationColorDuration;
+                auto colorIndex = (size_t)std::round(t) % celebrationColors.size();
                 for (auto& wall : playFieldBarriers) {
                     wall.color = celebrationColors[colorIndex];
                 }
@@ -728,24 +729,31 @@ int main(int, const char* [])
             resetTimer = 0;
             resetStates.clear();
             state = State::Resetting;
+
+
+
+
             for (auto& brick : bricks) {
                 liveBricks.insert(&brick);
                 brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-
                 physicsWorld.disable(brick.rigidBody);
+
                 auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
                 ResetState resetState { };
                 resetState.rotation = transform.getRotation();
                 resetState.translation = transform.getOrigin();
                 resetStates.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), resetState });
             }
+
+
+
             for (auto& ball : balls) {
                 // liveBalls.insert(&ball);
                 ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
-
                 physicsWorld.disable(ball.rigidBody);
+
                 auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                 ResetState resetState { };
                 resetState.rotation = transform.getRotation();
@@ -756,9 +764,34 @@ int main(int, const char* [])
         case State::Resetting: {
             // TODO : Documentation
             constexpr float ResetDuration = 2.5f;
-            resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
+            resetTimer += deltaTime;
             if (resetTimer < ResetDuration) {
                 float t = resetTimer / ResetDuration;
+#if 0
+                static size_t bi;
+                auto ballIndex = (size_t)(t * balls.size());
+
+                auto transform = balls[ballIndex].rigidBody.get_transform();
+                transform.setOrigin(BallPositions[ballIndex]);
+                balls[ballIndex].rigidBody.set_transform(transform);
+#endif
+
+#if 0
+                if (ballIndex != bi) {
+                    std::cout << bi << " -> " << ballIndex << std::endl;
+                    bi = ballIndex;
+                }
+                std::cout << ballIndex << std::endl;
+                if (ballIndex == 3) {
+                    int b = 0;
+                    (void)b;
+                }
+                if (balls.size() <= ballIndex) {
+                    assert(false);
+                }
+#endif
+
+
                 for (const auto& resetState : resetStates) {
                     auto pRigidBody = (btRigidBody*)resetState.first;
                     btTransform transform { };
