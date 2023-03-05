@@ -254,46 +254,6 @@ inline VkResult dst_sample_create_pipeline(
     return gvkResult;
 }
 
-inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>* pDescriptorSets)
-{
-    assert(pipeline);
-    assert(pDescriptorSets);
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        // TODO : Documentation
-        std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
-        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
-        for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
-            vkDescriptorSetLayouts.push_back(descriptorSetLayout);
-            auto descriptorSetLayoutCreateInfo = descriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
-            for (uint32_t i = 0; i < descriptorSetLayoutCreateInfo.bindingCount; ++i) {
-                const auto& descriptorSetLayoutBinding = descriptorSetLayoutCreateInfo.pBindings[i];
-                descriptorPoolSizes.push_back({
-                    .type = descriptorSetLayoutBinding.descriptorType,
-                    .descriptorCount = descriptorSetLayoutBinding.descriptorCount
-                });
-            }
-        }
-
-        // TODO : Documentation
-        auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
-        descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
-        descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
-        descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-        gvk::DescriptorPool descriptorPool;
-        gvk_result(gvk::DescriptorPool::create(pipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
-
-        // TODO : Documentation
-        auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
-        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-        descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
-        descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
-        pDescriptorSets->resize(vkDescriptorSetLayouts.size());
-        gvk_result(gvk::DescriptorSet::allocate(pipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, pDescriptorSets->data()));
-    } gvk_result_scope_end;
-    return gvkResult;
-}
-
 template <typename UniformBufferObjectType>
 inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk::Buffer* pUniformBuffer)
 {

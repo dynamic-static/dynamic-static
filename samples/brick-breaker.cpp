@@ -141,35 +141,13 @@ public:
             assert(mDescriptorSetLayout);
         }
 
-#if 0
-        Factory(const gvk::DescriptorSetLayout& descriptorSetLayout, uint32_t objectCount)
-            : mDescriptorSetLayout { descriptorSetLayout }
-        {
-            assert(mDescriptorSetLayout);
-
-            // TOOD : Documentation
-            std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
-            auto descriptorSetLayoutCreateInfo = mDescriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
-            for (uint32_t binding_i = 0; binding_i < descriptorSetLayoutCreateInfo.bindingCount; ++binding_i) {
-                const auto& binding = descriptorSetLayoutCreateInfo.pBindings[binding_i];
-                descriptorPoolSizes.push_back({ binding.descriptorType, binding.descriptorCount * objectCount });
-            }
-            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
-            descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            descriptorPoolCreateInfo.maxSets = objectCount;
-            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
-            descriptorPoolCreateInfo.pPoolSizes = !descriptorPoolSizes.empty() ? descriptorPoolSizes.data() : nullptr;
-            dst_vk_result(gvk::DescriptorPool::create(mDescriptorSetLayout.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &mDescriptorPool));
-        }
-#endif
-
         void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
         {
             assert(commandBuffer);
             assert(!createInfo.pBoxCreateInfo != !createInfo.pSphereCreateInfo);
             assert(pGameObject);
 
-            // TOOD : Documentation
+            // TODO : Documentation
             std::pair<btCollisionShape*, gvk::Mesh> resources;
             if (createInfo.pBoxCreateInfo) {
                 resources = get_box_resources(commandBuffer, *createInfo.pBoxCreateInfo);
@@ -186,7 +164,7 @@ public:
     private:
         std::pair<btCollisionShape*, gvk::Mesh> get_box_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::BoxCreateInfo& boxCreateInfo)
         {
-            // TOOD : Documentation
+            // TODO : Documentation
             auto itr = mBoxResources.find(boxCreateInfo.extents);
             if (itr == mBoxResources.end()) {
                 gvk::Mesh mesh;
@@ -198,7 +176,7 @@ public:
 
         std::pair<btCollisionShape*, gvk::Mesh> get_sphere_resources(const gvk::CommandBuffer& commandBuffer, const GameObject::SphereCreateInfo& sphereCreateInfo)
         {
-            // TOOD : Documentation
+            // TODO : Documentation
             auto itr = mSphereResources.find(sphereCreateInfo.radius);
             if (itr == mSphereResources.end()) {
                 gvk::Mesh mesh;
@@ -576,12 +554,10 @@ int main(int, const char* [])
 
     // TODO : Documentation
     float celebrationTimer = 0;
-
-    // TODO : Documentation
     float resetTimer = 0;
+    GameState state = GameState::Playing;
 
     // TODO : Documentation
-    GameState state = GameState::Playing;
     gvk::system::Clock clock;
     while (
         !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
@@ -733,8 +709,9 @@ int main(int, const char* [])
                     transform.setRotation(std::get<btQuaternion>(deadBricks[i]).slerp(btQuaternion::getIdentity(), t));
                     bricks[i].rigidBody.set_transform(transform);
                 }
-                auto ballIndex = BallCount - (size_t)(t * (BallCount + 1));
-                if (ballIndex < BallCount) {
+                auto ballResetCounter = BallCount - (size_t)(t * (BallCount + 1));
+                if (ballResetCounter < BallCount) {
+                    auto ballIndex = BallCount - ballResetCounter - 1;
                     auto transform = balls[ballIndex].rigidBody.get_transform();
                     transform.setOrigin(BallPositions[ballIndex]);
                     balls[ballIndex].rigidBody.set_transform(transform);
