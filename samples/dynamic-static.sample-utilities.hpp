@@ -64,30 +64,7 @@ private:
 public:
     static VkResult create(const char* pApplicationName, GfxContext* pGfxContext)
     {
-#if 0
-        auto applicationInfo = gvk::get_default<VkApplicationInfo>();
-        applicationInfo.pApplicationName = pApplicationName;
-        auto sysSurfaceCreateInfo = gvk::get_default<gvk::sys::Surface::CreateInfo>();
-        sysSurfaceCreateInfo.extent = { 1920, 1080 };
-        auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
-        debugUtilsMessengerCreateInfo.messageSeverity =
-            // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debugUtilsMessengerCreateInfo.messageType =
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
-        auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
-        contextCreateInfo.pApplicationInfo = &applicationInfo;
-        contextCreateInfo.pSysSurfaceCreateInfo = &sysSurfaceCreateInfo;
-        contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
-        return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
-#endif
-
-        // Setup a VkInstanceCreateInfo.
+        // Setup VkInstanceCreateInfo.
         auto applicationInfo = gvk::get_default<VkApplicationInfo>();
         applicationInfo.pApplicationName = pApplicationName;
         auto instanceCreateInfo = gvk::get_default<VkInstanceCreateInfo>();
@@ -99,9 +76,8 @@ public:
         auto deviceCreateInfo = gvk::get_default<VkDeviceCreateInfo>();
         deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
 
-        // VkDebugUtilsMessengerCreateInfoEXT is an optional member of gvk::Context::CreateInfo.
-        //  Providing a VkDebugUtilsMessengerCreateInfoEXT indicates that the debug
-        //  utils extension should be loaded.
+        // VkDebugUtilsMessengerCreateInfoEXT is optional, providing it indicates that
+        //  the debug utils extension should be loaded.
         auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
         debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
 
@@ -109,7 +85,7 @@ public:
         auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
         contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
         contextCreateInfo.loadApiDumpLayer = VK_FALSE;
-        contextCreateInfo.loadValidationLayer = VK_TRUE;
+        contextCreateInfo.loadValidationLayer = VK_FALSE;
         contextCreateInfo.loadWsiExtensions = VK_TRUE;
         contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
         contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;
@@ -117,21 +93,23 @@ public:
     }
 
 protected:
+#if 0
     VkResult create_instance(const VkInstanceCreateInfo* pInstanceCreateInfo, const VkAllocationCallbacks* pAllocator) override
     {
         assert(pInstanceCreateInfo);
         auto enabledLayerCount = pInstanceCreateInfo->enabledLayerCount;
         auto ppEnabledLayerNames = pInstanceCreateInfo->ppEnabledLayerNames;
         std::vector<const char*> layers(ppEnabledLayerNames, ppEnabledLayerNames + enabledLayerCount);
-#if 0
+        #if 0
         layers.push_back("VK_LAYER_LUNARG_api_dump");
-#endif
+        #endif
         layers.push_back("VK_LAYER_KHRONOS_validation");
         auto instanceCreateInfo = *pInstanceCreateInfo;
         instanceCreateInfo.enabledLayerCount = (uint32_t)layers.size();
         instanceCreateInfo.ppEnabledLayerNames = layers.data();
         return gvk::Context::create_instance(&instanceCreateInfo, pAllocator);
     }
+#endif
 
     VkResult create_devices(const VkDeviceCreateInfo* pDeviceCreateInfo, const VkAllocationCallbacks* pAllocator) override
     {
