@@ -63,7 +63,7 @@ public:
     void clear();
     void reset();
 
-public:
+private:
     static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep);
 
     std::unique_ptr<btCollisionConfiguration> mupCollisionConfiguration;

@@ -27,7 +27,6 @@ dst_add_static_library(
         "${includePath}/rigid-body.hpp"
         "${includePath}/world.hpp"
     sourceFiles
-        "${sourcePath}/material.cpp"
         "${sourcePath}/rigid-body.cpp"
         "${sourcePath}/world.cpp"
 )
