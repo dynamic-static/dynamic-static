@@ -241,12 +241,7 @@ public:
     {
         // TOOD : Documentation
         ObjectUniforms ubo { };
-        btTransform transform { };
-        if (rigidBody.get_state() != dst::physics::RigidBody::State::Dynamic) {
-            rigidBody.mupMotionState->setWorldTransform(rigidBody.mupRigidBody->getCenterOfMassTransform());
-        }
-        rigidBody.mupMotionState->getWorldTransform(transform);
-        transform.getOpenGLMatrix(&ubo.world[0][0]);
+        rigidBody.get_motion_state_transform().getOpenGLMatrix(&ubo.world[0][0]);
         ubo.color = color;
         VmaAllocationInfo allocationInfo { };
         vmaGetAllocationInfo(device.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), &allocationInfo);
@@ -256,7 +251,7 @@ public:
 
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout)
     {
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &(const VkDescriptorSet&)mDescriptorSet, 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
         mMesh.record_cmds(commandBuffer);
     }
 

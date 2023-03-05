@@ -88,8 +88,21 @@ RigidBody::State RigidBody::get_state() const
     return mState;
 }
 
+btTransform RigidBody::get_motion_state_transform() const
+{
+    assert(mupMotionState);
+    assert(mupRigidBody);
+    btTransform transform { };
+    if (mState != State::Dynamic) {
+        mupMotionState->setWorldTransform(mupRigidBody->getCenterOfMassTransform());
+    }
+    mupMotionState->getWorldTransform(transform);
+    return transform;
+}
+
 const btTransform& RigidBody::get_transform() const
 {
+    assert(mupRigidBody);
     return mupRigidBody->getCenterOfMassTransform();
 }
 

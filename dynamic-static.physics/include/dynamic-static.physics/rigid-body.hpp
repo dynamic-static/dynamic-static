@@ -65,6 +65,7 @@ public:
     ~RigidBody();
 
     State get_state() const;
+    btTransform get_motion_state_transform() const;
     const btTransform& get_transform() const;
     void set_transform(const btTransform& transform);
     void* get_user_data() const;
@@ -75,7 +76,7 @@ public:
     void activate();
     void halt();
 
-public:
+private:
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
     State mState { State::Disabled };
