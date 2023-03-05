@@ -40,6 +40,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 VkResult create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
@@ -310,6 +311,27 @@ public:
         std::map<btScalar, std::pair<btSphereShape, gvk::Mesh>> mSphereResources;
     };
 
+    GameObject() = default;
+
+    inline GameObject(GameObject && other) noexcept
+    {
+        *this = std::move(other);
+    }
+
+    inline GameObject& operator=(GameObject && other) noexcept
+    {
+        if (this != &other) {
+            rigidBody = std::move(other.rigidBody);
+            color = std::move(other.color);
+            mMesh = std::move(other.mMesh);
+            mUniformBuffer = std::move(other.mUniformBuffer);
+            mDescriptorSet = std::move(other.mDescriptorSet);
+            rigidBody.set_user_data(this);
+        }
+        return *this;
+    }
+
+#if 0
     void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color)
     {
         mColor = color;
@@ -332,6 +354,7 @@ public:
         rigidBodyCreateInfo.pUserData = this;
         dst::physics::RigidBody::create(&rigidBodyCreateInfo, &rigidBody);
     }
+#endif
 
     void update_uniform_buffer(const gvk::Device& device)
     {
@@ -342,7 +365,7 @@ public:
         }
         rigidBody.mupMotionState->getWorldTransform(transform);
         transform.getOpenGLMatrix(&ubo.world[0][0]);
-        ubo.color = mColor;
+        ubo.color = color;
         VmaAllocationInfo allocationInfo { };
         vmaGetAllocationInfo(device.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         assert(allocationInfo.pMappedData);
@@ -355,15 +378,10 @@ public:
         mMesh.record_cmds(commandBuffer);
     }
 
-    void set_color(const glm::vec4& color)
-    {
-        mColor = color;
-    }
-
     dst::physics::RigidBody rigidBody;
+    glm::vec4 color { gvk::math::Color::White };
 
 private:
-    glm::vec4 mColor { gvk::math::Color::White };
     gvk::Mesh mMesh;
     gvk::Buffer mUniformBuffer;
     gvk::DescriptorSet mDescriptorSet;
@@ -376,32 +394,6 @@ enum class State
     GameOver,
     Resetting,
 };
-
-static void bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar timeStep)
-{
-    (void)timeStep;
-    assert(pDynamicsWorld);
-    auto pCollisions = (std::set<std::pair<uint64_t, uint64_t>>*)pDynamicsWorld->getWorldUserInfo();
-    assert(pCollisions);
-    auto pDispatcher = pDynamicsWorld->getDispatcher();
-    assert(pDispatcher);
-    auto numManifolds = pDispatcher->getNumManifolds();
-    for (int manifold_i = 0; manifold_i < numManifolds; ++manifold_i) {
-        auto pManifold = pDispatcher->getManifoldByIndexInternal(manifold_i);
-        assert(pManifold);
-        int numContacts = pManifold->getNumContacts();
-        for (int contact_i = 0; contact_i < numContacts; ++contact_i) {
-            const auto& contactPoint = pManifold->getContactPoint(contact_i);
-            if (contactPoint.getDistance() < 0) {
-                auto collision = std::make_pair((uint64_t)pManifold->getBody0(), (uint64_t)pManifold->getBody1());
-                if (collision.second < collision.first) {
-                    std::swap(collision.first, collision.second);
-                }
-                pCollisions->insert(collision);
-            }
-        }
-    }
-}
 
 struct ResetState
 {
@@ -462,8 +454,6 @@ int main(int, const char* [])
     dst::physics::World::CreateInfo physicsWorldCreateInfo { };
     dst::physics::World physicsWorld;
     dst::physics::World::create(&physicsWorldCreateInfo, &physicsWorld);
-    std::set<std::pair<uint64_t, uint64_t>> collisions;
-    physicsWorld.mupWorld->setInternalTickCallback(bullet_physics_tick_callback, &collisions);
 
     ///////////////////////////////////////////////////////////////////////////////
     dst::physics::Collider::Pool colliderPool;
@@ -495,7 +485,7 @@ int main(int, const char* [])
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
     descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera
+    descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera + 1 floor
     auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
     descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
@@ -544,17 +534,26 @@ int main(int, const char* [])
     // TODO : Documentation
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
+    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 5); // BallCount + BrickCount + 1 paddle + 3 walls
+
     // TODO : Documentation
     GameObject floor;
     {
+#if 0
         dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
         rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
         rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
         floor.setup_physics_resources(rigidBodyCreateInfo);
         physicsWorld.make_static(floor.rigidBody);
+#endif
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { FloorWidth, FloorHeight, FloorDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &floor);
+        physicsWorld.make_static(floor.rigidBody);
     }
-
-    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 4); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
     const uint32_t WallCount = 3;
@@ -612,13 +611,13 @@ int main(int, const char* [])
     std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
     const auto PlayAreaWidth = CeilingWidth - WallWidth;
     const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
-    std::set<uint64_t> liveBricks;
+    std::set<GameObject*> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
         auto offset = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
             auto& brick = bricks[row_i * BrickColumCount + brick_i];
             btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
-#if 1
+#if 0
             
 
             gvk::DescriptorSet descriptorSet;
@@ -642,7 +641,7 @@ int main(int, const char* [])
             gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
             gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
             gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &brick);
-            brick.set_color(BrickRowColors[row_i]);
+            brick.color = BrickRowColors[row_i];
 
             // dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
             // rigidBodyCreateInfo.mass = BrickMass;
@@ -653,7 +652,7 @@ int main(int, const char* [])
 
             offset += BrickAreaWidth;
             physicsWorld.make_static(brick.rigidBody);
-            liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+            liveBricks.insert(&brick);
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
         }
     }
@@ -692,7 +691,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ball);
-        ball.set_color(gvk::math::Color::SlateGray);
+        ball.color = gvk::math::Color::SlateGray;
 #endif
 
         liveBalls.insert(&ball);
@@ -731,7 +730,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PaddlePosition);
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
-        paddle.set_color(gvk::math::Color::Brown);
+        paddle.color = gvk::math::Color::Brown;
 #endif
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
@@ -759,7 +758,12 @@ int main(int, const char* [])
     while (
         !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
         !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
+
+        // TODO : Documentation
         clock.update();
+        auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
+
+        // TODO : Documentation
         gvk::system::Surface::update();
         const auto& input = systemSurface.get_input();
 
@@ -793,7 +797,20 @@ int main(int, const char* [])
                     ballCount -= 1;
                 }
             }
-            for (const auto& collision : collisions) {
+
+            for (auto brickItr = liveBricks.begin(); brickItr != liveBricks.end();) {
+                auto& rigidBody = (*brickItr)->rigidBody;
+                if (physicsWorld.get_collided_rigid_bodies().count(&rigidBody)) {
+                    physicsWorld.disable(rigidBody);
+                    physicsWorld.make_dynamic(rigidBody);
+                    liveBricks.erase(brickItr++);
+                } else {
+                    ++brickItr;
+                }
+            }
+
+#if 0
+            for (const auto& collision : physicsWorld.get_collisions()) {
                 for (auto collider : std::array<uint64_t, 2> { collision.first, collision.second }) {
                     if (liveBricks.count(collider)) {
                         liveBricks.erase(collider);
@@ -807,13 +824,32 @@ int main(int, const char* [])
                     }
                 }
             }
+#endif
 
+            bool liveBall = false;
+            const auto& paddleTransform = paddle.rigidBody.get_transform();
+            const auto& floorTransform = floor.rigidBody.get_transform();
+            auto liveBallMinY = (paddleTransform.getOrigin().y() + floorTransform.getOrigin().y()) * 0.5f;
+            for (auto& ball : balls) {
+                const auto& ballTransform = ball.rigidBody.get_transform();
+                liveBall |= liveBallMinY < ballTransform.getOrigin().y();
+                if (physicsWorld.get_collisions().count(dst::physics::make_collision(&ball.rigidBody, &paddle.rigidBody))) {
+                    if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                        auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                        impulse *= 64;
+                        impulse.setY(64);
+                        ball.rigidBody.apply_impulse(impulse);
+                    }
+                }
+            }
+
+#if 0
             for (auto& ball : balls) {
                 auto collision = std::make_pair((uint64_t)ball.rigidBody.mupRigidBody.get(), (uint64_t)paddle.rigidBody.mupRigidBody.get());
                 if (collision.second < collision.first) {
                     std::swap(collision.first, collision.second);
                 }
-                if (collisions.count(collision)) {
+                if (physicsWorld.get_collisions().count(collision)) {
                     const auto& ballTransform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     const auto& paddleTransform = paddle.rigidBody.mupRigidBody->getCenterOfMassTransform();
                     if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
@@ -830,11 +866,12 @@ int main(int, const char* [])
                     liveBalls.erase(&ball);
                 }
             }
+#endif
 
             if (liveBricks.empty()) {
                 celebrationTimer = 0;
                 state = State::Celebration;
-            } else if (liveBalls.empty()) {
+            } else if (!liveBall) {
                 state = State::GameOver;
             }
         } break;
@@ -843,14 +880,13 @@ int main(int, const char* [])
             celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
             if (celebrationTimer < celebrationDuration) {
                 auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
-                auto color = celebrationColors[index];
                 for (auto& wall : walls) {
-                    wall.set_color(color);
+                    wall.color = celebrationColors[index];
                 }
             } else {
                 state = State::GameOver;
                 for (auto& wall : walls) {
-                    wall.set_color(gvk::math::Color::White);
+                    wall.color = gvk::math::Color::White;
                 }
             }
         } break;
@@ -860,7 +896,7 @@ int main(int, const char* [])
             resetStates.clear();
             state = State::Resetting;
             for (auto& brick : bricks) {
-                liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+                liveBricks.insert(&brick);
                 brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
 
@@ -913,7 +949,7 @@ int main(int, const char* [])
                     pRigidBody->setCenterOfMassTransform(transform);
                 }
                 for (auto& brick : bricks) {
-                    liveBricks.insert((uint64_t)brick.rigidBody.mupRigidBody.get());
+                    liveBricks.insert(&brick);
                     brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
                     physicsWorld.make_static(brick.rigidBody);
                 }
@@ -935,8 +971,6 @@ int main(int, const char* [])
         paddleTransform.getOrigin().setX(glm::clamp(paddleX, xMin, xMax));
         paddle.rigidBody.set_transform(paddleTransform);
 
-        collisions.clear();
-        auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
         physicsWorld.update(deltaTime);
 
         // TODO : Documentation

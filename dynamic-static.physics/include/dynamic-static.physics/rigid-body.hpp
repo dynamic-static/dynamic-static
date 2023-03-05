@@ -35,8 +35,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace dst {
 namespace physics {
 
-class World;
-
 class RigidBody final
 {
 public:
@@ -60,11 +58,18 @@ public:
         void* pUserData { nullptr };
     };
 
+    RigidBody() = default;
     static void create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody);
+    RigidBody(RigidBody&& other) noexcept;
+    RigidBody& operator=(RigidBody&& other) noexcept;
+    void reset();
+    ~RigidBody();
 
     State get_state() const;
     const btTransform& get_transform() const;
     void set_transform(const btTransform& transform);
+    void* get_user_data() const;
+    void set_user_data(void* pUserData);
 
     void apply_impulse(const btVector3& impulse);
     void apply_force(const btVector3& force);
@@ -75,8 +80,14 @@ public:
     std::unique_ptr<btMotionState> mupMotionState;
     std::unique_ptr<btRigidBody> mupRigidBody;
     State mState { State::Disabled };
+    void* mpUserData { nullptr };
     friend class World;
 };
 
+namespace detail {
+
+const RigidBody* get_rigid_body(const btCollisionObject* pBtCollisionObject);
+
+} // namespace detail
 } // namespace physics
 } // namespace dst

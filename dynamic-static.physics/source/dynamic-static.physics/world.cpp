@@ -33,9 +33,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace dst {
 namespace physics {
 
-Collision make_collision(const btCollisionObject* collider0, const btCollisionObject* collider1)
+Collision make_collision(const RigidBody* pRigidBody0, const RigidBody* pRigidBody1)
 {
-    return collider0 < collider1 ? Collision { collider0, collider1 } : Collision { collider1, collider0 };
+    return pRigidBody0 < pRigidBody1 ? Collision { pRigidBody0, pRigidBody1 } : Collision { pRigidBody1, pRigidBody0 };
 }
 
 void World::create(const CreateInfo* pCreateInfo, World* pWorld)
@@ -54,6 +54,7 @@ void World::create(const CreateInfo* pCreateInfo, World* pWorld)
     );
     pWorld->set_gravity(btVector3(0, -9.8f, 0));
     pWorld->mupWorld->setWorldUserInfo(pWorld);
+    pWorld->mupWorld->setInternalTickCallback(bullet_physics_tick_callback, pWorld);
 }
 
 World::~World()
@@ -61,9 +62,9 @@ World::~World()
     reset();
 }
 
-const std::set<const btCollisionObject*>& World::get_collided_objects() const
+const std::set<const RigidBody*>& World::get_collided_rigid_bodies() const
 {
-    return mCollidedObjects;
+    return mCollidedRigidBodies;
 }
 
 const std::set<Collision>& World::get_collisions() const
@@ -108,7 +109,7 @@ void World::disable(RigidBody& rigidBody)
 void World::update(btScalar deltaTime)
 {
     assert(mupWorld);
-    mCollidedObjects.clear();
+    mCollidedRigidBodies.clear();
     mCollisions.clear();
     mupWorld->stepSimulation(deltaTime);
 }
@@ -116,7 +117,7 @@ void World::update(btScalar deltaTime)
 void World::clear()
 {
     if (mupWorld) {
-        mCollidedObjects.clear();
+        mCollidedRigidBodies.clear();
         mCollisions.clear();
         for (int i = mupWorld->getNumCollisionObjects() - 1; 0 <= i; --i) {
             auto pCollisionObject = mupWorld->getCollisionObjectArray()[i];
@@ -133,27 +134,24 @@ void World::reset()
     mupBroadPhaseInterface.reset();
     mupSolver.reset();
     mupWorld.reset();
-    mCollidedObjects.clear();
+    mCollidedRigidBodies.clear();
     mCollisions.clear();
 }
 
 void World::bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScalar)
 {
-    assert(pDynamicsWorld);
     auto pWorld = (World*)pDynamicsWorld->getWorldUserInfo();
-    assert(pWorld);
     auto& collisions = pWorld->mCollisions;
-    auto& collidedObjects = pWorld->mCollidedObjects;
+    auto& collidedRigidBodies = pWorld->mCollidedRigidBodies;
     auto pDispatcher = pDynamicsWorld->getDispatcher();
-    assert(pDispatcher);
     auto numManifolds = pDispatcher->getNumManifolds();
     for (int manifold_i = 0; manifold_i < numManifolds; ++manifold_i) {
         auto pManifold = pDispatcher->getManifoldByIndexInternal(manifold_i);
-        assert(pManifold);
         for (int contact_i = 0; contact_i < pManifold->getNumContacts(); ++contact_i) {
             if (pManifold->getContactPoint(contact_i).getDistance() < 0) {
-                auto collision = make_collision(pManifold->getBody0(), pManifold->getBody1());
-                collidedObjects.insert(collision[0], collision[1]);
+                auto collision = make_collision(detail::get_rigid_body(pManifold->getBody0()), detail::get_rigid_body(pManifold->getBody1()));
+                collidedRigidBodies.insert(collision[0]);
+                collidedRigidBodies.insert(collision[1]);
                 collisions.insert(collision);
             }
         }

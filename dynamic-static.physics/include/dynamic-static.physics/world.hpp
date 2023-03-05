@@ -36,9 +36,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace dst {
 namespace physics {
 
-using Collision = std::array<const btCollisionObject*, 2>;
+using Collision = std::array<const RigidBody*, 2>;
 
-Collision make_collision(const btCollisionObject* collider0, const btCollisionObject* collider1);
+Collision make_collision(const RigidBody* pRigidBody0, const RigidBody* pRigidBody1);
 
 class World final
 {
@@ -51,7 +51,7 @@ public:
 
     ~World();
 
-    const std::set<const btCollisionObject*>& get_collided_objects() const;
+    const std::set<const RigidBody*>& get_collided_rigid_bodies() const;
     const std::set<Collision>& get_collisions() const;
     btVector3 get_gravity() const;
     void set_gravity(const btVector3& gravity);
@@ -71,7 +71,7 @@ public:
     std::unique_ptr<btBroadphaseInterface> mupBroadPhaseInterface;
     std::unique_ptr<btSequentialImpulseConstraintSolver> mupSolver;
     std::unique_ptr<btDiscreteDynamicsWorld> mupWorld;
-    std::set<const btCollisionObject*> mCollidedObjects;
+    std::set<const RigidBody*> mCollidedRigidBodies;
     std::set<Collision> mCollisions;
 };
 

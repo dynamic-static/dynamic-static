@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.physics/rigid-body.hpp"
 
 #include <cassert>
+#include <utility>
 
 namespace dst {
 namespace physics {
@@ -36,6 +37,7 @@ void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
     assert(pCreateInfo);
     assert(pCreateInfo->pCollisionShape);
     assert(pRigidBody);
+    pRigidBody->reset();
     btVector3 localInertia { };
     pCreateInfo->pCollisionShape->calculateLocalInertia(pCreateInfo->mass, localInertia);
     pRigidBody->mupMotionState = std::make_unique<btDefaultMotionState>(pCreateInfo->initialTransform);
@@ -47,7 +49,38 @@ void RigidBody::create(const CreateInfo* pCreateInfo, RigidBody* pRigidBody)
     pRigidBody->mupRigidBody->setAngularFactor(pCreateInfo->angularFactor);
     pRigidBody->mupRigidBody->setFriction(pCreateInfo->material.friction);
     pRigidBody->mupRigidBody->setRestitution(pCreateInfo->material.restitution);
-    pRigidBody->mupRigidBody->setUserPointer(pCreateInfo->pUserData);
+    pRigidBody->mupRigidBody->setUserPointer(pRigidBody);
+    pRigidBody->mpUserData = pCreateInfo->pUserData;
+}
+
+RigidBody::RigidBody(RigidBody&& other) noexcept
+{
+    *this = std::move(other);
+}
+
+RigidBody& RigidBody::operator=(RigidBody&& other) noexcept
+{
+    if (this != &other) {
+        mupMotionState = std::move(other.mupMotionState);
+        mupRigidBody = std::move(other.mupRigidBody);
+        mState = std::move(other.mState);
+        mpUserData = std::move(other.mpUserData);
+        mupRigidBody->setUserPointer(this);
+    }
+    return *this;
+}
+
+void RigidBody::reset()
+{
+    mupMotionState.reset();
+    mupRigidBody.reset();
+    mState = { };
+    mpUserData = nullptr;
+}
+
+RigidBody::~RigidBody()
+{
+    reset();
 }
 
 RigidBody::State RigidBody::get_state() const
@@ -64,6 +97,16 @@ void RigidBody::set_transform(const btTransform& transform)
 {
     assert(mupRigidBody);
     mupRigidBody->setCenterOfMassTransform(transform);
+}
+
+void* RigidBody::get_user_data() const
+{
+    return mpUserData;
+}
+
+void RigidBody::set_user_data(void* pUserData)
+{
+    mpUserData = pUserData;
 }
 
 void RigidBody::apply_impulse(const btVector3& impulse)
@@ -95,5 +138,16 @@ void RigidBody::halt()
     mupRigidBody->setAngularVelocity({ 0, 0, 0 });
 }
 
+namespace detail {
+
+const RigidBody* get_rigid_body(const btCollisionObject* pBtCollisionObject)
+{
+    assert(pBtCollisionObject);
+    auto pRigidBody = (const RigidBody*)pBtCollisionObject->getUserPointer();
+    assert(pRigidBody);
+    return pRigidBody;
+}
+
+} // namespace detail
 } // namespace physics
 } // namespace dst
