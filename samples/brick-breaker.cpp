@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.sample-utilities.hpp"
 
 #include <map>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 
@@ -294,12 +295,6 @@ enum class State
     Resetting,
 };
 
-struct ResetState
-{
-    btQuaternion rotation { };
-    btVector3 translation { };
-};
-
 int main(int, const char* [])
 {
     std::cout <<                                                                                       std::endl;
@@ -514,8 +509,9 @@ int main(int, const char* [])
             return brickPositions;
         }()
     };
-    std::array<GameObject, BrickCount> bricks;
+    std::array<GameObject, BrickCount> bricks { };
     std::unordered_set<GameObject*> liveBricks;
+    std::array<std::tuple<btVector3, btQuaternion>, BrickCount> deadBricks { };
     for (uint32_t i = 0; i < BrickCount; ++i) {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
@@ -562,7 +558,7 @@ int main(int, const char* [])
         gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &balls[i]);
         balls[i].color = gvk::math::Color::SlateGray;
 
-        initialPositions.insert({ (uint64_t)balls[i].rigidBody.mupRigidBody.get(), BallPositions[i] });
+        // initialPositions.insert({ (uint64_t)balls[i].rigidBody.mupRigidBody.get(), BallPositions[i] });
     }
 
     // TODO : Documentation
@@ -591,7 +587,7 @@ int main(int, const char* [])
 
     // TODO : Documentation
     float resetTimer = 0;
-    std::map<uint64_t, ResetState> resetStates;
+    // std::map<uint64_t, ResetState> resetStates;
 
     // TODO : Documentation
     State state = State::Play;
@@ -727,17 +723,30 @@ int main(int, const char* [])
         case State::GameOver: {
             // TODO : Documentation
             resetTimer = 0;
-            resetStates.clear();
+            // resetStates.clear();
             state = State::Resetting;
 
 
+            for (uint32_t i = 0; i < BrickCount; ++i) {
+                auto& brick = bricks[i];
 
-
-            for (auto& brick : bricks) {
-                liveBricks.insert(&brick);
                 brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
                 physicsWorld.disable(brick.rigidBody);
+
+                const auto& transform = brick.rigidBody.get_transform();
+                std::get<btVector3>(deadBricks[i]) = transform.getOrigin();
+                std::get<btQuaternion>(deadBricks[i]) = transform.getRotation();
+            }
+
+#if 0
+            for (auto& brick : bricks) {
+                // liveBricks.insert(&brick);
+                brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
+                brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+                physicsWorld.disable(brick.rigidBody);
+
+                deadBricks
 
                 auto transform = brick.rigidBody.mupRigidBody->getCenterOfMassTransform();
                 ResetState resetState { };
@@ -745,8 +754,7 @@ int main(int, const char* [])
                 resetState.translation = transform.getOrigin();
                 resetStates.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), resetState });
             }
-
-
+#endif
 
             for (auto& ball : balls) {
                 // liveBalls.insert(&ball);
@@ -754,11 +762,11 @@ int main(int, const char* [])
                 ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
                 physicsWorld.disable(ball.rigidBody);
 
-                auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
-                ResetState resetState { };
-                resetState.rotation = transform.getRotation();
-                resetState.translation = transform.getOrigin();
-                resetStates.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), resetState });
+                // auto transform = ball.rigidBody.mupRigidBody->getCenterOfMassTransform();
+                // ResetState resetState { };
+                // resetState.rotation = transform.getRotation();
+                // resetState.translation = transform.getOrigin();
+                // resetStates.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), resetState });
             }
         } break;
         case State::Resetting: {
@@ -767,31 +775,24 @@ int main(int, const char* [])
             resetTimer += deltaTime;
             if (resetTimer < ResetDuration) {
                 float t = resetTimer / ResetDuration;
+
+                // TOOD : Documentation
+                for (uint32_t i = 0; i < BrickCount; ++i) {
+                    auto transforme = bricks[i].rigidBody.get_transform();
+                    transforme.setOrigin(std::get<btVector3>(deadBricks[i]).lerp(BrickPositions[i], t));
+                    transforme.setRotation(std::get<btQuaternion>(deadBricks[i]).slerp(btQuaternion::getIdentity(), t));
+                    bricks[i].rigidBody.set_transform(transforme);
+                }
+
+                // TODO : Documentation
+                auto ballIndex = BallCount - (size_t)(t * (BallCount + 1));
+                if (ballIndex < BallCount) {
+                    auto transforme = balls[ballIndex].rigidBody.get_transform();
+                    transforme.setOrigin(BallPositions[ballIndex]);
+                    balls[ballIndex].rigidBody.set_transform(transforme);
+                }
+
 #if 0
-                static size_t bi;
-                auto ballIndex = (size_t)(t * balls.size());
-
-                auto transform = balls[ballIndex].rigidBody.get_transform();
-                transform.setOrigin(BallPositions[ballIndex]);
-                balls[ballIndex].rigidBody.set_transform(transform);
-#endif
-
-#if 0
-                if (ballIndex != bi) {
-                    std::cout << bi << " -> " << ballIndex << std::endl;
-                    bi = ballIndex;
-                }
-                std::cout << ballIndex << std::endl;
-                if (ballIndex == 3) {
-                    int b = 0;
-                    (void)b;
-                }
-                if (balls.size() <= ballIndex) {
-                    assert(false);
-                }
-#endif
-
-
                 for (const auto& resetState : resetStates) {
                     auto pRigidBody = (btRigidBody*)resetState.first;
                     btTransform transform { };
@@ -802,7 +803,9 @@ int main(int, const char* [])
                     transform.setRotation(resetState.second.rotation.slerp(btQuaternion::getIdentity(), t));
                     pRigidBody->setCenterOfMassTransform(transform);
                 }
+#endif
             } else {
+#if 0
                 for (const auto& resetState : resetStates) {
                     auto pRigidBody = (btRigidBody*)resetState.first;
                     btTransform transform { };
@@ -813,16 +816,27 @@ int main(int, const char* [])
                     transform.setRotation(btQuaternion::getIdentity());
                     pRigidBody->setCenterOfMassTransform(transform);
                 }
+#endif
+                for (uint32_t i = 0; i < BrickCount; ++i) {
+                    auto transforme = bricks[i].rigidBody.get_transform();
+                    transforme.setOrigin(BrickPositions[i]);
+                    transforme.setRotation(btQuaternion::getIdentity());
+                    bricks[i].rigidBody.set_transform(transforme);
+                    physicsWorld.make_static(bricks[i].rigidBody);
+                    liveBricks.insert(&bricks[i]);
+                }
+#if 0
                 for (auto& brick : bricks) {
                     liveBricks.insert(&brick);
                     brick.rigidBody.mupMotionState->setWorldTransform(brick.rigidBody.mupRigidBody->getCenterOfMassTransform());
                     physicsWorld.make_static(brick.rigidBody);
                 }
-                for (auto& ball : balls) {
-                    ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
-                    // liveBalls.insert(&ball);
-                }
-                resetStates.clear();
+#endif
+                // for (auto& ball : balls) {
+                //     ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
+                //     // liveBalls.insert(&ball);
+                // }
+                // resetStates.clear();
                 state = State::Play;
             }
         } break;
