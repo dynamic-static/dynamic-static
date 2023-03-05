@@ -132,8 +132,6 @@ void RigidBody::activate()
 void RigidBody::halt()
 {
     assert(mupRigidBody);
-    // mupRigidBody->clearForces();
-    // mupRigidBody->clearGravity();
     mupRigidBody->setLinearVelocity({ 0, 0, 0 });
     mupRigidBody->setAngularVelocity({ 0, 0, 0 });
 }
