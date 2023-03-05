@@ -531,37 +531,12 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BrickPositions[i]);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &bricks[i]);
-        bricks[i].color = BrickRowColors[0];
+        bricks[i].color = BrickRowColors[i / BrickColumCount];
         physicsWorld.make_static(bricks[i].rigidBody);
         liveBricks.insert(&bricks[i]);
 
         initialPositions.insert({ (uint64_t)bricks[i].rigidBody.mupRigidBody.get(), BrickPositions[i] });
     }
-
-#if 0
-    std::unordered_set<GameObject*> liveBricks;
-    for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
-        auto offset = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
-        for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
-            auto& brick = bricks[row_i * BrickColumCount + brick_i];
-            btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
-
-            GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-            gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
-            GameObject::CreateInfo gameObjectCreateInfo { };
-            gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-            gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
-            gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
-            gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &brick);
-            brick.color = BrickRowColors[row_i];
-
-            offset += BrickAreaWidth;
-            physicsWorld.make_static(brick.rigidBody);
-            liveBricks.insert(&brick);
-            initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
-        }
-    }
-#endif
 
     // TODO : Documentation
     std::array<GameObject, BallCount> balls;
@@ -701,7 +676,7 @@ int main(int, const char* [])
 
             // TODO : Documentation
             uint32_t liveBallCount = 0;
-            const auto OutOfPlay = -PlayFieldHeight * 0.5f;
+            const btScalar OutOfPlay = -PlayFieldHeight * 0.5f;
             const auto& paddlePosition = paddle.rigidBody.get_transform().getOrigin();
             for (auto& ball : balls) {
                 const auto& ballPosition = ball.rigidBody.get_transform().getOrigin();
