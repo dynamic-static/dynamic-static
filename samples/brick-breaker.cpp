@@ -275,7 +275,7 @@ public:
         memcpy(allocationInfo.pMappedData, &ubo, sizeof(ObjectUniforms));
     }
 
-    void record_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout)
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::PipelineLayout& pipelineLayout)
     {
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &(const VkDescriptorSet&)mDescriptorSet, 0, nullptr);
         mMesh.record_cmds(commandBuffer);
@@ -329,15 +329,15 @@ int main(int, const char* [])
     std::cout <<                                                                                       std::endl;
 
     // TOOD : Documentation
-    GfxContext gfxContext;
-    auto vkResult = GfxContext::create("dynamic-static - Brick Breaker", &gfxContext);
+    gvk::Context gvkContext;
+    auto vkResult = dst_sample_create_gvk_context("dynamic-static - Brick Breaker", &gvkContext);
     assert(vkResult == VK_SUCCESS);
-    auto gvkDevice = gfxContext.get_devices()[0];
+    auto gvkDevice = gvkContext.get_devices()[0];
     auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
 
     // TOOD : Documentation
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
-    systemSurfaceCreateInfo.pTitle = gfxContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
+    systemSurfaceCreateInfo.pTitle = gvkContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
     systemSurfaceCreateInfo.extent = { 1280, 720 };
     gvk::system::Surface systemSurface;
     auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
@@ -381,7 +381,7 @@ int main(int, const char* [])
     descriptorPoolCreateInfo.poolSizeCount = 1;
     descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
     gvk::DescriptorPool descriptorPool;
-    vkResult = gvk::DescriptorPool::create(gfxContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool);
+    vkResult = gvk::DescriptorPool::create(gvkContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool);
     assert(vkResult == VK_SUCCESS);
 
     // TODO : Documentation
@@ -394,7 +394,7 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout;
     gvk::DescriptorSet cameraDescriptorSet;
-    vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
+    vkResult = gvk::DescriptorSet::allocate(gvkContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet);
     assert(vkResult == VK_SUCCESS);
 
     // TODO : Documentation
@@ -416,7 +416,7 @@ int main(int, const char* [])
     writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     writeDescriptorSet.dstSet = cameraDescriptorSet;
     writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-    vkUpdateDescriptorSets(gfxContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
+    vkUpdateDescriptorSets(gvkContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
 
     std::map<uint64_t, btVector3> initialPositions;
 
@@ -449,7 +449,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = PlayFieldBarrierRestitution;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PlayFieldBarrierPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &playFieldBarriers[i]);
+        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &playFieldBarriers[i]);
         physicsWorld.make_static(playFieldBarriers[i].rigidBody);
     }
 
@@ -479,7 +479,7 @@ int main(int, const char* [])
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(ContainerBarrierPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &containerBarriers[i]);
+        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &containerBarriers[i]);
         physicsWorld.make_static(containerBarriers[i].rigidBody);
     }
 
@@ -525,7 +525,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BrickPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &bricks[i]);
+        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &bricks[i]);
         bricks[i].color = BrickRowColors[i / BrickColumCount];
         physicsWorld.make_static(bricks[i].rigidBody);
         liveBricks.insert(&bricks[i]);
@@ -561,7 +561,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = BallRestitution;
         gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BallPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &balls[i]);
+        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &balls[i]);
         balls[i].color = gvk::math::Color::SlateGray;
 
         initialPositions.insert({ (uint64_t)balls[i].rigidBody.mupRigidBody.get(), BallPositions[i] });
@@ -583,7 +583,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -PlayFieldHeight * 0.5f + PaddleHeight * 4, 0 });
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
+        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
         paddle.color = gvk::math::Color::Brown;
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
@@ -813,25 +813,25 @@ int main(int, const char* [])
         cameraUbo.view = camera.view();
         cameraUbo.projection = camera.projection();
         VmaAllocationInfo allocationInfo { };
-        vmaGetAllocationInfo(gfxContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+        vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
         // TODO : Documentation
-        paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
+        paddle.update_uniform_buffer(gvkContext.get_devices()[0]);
         for (auto& wall : playFieldBarriers) {
-            wall.update_uniform_buffer(gfxContext.get_devices()[0]);
+            wall.update_uniform_buffer(gvkContext.get_devices()[0]);
         }
         for (auto& brick : bricks) {
-            brick.update_uniform_buffer(gfxContext.get_devices()[0]);
+            brick.update_uniform_buffer(gvkContext.get_devices()[0]);
         }
         for (auto& ball : balls) {
-            ball.update_uniform_buffer(gfxContext.get_devices()[0]);
+            ball.update_uniform_buffer(gvkContext.get_devices()[0]);
         }
 
         // TODO : Documentation
         if (pipeline == wireframePipeline) {
             for (auto& backStop : containerBarriers) {
-                backStop.update_uniform_buffer(gfxContext.get_devices()[0]);
+                backStop.update_uniform_buffer(gvkContext.get_devices()[0]);
             }
         }
 
@@ -876,21 +876,21 @@ int main(int, const char* [])
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
 
             // TODO : Documentation
-            paddle.record_cmds(commandBuffer, pipelineLayout);
+            paddle.record_draw_cmds(commandBuffer, pipelineLayout);
             for (auto& wall : playFieldBarriers) {
-                wall.record_cmds(commandBuffer, pipelineLayout);
+                wall.record_draw_cmds(commandBuffer, pipelineLayout);
             }
             for (auto& brick : bricks) {
-                brick.record_cmds(commandBuffer, pipelineLayout);
+                brick.record_draw_cmds(commandBuffer, pipelineLayout);
             }
             for (auto& ball : balls) {
-                ball.record_cmds(commandBuffer, pipelineLayout);
+                ball.record_draw_cmds(commandBuffer, pipelineLayout);
             }
 
             // TODO : Documentation
             if (pipeline == wireframePipeline) {
                 for (auto& backStop : containerBarriers) {
-                    backStop.record_cmds(commandBuffer, pipelineLayout);
+                    backStop.record_draw_cmds(commandBuffer, pipelineLayout);
                 }
             }
 
@@ -912,7 +912,7 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    vkResult = vkDeviceWaitIdle(gfxContext.get_devices()[0]);
+    vkResult = vkDeviceWaitIdle(gvkContext.get_devices()[0]);
     assert(vkResult == VK_SUCCESS);
 
     // TODO : Documentation

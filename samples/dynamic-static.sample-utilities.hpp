@@ -38,90 +38,55 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <vector>
 #include <unordered_map>
 
-class GfxContext final
-    : public gvk::Context
+static VkBool32 dst_sample_debug_utils_messenger_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+)
 {
-private:
-    static VkBool32 debug_utils_messenger_callback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData
-    )
-    {
-        (void)messageTypes;
-        (void)pUserData;
-        if (pCallbackData && pCallbackData->pMessage) {
-            if (messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-                std::cerr << pCallbackData->pMessage << std::endl;
-            } else {
-                std::cout << pCallbackData->pMessage << std::endl;
-            }
+    (void)messageTypes;
+    (void)pUserData;
+    if (pCallbackData && pCallbackData->pMessage) {
+        if (messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
+            std::cerr << pCallbackData->pMessage << std::endl;
+        } else {
+            std::cout << pCallbackData->pMessage << std::endl;
         }
-        return VK_FALSE;
     }
+    return VK_FALSE;
+}
 
-public:
-    static VkResult create(const char* pApplicationName, GfxContext* pGfxContext)
-    {
-        // Setup VkInstanceCreateInfo.
-        auto applicationInfo = gvk::get_default<VkApplicationInfo>();
-        applicationInfo.pApplicationName = pApplicationName;
-        auto instanceCreateInfo = gvk::get_default<VkInstanceCreateInfo>();
-        instanceCreateInfo.pApplicationInfo = &applicationInfo;
+inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk::Context* pGfxContext)
+{
+    // Setup VkInstanceCreateInfo.
+    auto applicationInfo = gvk::get_default<VkApplicationInfo>();
+    applicationInfo.pApplicationName = pApplicationName;
+    auto instanceCreateInfo = gvk::get_default<VkInstanceCreateInfo>();
+    instanceCreateInfo.pApplicationInfo = &applicationInfo;
 
-        // Setup VkDeviceCreateInfo with desired VkPhysicalDeviceFeatures.
-        auto physicalDeviceFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
-        physicalDeviceFeatures.samplerAnisotropy = VK_TRUE;
-        auto deviceCreateInfo = gvk::get_default<VkDeviceCreateInfo>();
-        deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
+    // Setup VkDeviceCreateInfo with desired VkPhysicalDeviceFeatures.
+    auto physicalDeviceFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
+    physicalDeviceFeatures.samplerAnisotropy = VK_TRUE;
+    physicalDeviceFeatures.fillModeNonSolid = VK_TRUE;
+    auto deviceCreateInfo = gvk::get_default<VkDeviceCreateInfo>();
+    deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
 
-        // VkDebugUtilsMessengerCreateInfoEXT is optional, providing it indicates that
-        //  the debug utils extension should be loaded.
-        auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
-        debugUtilsMessengerCreateInfo.pfnUserCallback = debug_utils_messenger_callback;
+    // VkDebugUtilsMessengerCreateInfoEXT is optional, providing it indicates that
+    //  the debug utils extension should be loaded.
+    auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
+    debugUtilsMessengerCreateInfo.pfnUserCallback = dst_sample_debug_utils_messenger_callback;
 
-        // Populate the gvk::Context::CreateInfo and call the base implementation.
-        auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
-        contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
-        contextCreateInfo.loadApiDumpLayer = VK_FALSE;
-        contextCreateInfo.loadValidationLayer = VK_FALSE;
-        contextCreateInfo.loadWsiExtensions = VK_TRUE;
-        contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
-        contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;
-        return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
-    }
-
-protected:
-#if 0
-    VkResult create_instance(const VkInstanceCreateInfo* pInstanceCreateInfo, const VkAllocationCallbacks* pAllocator) override
-    {
-        assert(pInstanceCreateInfo);
-        auto enabledLayerCount = pInstanceCreateInfo->enabledLayerCount;
-        auto ppEnabledLayerNames = pInstanceCreateInfo->ppEnabledLayerNames;
-        std::vector<const char*> layers(ppEnabledLayerNames, ppEnabledLayerNames + enabledLayerCount);
-        #if 0
-        layers.push_back("VK_LAYER_LUNARG_api_dump");
-        #endif
-        layers.push_back("VK_LAYER_KHRONOS_validation");
-        auto instanceCreateInfo = *pInstanceCreateInfo;
-        instanceCreateInfo.enabledLayerCount = (uint32_t)layers.size();
-        instanceCreateInfo.ppEnabledLayerNames = layers.data();
-        return gvk::Context::create_instance(&instanceCreateInfo, pAllocator);
-    }
-#endif
-
-    VkResult create_devices(const VkDeviceCreateInfo* pDeviceCreateInfo, const VkAllocationCallbacks* pAllocator) override
-    {
-        assert(pDeviceCreateInfo);
-        auto enabledFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
-        enabledFeatures.samplerAnisotropy = VK_TRUE;
-        enabledFeatures.fillModeNonSolid = VK_TRUE;
-        auto deviceCreateInfo = *pDeviceCreateInfo;
-        deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
-        return gvk::Context::create_devices(&deviceCreateInfo, pAllocator);
-    }
-};
+    // Populate the gvk::Context::CreateInfo and call the base implementation.
+    auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
+    contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
+    contextCreateInfo.loadApiDumpLayer = VK_FALSE;
+    contextCreateInfo.loadValidationLayer = VK_TRUE;
+    contextCreateInfo.loadWsiExtensions = VK_TRUE;
+    contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
+    contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;
+    return gvk::Context::create(&contextCreateInfo, nullptr, pGfxContext);
+}
 
 inline VkResult dst_sample_validate_shader_info(const gvk::spirv::ShaderInfo& shaderInfo)
 {
@@ -170,7 +135,7 @@ inline VkResult dst_sample_create_pipeline(
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         // Create a gvk::spirv::Compiler, compile GLSL to SPIR-V, then validate both
-        //  shaders...
+        //  shaders.
         gvk::spirv::Context spirvContext;
         gvk_result(gvk::spirv::Context::create(&gvk::get_default<gvk::spirv::Context::CreateInfo>(), &spirvContext));
         spirvContext.compile(&vertexShaderInfo);
@@ -182,7 +147,7 @@ inline VkResult dst_sample_create_pipeline(
         gvk_result(vsVkResult);
         gvk_result(fsVkResult);
 
-        // Create a gvk::ShaderModule for the vertex shader...
+        // Create a gvk::ShaderModule for the vertex shader.
         auto vertexShaderModuleCreateInfo = gvk::get_default<VkShaderModuleCreateInfo>();
         vertexShaderModuleCreateInfo.codeSize = vertexShaderInfo.spirv.size() * sizeof(uint32_t);
         vertexShaderModuleCreateInfo.pCode = vertexShaderInfo.spirv.data();
@@ -192,7 +157,7 @@ inline VkResult dst_sample_create_pipeline(
         vertexPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertexPipelineShaderStageCreateInfo.module = vertexShaderModule;
 
-        // Create a gvk::ShaderModule for the fragment shader...
+        // Create a gvk::ShaderModule for the fragment shader.
         auto fragmentShaderModuleCreateInfo = gvk::get_default<VkShaderModuleCreateInfo>();
         fragmentShaderModuleCreateInfo.codeSize = fragmentShaderInfo.spirv.size() * sizeof(uint32_t);
         fragmentShaderModuleCreateInfo.pCode = fragmentShaderInfo.spirv.data();
@@ -203,17 +168,17 @@ inline VkResult dst_sample_create_pipeline(
         fragmentPipelineShaderStageCreateInfo.module = fragmentShaderModule;
 
         // Create an array of VkPipelineShaderStageCreateInfo for the shaders used in
-        //  this gvk::Pipeline...
+        //  this gvk::Pipeline.
         std::array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
             vertexPipelineShaderStageCreateInfo,
             fragmentPipelineShaderStageCreateInfo,
         };
 
         // VkVertexInputBindingDescription describes how the gvk::Pipeline should
-        //  traverse vertex buffer data when draw calls are issued...
+        //  traverse vertex buffer data when draw calls are issued.
         // NOTE : gvk::get_vertex_description<VertexType>(0) is used to get an array of
         //  VkVertexInputAttributeDescriptions at binding 0 which indicates that the
-        //  array is associated with the 0th element of pVertexBindingDescriptions...
+        //  array is associated with the 0th element of pVertexBindingDescriptions.
         VkVertexInputBindingDescription vertexInputBindingDescription { 0, sizeof(VertexType), VK_VERTEX_INPUT_RATE_VERTEX };
         auto vertexInputAttributeDescriptions = gvk::get_vertex_description<VertexType>(0);
         auto pipelineVertexInputStateCreateInfo = gvk::get_default<VkPipelineVertexInputStateCreateInfo>();
@@ -224,7 +189,7 @@ inline VkResult dst_sample_create_pipeline(
 
         // VkPipelineRasterizationStateCreateInfo describes how rasterization should
         //  occur...this includes parameters for polygon mode, winding order, face
-        //  culling, etc...
+        //  culling, etc.
         auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
         pipelineRasterizationStateCreateInfo.cullMode = cullMode;
         pipelineRasterizationStateCreateInfo.polygonMode = polygonMode;
@@ -236,7 +201,7 @@ inline VkResult dst_sample_create_pipeline(
         pipelineMultisampleStateCreateInfo.rasterizationSamples = dst_sample_get_render_pass_sample_count(renderPass);
 
         // VkPipelineDepthStencilStateCreateInfo describes how depth should be handled
-        //  during fragment shading...
+        //  during fragment shading.
         auto depthTestEnable = dst_sample_get_render_pass_depth_format(renderPass) != VK_FORMAT_UNDEFINED;
         auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
         pipelineDepthStencilStateCreateInfo.depthTestEnable = depthTestEnable;
@@ -255,7 +220,7 @@ inline VkResult dst_sample_create_pipeline(
         gvk_result(gvk::spirv::create_pipeline_layout(renderPass.get<gvk::Device>(), spirvBindingInfo, nullptr, &pipelineLayout));
 
         // Finally we populate a VkGraphicsPipelineCreateInfo with the components
-        //  necessary for this gvk::Pipeline...
+        //  necessary for this gvk::Pipeline.
         // NOTE : gvk::get_default<VkGraphicsPipelineCreateInfo>() is used to get the
         //  VkGraphicsPipelineCreateInfo that is prepared for this gvk::Pipeline.
         //  gvk::get_default<>() automatically sets sTypes and sensible default values
@@ -283,6 +248,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
     assert(pipeline);
     assert(pDescriptorSets);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        // TODO : Documentation
         std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
         std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
         for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
@@ -297,6 +263,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
             }
         }
 
+        // TODO : Documentation
         auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
         descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
@@ -305,6 +272,7 @@ inline VkResult dst_sample_allocate_descriptor_sets(const gvk::Pipeline& pipelin
         gvk::DescriptorPool descriptorPool;
         gvk_result(gvk::DescriptorPool::create(pipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
 
+        // TODO : Documentation
         auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
         descriptorSetAllocateInfo.descriptorPool = descriptorPool;
         descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
@@ -319,7 +287,8 @@ template <typename UniformBufferObjectType>
 inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk::Buffer* pUniformBuffer)
 {
     assert(pUniformBuffer);
-    // Creates a persistently mapped gvk::Buffer for writing uniform buffer data...
+
+    // Create a persistently mapped gvk::Buffer for writing uniform buffer data.
     auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
     bufferCreateInfo.size = sizeof(UniformBufferObjectType);
     bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
