@@ -136,8 +136,6 @@ public:
             : mDescriptorSetLayout { descriptorSetLayout }
         {
             assert(mDescriptorSetLayout);
-
-            // TODO : Documentation
             std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
             auto descriptorSetLayoutCreateInfo = mDescriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
             for (uint32_t binding_i = 0; binding_i < descriptorSetLayoutCreateInfo.bindingCount; ++binding_i) {
@@ -156,7 +154,6 @@ public:
 
         void create_game_object(const gvk::CommandBuffer& commandBuffer, GameObject::CreateInfo createInfo, GameObject* pGameObject)
         {
-            // TODO : Documentation
             assert(commandBuffer);
             assert(!createInfo.pBoxCreateInfo != !createInfo.pSphereCreateInfo);
             assert(pGameObject);
@@ -433,19 +430,7 @@ int main(int, const char* [])
     // TODO : Documentation
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
-    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 5); // BallCount + BrickCount + 1 paddle + 3 walls
-
-    // TODO : Documentation
-    GameObject floor;
-    {
-        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = { FloorWidth, FloorHeight, FloorDepth };
-        GameObject::CreateInfo gameObjectCreateInfo { };
-        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &floor);
-        physicsWorld.make_static(floor.rigidBody);
-    }
+    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 5 + 1000); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
     const uint32_t WallCount = 3;
@@ -477,6 +462,62 @@ int main(int, const char* [])
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &walls[i]);
         physicsWorld.make_static(walls[i].rigidBody);
     }
+
+    // TODO : Documentation
+
+    // TODO : Documentation
+    const uint32_t BarrierCount = 5;
+    const btScalar BackStopWidth       = CeilingWidth + CeilingWidth * 0.5f;
+    const btScalar BackStopHeight      = WallHeight + WallHeight * 0.18f;
+    const btScalar BackStopDepth       = 1;
+    const btScalar BackStopWallWidth   = 1;
+    const btScalar BackStopWallHeight  = BackStopHeight;
+    const btScalar BackStopWallDepth   = 32;
+    const btScalar BackStopFloorWidth  = BackStopWidth;
+    const btScalar BackStopFloorHeight = 1;
+    const btScalar BackStopFloorDepth  = BackStopWallDepth;
+    const std::array<btVector3, BarrierCount> BackStopExtents {
+        btVector3(BackStopWidth,      BackStopHeight,      BackStopDepth),      // Back
+        btVector3(BackStopWallWidth,  BackStopWallHeight,  BackStopWallDepth),  // Left
+        btVector3(BackStopWallWidth,  BackStopWallHeight,  BackStopWallDepth),  // Right
+        btVector3(BackStopFloorWidth, BackStopFloorHeight, BackStopFloorDepth), // Bottom
+        btVector3(BackStopWidth,      BackStopHeight,      BackStopDepth),      // Front
+    };
+    const std::array<btVector3, BarrierCount> BackStopPositions {
+        btVector3(                 0,                      0,     BackStopWallDepth * 0.5f), // Back
+        btVector3( BackStopWidth * 0.5f,                   0,                         0),    // Left
+        btVector3(-BackStopWidth * 0.5f,                   0,                         0),    // Right
+        btVector3(                 0,    -BackStopHeight * 0.5f,                      0),    // Bottom
+        btVector3(                 0,                      0,    -BackStopWallDepth * 0.5f), // Front
+    };
+    std::array<GameObject, BarrierCount> backStops;
+    for (size_t i = 0; i < backStops.size(); ++i) {
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = BackStopExtents[i];
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BackStopPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &backStops[i]);
+        physicsWorld.make_static(backStops[i].rigidBody);
+    }
+
+#if 0
+    // TODO : Documentation
+    GameObject floor;
+    {
+        float y = -38;
+        y = -((WallHeight + WallHeight * 0.18f) * 0.5f);
+        std::cout << y << std::endl;
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { FloorWidth, FloorHeight, FloorDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        // gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, y, 0 });
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &floor);
+        physicsWorld.make_static(floor.rigidBody);
+    }
+#endif
 
     // TODO : Documentation
     const uint32_t BrickRowCount   = 6;
@@ -593,6 +634,7 @@ int main(int, const char* [])
         gvk::system::Surface::update();
         const auto& input = systemSurface.get_input();
 
+        // TODO : Documentation
         if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
             if (pipeline == polygonPipeline) {
                 pipeline = wireframePipeline;
@@ -600,6 +642,25 @@ int main(int, const char* [])
                 pipeline = polygonPipeline;
             }
         }
+
+        // TODO : Documentation
+        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
+            .deltaTime = deltaTime,
+            .moveUp = input.keyboard.down(gvk::system::Key::Q),
+            .moveDown = input.keyboard.down(gvk::system::Key::E),
+            .moveLeft = input.keyboard.down(gvk::system::Key::A),
+            .moveRight = input.keyboard.down(gvk::system::Key::D),
+            .moveForward = input.keyboard.down(gvk::system::Key::W),
+            .moveBackward = input.keyboard.down(gvk::system::Key::S),
+            .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
+            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
+            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
+        };
+        cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
+        if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
+            camera.fieldOfView = 60.0f;
+        }
+        cameraController.update(cameraControllerUpdateInfo);
 
         // TODO : Documentation
         if (input.keyboard.down(gvk::system::Key::LeftArrow)) {
@@ -637,19 +698,20 @@ int main(int, const char* [])
             }
 
             // TODO : Documentation
-            bool liveBall = false;
+            uint32_t liveBallCount = 0;
             const auto& paddleTransform = paddle.rigidBody.get_transform();
-            const auto& floorTransform = floor.rigidBody.get_transform();
-            auto liveBallMinY = (paddleTransform.getOrigin().y() + floorTransform.getOrigin().y()) * 0.5f;
+            auto liveBallMinY = paddleTransform.getOrigin().y();
             for (auto& ball : balls) {
                 const auto& ballTransform = ball.rigidBody.get_transform();
-                liveBall |= liveBallMinY < ballTransform.getOrigin().y();
-                if (physicsWorld.get_collisions().count(dst::physics::make_collision(&ball.rigidBody, &paddle.rigidBody))) {
-                    if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                        auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
-                        impulse *= 64;
-                        impulse.setY(64);
-                        ball.rigidBody.apply_impulse(impulse);
+                if (liveBallMinY < ballTransform.getOrigin().y()) {
+                    ++liveBallCount;
+                    if (physicsWorld.get_collisions().count(dst::physics::make_collision(&ball.rigidBody, &paddle.rigidBody))) {
+                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
+                            auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                            impulse *= 64;
+                            impulse.setY(64);
+                            ball.rigidBody.apply_impulse(impulse);
+                        }
                     }
                 }
             }
@@ -658,12 +720,11 @@ int main(int, const char* [])
             if (liveBricks.empty()) {
                 celebrationTimer = 0;
                 state = State::Celebration;
-            } else if (!liveBall) {
+            } else if (!liveBallCount) {
                 state = State::GameOver;
             }
         } break;
-        case State::Celebration:
-        {
+        case State::Celebration: {
             celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
             if (celebrationTimer < celebrationDuration) {
                 auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
@@ -677,8 +738,7 @@ int main(int, const char* [])
                 }
             }
         } break;
-        case State::GameOver:
-        {
+        case State::GameOver: {
             resetTimer = 0;
             resetStates.clear();
             state = State::Resetting;
@@ -707,11 +767,8 @@ int main(int, const char* [])
                 resetStates.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), resetState });
             }
         } break;
-        case State::Resetting:
-        {
+        case State::Resetting: {
             resetTimer += clock.elapsed<gvk::system::Seconds<float>>();
-
-
             if (resetTimer < resetDuration) {
                 float t = resetTimer / resetDuration;
                 for (const auto& resetState : resetStates) {
@@ -751,6 +808,7 @@ int main(int, const char* [])
         } break;
         }
 
+        // TODO : Documentation
         auto paddleTransform = paddle.rigidBody.get_transform();
         auto paddleX = paddleTransform.getOrigin().x();
         auto xMax = CeilingWidth * 0.5f - PaddleWidth * 0.5f;
@@ -758,26 +816,8 @@ int main(int, const char* [])
         paddleTransform.getOrigin().setX(glm::clamp(paddleX, xMin, xMax));
         paddle.rigidBody.set_transform(paddleTransform);
 
-        physicsWorld.update(deltaTime);
-
         // TODO : Documentation
-        gvk::math::FreeCameraController::UpdateInfo cameraControllerUpdateInfo {
-            .deltaTime = deltaTime,
-            .moveUp = input.keyboard.down(gvk::system::Key::Q),
-            .moveDown = input.keyboard.down(gvk::system::Key::E),
-            .moveLeft = input.keyboard.down(gvk::system::Key::A),
-            .moveRight = input.keyboard.down(gvk::system::Key::D),
-            .moveForward = input.keyboard.down(gvk::system::Key::W),
-            .moveBackward = input.keyboard.down(gvk::system::Key::S),
-            .moveSpeedMultiplier = input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
-            .lookDelta = { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
-            .fieldOfViewDelta = input.mouse.scroll.delta()[1],
-        };
-        cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
-        if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
-            camera.fieldOfView = 60.0f;
-        }
-        cameraController.update(cameraControllerUpdateInfo);
+        physicsWorld.update(deltaTime);
 
         // TODO : Documentation
         CameraUniforms cameraUbo { };
@@ -797,6 +837,11 @@ int main(int, const char* [])
         }
         for (auto& ball : balls) {
             ball.update_uniform_buffer(gfxContext.get_devices()[0]);
+        }
+        if (pipeline == wireframePipeline) {
+            for (auto& backStop : backStops) {
+                backStop.update_uniform_buffer(gfxContext.get_devices()[0]);
+            }
         }
 
         // TODO : Documentation
@@ -836,18 +881,24 @@ int main(int, const char* [])
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
             // TODO : Documentation
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+            const auto& pipelineLayout = pipeline.get<gvk::PipelineLayout>();
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
 
             // TODO : Documentation
-            paddle.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+            paddle.record_cmds(commandBuffer, pipelineLayout);
             for (auto& wall : walls) {
-                wall.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                wall.record_cmds(commandBuffer, pipelineLayout);
             }
             for (auto& brick : bricks) {
-                brick.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                brick.record_cmds(commandBuffer, pipelineLayout);
             }
             for (auto& ball : balls) {
-                ball.record_cmds(commandBuffer, pipeline.get<gvk::PipelineLayout>());
+                ball.record_cmds(commandBuffer, pipelineLayout);
+            }
+            if (pipeline == wireframePipeline) {
+                for (auto& backStop : backStops) {
+                    backStop.record_cmds(commandBuffer, pipelineLayout);
+                }
             }
 
             // TODO : Documentation
