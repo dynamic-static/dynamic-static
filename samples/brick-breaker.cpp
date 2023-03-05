@@ -491,7 +491,7 @@ int main(int, const char* [])
     constexpr uint32_t BrickCount      = BrickRowCount * BrickColumCount;
     const std::array<glm::vec4, BrickRowCount> BrickRowColors {
         gvk::math::Color::Red,
-        gvk::math::Color::Orange,
+        gvk::math::Color::DarkOrange,
         gvk::math::Color::Yellow,
         gvk::math::Color::Green,
         gvk::math::Color::DodgerBlue,
