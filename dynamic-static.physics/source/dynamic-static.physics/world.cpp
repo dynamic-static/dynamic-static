@@ -27,10 +27,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.physics/world.hpp"
 #include "dynamic-static.physics/rigid-body.hpp"
 
+#include <algorithm>
 #include <cassert>
 
 namespace dst {
 namespace physics {
+
+Collision make_collision(const btCollisionObject* collider0, const btCollisionObject* collider1)
+{
+    return collider0 < collider1 ? Collision { collider0, collider1 } : Collision { collider1, collider0 };
+}
 
 void World::create(const CreateInfo* pCreateInfo, World* pWorld)
 {
@@ -55,7 +61,12 @@ World::~World()
     reset();
 }
 
-const std::set<std::pair<uint64_t, uint64_t>>& World::get_collisions() const
+const std::set<const btCollisionObject*>& World::get_collided_objects() const
+{
+    return mCollidedObjects;
+}
+
+const std::set<Collision>& World::get_collisions() const
 {
     return mCollisions;
 }
@@ -97,6 +108,7 @@ void World::disable(RigidBody& rigidBody)
 void World::update(btScalar deltaTime)
 {
     assert(mupWorld);
+    mCollidedObjects.clear();
     mCollisions.clear();
     mupWorld->stepSimulation(deltaTime);
 }
@@ -104,6 +116,7 @@ void World::update(btScalar deltaTime)
 void World::clear()
 {
     if (mupWorld) {
+        mCollidedObjects.clear();
         mCollisions.clear();
         for (int i = mupWorld->getNumCollisionObjects() - 1; 0 <= i; --i) {
             auto pCollisionObject = mupWorld->getCollisionObjectArray()[i];
@@ -120,6 +133,7 @@ void World::reset()
     mupBroadPhaseInterface.reset();
     mupSolver.reset();
     mupWorld.reset();
+    mCollidedObjects.clear();
     mCollisions.clear();
 }
 
@@ -129,6 +143,7 @@ void World::bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScal
     auto pWorld = (World*)pDynamicsWorld->getWorldUserInfo();
     assert(pWorld);
     auto& collisions = pWorld->mCollisions;
+    auto& collidedObjects = pWorld->mCollidedObjects;
     auto pDispatcher = pDynamicsWorld->getDispatcher();
     assert(pDispatcher);
     auto numManifolds = pDispatcher->getNumManifolds();
@@ -137,10 +152,8 @@ void World::bullet_physics_tick_callback(btDynamicsWorld* pDynamicsWorld, btScal
         assert(pManifold);
         for (int contact_i = 0; contact_i < pManifold->getNumContacts(); ++contact_i) {
             if (pManifold->getContactPoint(contact_i).getDistance() < 0) {
-                auto collision = std::make_pair((uint64_t)pManifold->getBody0(), (uint64_t)pManifold->getBody1());
-                if (collision.second < collision.first) {
-                    std::swap(collision.first, collision.second);
-                }
+                auto collision = make_collision(pManifold->getBody0(), pManifold->getBody1());
+                collidedObjects.insert(collision[0], collision[1]);
                 collisions.insert(collision);
             }
         }

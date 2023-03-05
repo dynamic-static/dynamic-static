@@ -441,7 +441,7 @@ int main(int, const char* [])
 
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
     systemSurfaceCreateInfo.pTitle = gfxContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
-    systemSurfaceCreateInfo.extent = { 1920, 1080 };
+    systemSurfaceCreateInfo.extent = { 1280, 720 };
     gvk::system::Surface systemSurface;
     auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
     assert(success);
