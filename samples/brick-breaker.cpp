@@ -363,19 +363,6 @@ int main(int, const char* [])
     assert(vkResult == VK_SUCCESS);
     auto pipeline = polygonPipeline;
 
-    const float FloorWidth = 1024;
-    const float FloorHeight = 1;
-    const float FloorDepth = 1024;
-
-
-    const float PaddleWidth = 6;
-    const float PaddleHeight = 1;
-    const float PaddleDepth = 0.1f;
-
-    const float BallRadius = 0.5f;
-    const float BallMass = 1;
-    const uint32_t BallCount = 3;
-
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
     descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -431,10 +418,10 @@ int main(int, const char* [])
     GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], 1000); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
-    const uint32_t PlayFieldBarrierCount  = 3;
-    const btScalar PlayFieldWidth         = 32;
-    const btScalar PlayFieldHeight        = 64;
-    const btScalar BarrierThickness       = 1;
+    constexpr btScalar PlayFieldWidth        = 32;
+    constexpr btScalar PlayFieldHeight       = 64;
+    constexpr btScalar BarrierThickness      = 1;
+    constexpr uint32_t PlayFieldBarrierCount = 3;
     const std::array<btVector3, PlayFieldBarrierCount> PlayFieldBarrierExtents {
         btVector3(PlayFieldWidth,   BarrierThickness, BarrierThickness), // Top
         btVector3(BarrierThickness, PlayFieldHeight,  BarrierThickness), // Left
@@ -445,7 +432,7 @@ int main(int, const char* [])
         btVector3( PlayFieldWidth * 0.5f,                   0,    0), // Left
         btVector3(-PlayFieldWidth * 0.5f,                   0,    0), // Right
     };
-    const btScalar PlayFieldBarrierRestitution = 0.6f;
+    constexpr btScalar PlayFieldBarrierRestitution = 0.6f;
     std::array<GameObject, PlayFieldBarrierCount> playFieldBarriers;
     for (size_t i = 0; i < playFieldBarriers.size(); ++i) {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
@@ -459,10 +446,10 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    const uint32_t ContainerBarrierCount = 5;
-    const btScalar ContainerWidth  = PlayFieldWidth + PlayFieldWidth * 0.5f;
-    const btScalar ContainerHeight = PlayFieldHeight + PlayFieldHeight * 0.18f;
-    const btScalar ContainerDepth  = 32;
+    constexpr btScalar ContainerWidth        = PlayFieldWidth + PlayFieldWidth * 0.5f;
+    constexpr btScalar ContainerHeight       = PlayFieldHeight + PlayFieldHeight * 0.18f;
+    constexpr btScalar ContainerDepth        = 32;
+    constexpr uint32_t ContainerBarrierCount = 5;
     const std::array<btVector3, ContainerBarrierCount> ContainerBarrierExtents {
         btVector3(ContainerWidth,   ContainerHeight,  BarrierThickness), // Back
         btVector3(BarrierThickness, ContainerHeight,  ContainerDepth),   // Left
@@ -489,13 +476,13 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    const uint32_t BrickRowCount   = 6;
-    const uint32_t BrickColumCount = 10;
-    const uint32_t BrickCount      = BrickRowCount * BrickColumCount;
-    const btScalar BrickMass       = 8;
-    const btScalar BrickWidth      = 2;
-    const btScalar BrickHeight     = 1;
-    const btScalar BrickDepth      = 1;
+    constexpr btScalar BrickMass       = 8;
+    constexpr btScalar BrickWidth      = 2;
+    constexpr btScalar BrickHeight     = 1;
+    constexpr btScalar BrickDepth      = 1;
+    constexpr uint32_t BrickRowCount   = 6;
+    constexpr uint32_t BrickColumCount = 10;
+    constexpr uint32_t BrickCount      = BrickRowCount * BrickColumCount;
     const std::array<glm::vec4, BrickRowCount> BrickRowColors {
         gvk::math::Color::Red,
         gvk::math::Color::Orange,
@@ -507,8 +494,8 @@ int main(int, const char* [])
     const std::array<btVector3, BrickCount> BrickPositions {
         [&]()
         {
-            const auto PlayAreaWidth = PlayFieldWidth - BarrierThickness;
-            const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
+            const btScalar PlayAreaWidth = PlayFieldWidth - BarrierThickness;
+            const btScalar BrickAreaWidth = PlayAreaWidth / BrickColumCount;
             std::array<btVector3, BrickCount> brickPositions { };
             for (uint32_t row_i = 0; row_i < BrickRowCount; ++row_i) {
                 auto x = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
@@ -521,8 +508,8 @@ int main(int, const char* [])
             return brickPositions;
         }()
     };
-    std::unordered_set<GameObject*> liveBricks;
     std::array<GameObject, BrickCount> bricks;
+    std::unordered_set<GameObject*> liveBricks;
     for (uint32_t i = 0; i < BrickCount; ++i) {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
@@ -539,6 +526,40 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
+    constexpr btScalar BallRadius = 0.5f;
+    constexpr btScalar BallMass   = 1;
+    constexpr uint32_t BallCount  = 3;
+    const std::array<btVector3, BallCount> BallPositions {
+        [&]()
+        {
+            const btScalar Gap = BallRadius * 4;
+            std::array<btVector3, BallCount> ballPositions { };
+            for (uint32_t i = 0; i < BallCount; ++i) {
+                auto x = -PlayFieldWidth * 0.5f + i * Gap;
+                auto y = PlayFieldHeight * 0.5f + Gap;
+                ballPositions[i] = { x, y, 0 };
+            }
+            return ballPositions;
+        }()
+    };
+    constexpr btScalar BallRestitution = 0.9f;
+    std::array<GameObject, BallCount> balls;
+    for (uint32_t i = 0; i < BallCount; ++i) {
+        GameObject::SphereCreateInfo gameObjectSphereCreateInfo { };
+        gameObjectSphereCreateInfo.radius = BallRadius;
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pSphereCreateInfo = &gameObjectSphereCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.mass = BallMass;
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = BallRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BallPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &balls[i]);
+        balls[i].color = gvk::math::Color::SlateGray;
+
+        initialPositions.insert({ (uint64_t)balls[i].rigidBody.mupRigidBody.get(), BallPositions[i] });
+    }
+
+#if 0
     std::array<GameObject, BallCount> balls;
     std::unordered_set<GameObject*> liveBalls;
     for (size_t i = 0; i < balls.size(); ++i) {
@@ -559,10 +580,13 @@ int main(int, const char* [])
         liveBalls.insert(&ball);
         initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
     }
+#endif
 
     // TODO : Documentation
-    const btScalar PaddleMass = 1;
-    const btVector3 PaddlePosition = { 0, -28, 0 };
+    constexpr btScalar PaddleWidth  = 6;
+    constexpr btScalar PaddleHeight = 1;
+    constexpr btScalar PaddleDepth  = 0.1f;
+    constexpr btScalar PaddleMass   = 1;
     GameObject paddle;
     {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
@@ -572,7 +596,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.linearDamping = 0.4f;
         gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 0, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PaddlePosition);
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -PlayFieldHeight * 0.5f + PaddleHeight * 4, 0 });
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
         paddle.color = gvk::math::Color::Brown;
@@ -732,7 +756,7 @@ int main(int, const char* [])
                 resetStates.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), resetState });
             }
             for (auto& ball : balls) {
-                liveBalls.insert(&ball);
+                // liveBalls.insert(&ball);
                 ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
 
@@ -776,7 +800,7 @@ int main(int, const char* [])
                 }
                 for (auto& ball : balls) {
                     ball.rigidBody.mupMotionState->setWorldTransform(ball.rigidBody.mupRigidBody->getCenterOfMassTransform());
-                    liveBalls.insert(&ball);
+                    // liveBalls.insert(&ball);
                 }
                 resetStates.clear();
                 ballCount = 3;
