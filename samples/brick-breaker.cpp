@@ -368,8 +368,6 @@ int main(int, const char* [])
     const float FloorDepth = 1024;
 
 
-    const uint32_t BrickCount = 60;
-
     const float PaddleWidth = 6;
     const float PaddleHeight = 1;
     const float PaddleDepth = 0.1f;
@@ -381,7 +379,7 @@ int main(int, const char* [])
     // TODO : Documentation
     auto descriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
     descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorPoolSize.descriptorCount = BallCount + BrickCount + 5; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera + 1 floor
+    descriptorPoolSize.descriptorCount = 1; // BallCount + BrickCount + 1 paddle + 1 ceiling + 2 walls + 1 camera + 1 floor
     auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
     descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descriptorPoolCreateInfo.maxSets = descriptorPoolSize.descriptorCount;
@@ -430,7 +428,7 @@ int main(int, const char* [])
     // TODO : Documentation
     descriptorSetAllocateInfo.pSetLayouts = &objectDescriptorSetLayout;
 
-    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 5 + 1000); // BallCount + BrickCount + 1 paddle + 3 walls
+    GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], 1000); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
     const uint32_t PlayFieldBarrierCount  = 3;
@@ -493,6 +491,7 @@ int main(int, const char* [])
     // TODO : Documentation
     const uint32_t BrickRowCount   = 6;
     const uint32_t BrickColumCount = 10;
+    const uint32_t BrickCount      = BrickRowCount * BrickColumCount;
     const btScalar BrickMass       = 8;
     const btScalar BrickWidth      = 2;
     const btScalar BrickHeight     = 1;
@@ -505,10 +504,41 @@ int main(int, const char* [])
         gvk::math::Color::DodgerBlue,
         gvk::math::Color::Violet,
     };
+    const std::array<btVector3, BrickCount> BrickPositions {
+        [&]()
+        {
+            const auto PlayAreaWidth = PlayFieldWidth - BarrierThickness;
+            const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
+            std::array<btVector3, BrickCount> brickPositions { };
+            for (uint32_t row_i = 0; row_i < BrickRowCount; ++row_i) {
+                auto x = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
+                for (uint32_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
+                    auto y = 30.0f - row_i * BrickHeight * 2.0f;
+                    brickPositions[row_i * BrickColumCount + brick_i] = { x, y, 0 };
+                    x += BrickAreaWidth;
+                }
+            }
+            return brickPositions;
+        }()
+    };
+    std::unordered_set<GameObject*> liveBricks;
+    std::array<GameObject, BrickCount> bricks;
+    for (uint32_t i = 0; i < BrickCount; ++i) {
+        GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
+        gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
+        GameObject::CreateInfo gameObjectCreateInfo { };
+        gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
+        gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BrickPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &bricks[i]);
+        bricks[i].color = BrickRowColors[0];
+        physicsWorld.make_static(bricks[i].rigidBody);
+        liveBricks.insert(&bricks[i]);
 
-    std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
-    const auto PlayAreaWidth = PlayFieldWidth - BarrierThickness;
-    const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
+        initialPositions.insert({ (uint64_t)bricks[i].rigidBody.mupRigidBody.get(), BrickPositions[i] });
+    }
+
+#if 0
     std::unordered_set<GameObject*> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
         auto offset = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
@@ -531,6 +561,7 @@ int main(int, const char* [])
             initialPositions.insert({ (uint64_t)brick.rigidBody.mupRigidBody.get(), initialPosition });
         }
     }
+#endif
 
     // TODO : Documentation
     std::array<GameObject, BallCount> balls;
