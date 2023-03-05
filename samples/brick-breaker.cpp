@@ -714,22 +714,22 @@ int main(int, const char* [])
                     wall.color = CelebrationColors[colorIndex];
                 }
             } else {
-                state = State::GameOver;
                 for (auto& wall : playFieldBarriers) {
                     wall.color = gvk::math::Color::White;
                 }
+                state = State::GameOver;
             }
         } break;
         case State::GameOver: {
             // TODO : Documentation
-            resetTimer = 0;
-            state = State::Resetting;
-
             for (uint32_t i = 0; i < BrickCount; ++i) {
                 auto& brick = bricks[i];
-
+#if 0
                 brick.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 brick.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+#else
+                brick.rigidBody.halt();
+#endif
                 physicsWorld.disable(brick.rigidBody);
 
                 const auto& transform = brick.rigidBody.get_transform();
@@ -738,10 +738,16 @@ int main(int, const char* [])
             }
 
             for (auto& ball : balls) {
+#if 0
                 ball.rigidBody.mupRigidBody->setLinearVelocity(btVector3(0, 0, 0));
                 ball.rigidBody.mupRigidBody->setAngularVelocity(btVector3(0, 0, 0));
+#else
+                ball.rigidBody.halt();
+#endif
                 physicsWorld.disable(ball.rigidBody);
             }
+            resetTimer = 0;
+            state = State::Resetting;
         } break;
         case State::Resetting: {
             // TODO : Documentation
@@ -766,6 +772,7 @@ int main(int, const char* [])
                     balls[ballIndex].rigidBody.set_transform(transforme);
                 }
             } else {
+                // TODO : Documentation
                 for (uint32_t i = 0; i < BrickCount; ++i) {
                     auto transforme = bricks[i].rigidBody.get_transform();
                     transforme.setOrigin(BrickPositions[i]);
