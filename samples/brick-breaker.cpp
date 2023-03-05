@@ -433,72 +433,61 @@ int main(int, const char* [])
     GameObject::Factory gameObjectFactory(descriptorSetLayouts[1], BallCount + BrickCount + 5 + 1000); // BallCount + BrickCount + 1 paddle + 3 walls
 
     // TODO : Documentation
-    const uint32_t WallCount = 3;
-    const btScalar CeilingWidth  = 32;
-    const btScalar CeilingHeight = 1;
-    const btScalar CeilingDepth  = 1;
-    const btScalar WallWidth     = 1;
-    const btScalar WallHeight    = 64;
-    const btScalar WallDepth     = 1;
-    const std::array<btVector3, WallCount> WallExtents {
-        btVector3(CeilingWidth, CeilingHeight, CeilingDepth), // Ceiling
-        btVector3(WallWidth,    WallHeight,    WallDepth),    // Left wall
-        btVector3(WallWidth,    WallHeight,    WallDepth),    // Right wall
+    const uint32_t PlayFieldBarrierCount  = 3;
+    const btScalar PlayFieldWidth         = 32;
+    const btScalar PlayFieldHeight        = 64;
+    const btScalar BarrierThickness       = 1;
+    const std::array<btVector3, PlayFieldBarrierCount> PlayFieldBarrierExtents {
+        btVector3(PlayFieldWidth,   BarrierThickness, BarrierThickness), // Top
+        btVector3(BarrierThickness, PlayFieldHeight,  BarrierThickness), // Left
+        btVector3(BarrierThickness, PlayFieldHeight,  BarrierThickness), // Right
     };
-    const std::array<btVector3, WallCount> WallPositions {
-        btVector3(  0, 32, 0), // Ceiling
-        btVector3( 16,  0, 0), // Left wall
-        btVector3(-16,  0, 0), // Right wall
+    const std::array<btVector3, PlayFieldBarrierCount> PlayFieldBarrierPositions {
+        btVector3(                  0,    PlayFieldHeight * 0.5f, 0), // Top
+        btVector3( PlayFieldWidth * 0.5f,                   0,    0), // Left
+        btVector3(-PlayFieldWidth * 0.5f,                   0,    0), // Right
     };
-    const btScalar WallRestitution = 0.6f;
-    std::array<GameObject, WallCount> walls;
-    for (size_t i = 0; i < walls.size(); ++i) {
+    const btScalar PlayFieldBarrierRestitution = 0.6f;
+    std::array<GameObject, PlayFieldBarrierCount> playFieldBarriers;
+    for (size_t i = 0; i < playFieldBarriers.size(); ++i) {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = WallExtents[i];
+        gameObjectBoxCreateInfo.extents = PlayFieldBarrierExtents[i];
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = WallRestitution;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(WallPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &walls[i]);
-        physicsWorld.make_static(walls[i].rigidBody);
+        gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = PlayFieldBarrierRestitution;
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PlayFieldBarrierPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &playFieldBarriers[i]);
+        physicsWorld.make_static(playFieldBarriers[i].rigidBody);
     }
 
     // TODO : Documentation
-
-    // TODO : Documentation
-    const uint32_t BarrierCount = 5;
-    const btScalar BackStopWidth       = CeilingWidth + CeilingWidth * 0.5f;
-    const btScalar BackStopHeight      = WallHeight + WallHeight * 0.18f;
-    const btScalar BackStopDepth       = 1;
-    const btScalar BackStopWallWidth   = 1;
-    const btScalar BackStopWallHeight  = BackStopHeight;
-    const btScalar BackStopWallDepth   = 32;
-    const btScalar BackStopFloorWidth  = BackStopWidth;
-    const btScalar BackStopFloorHeight = 1;
-    const btScalar BackStopFloorDepth  = BackStopWallDepth;
-    const std::array<btVector3, BarrierCount> BackStopExtents {
-        btVector3(BackStopWidth,      BackStopHeight,      BackStopDepth),      // Back
-        btVector3(BackStopWallWidth,  BackStopWallHeight,  BackStopWallDepth),  // Left
-        btVector3(BackStopWallWidth,  BackStopWallHeight,  BackStopWallDepth),  // Right
-        btVector3(BackStopFloorWidth, BackStopFloorHeight, BackStopFloorDepth), // Bottom
-        btVector3(BackStopWidth,      BackStopHeight,      BackStopDepth),      // Front
+    const uint32_t ContainerBarrierCount = 5;
+    const btScalar ContainerWidth  = PlayFieldWidth + PlayFieldWidth * 0.5f;
+    const btScalar ContainerHeight = PlayFieldHeight + PlayFieldHeight * 0.18f;
+    const btScalar ContainerDepth  = 32;
+    const std::array<btVector3, ContainerBarrierCount> ContainerBarrierExtents {
+        btVector3(ContainerWidth,   ContainerHeight,  BarrierThickness), // Back
+        btVector3(BarrierThickness, ContainerHeight,  ContainerDepth),   // Left
+        btVector3(BarrierThickness, ContainerHeight,  ContainerDepth),   // Right
+        btVector3(ContainerWidth,   ContainerHeight,  BarrierThickness), // Front
+        btVector3(ContainerWidth,   BarrierThickness, ContainerDepth),   // Bottom
     };
-    const std::array<btVector3, BarrierCount> BackStopPositions {
-        btVector3(                 0,                      0,     BackStopWallDepth * 0.5f), // Back
-        btVector3( BackStopWidth * 0.5f,                   0,                         0),    // Left
-        btVector3(-BackStopWidth * 0.5f,                   0,                         0),    // Right
-        btVector3(                 0,    -BackStopHeight * 0.5f,                      0),    // Bottom
-        btVector3(                 0,                      0,    -BackStopWallDepth * 0.5f), // Front
+    const std::array<btVector3, ContainerBarrierCount> ContainerBarrierPositions {
+        btVector3(                  0,                       0,     ContainerDepth * 0.5f), // Back
+        btVector3( ContainerWidth * 0.5f,                    0,                      0),    // Left
+        btVector3(-ContainerWidth * 0.5f,                    0,                      0),    // Right
+        btVector3(                  0,                       0,    -ContainerDepth * 0.5f), // Front
+        btVector3(                  0,    -ContainerHeight * 0.5f,                   0),    // Bottom
     };
-    std::array<GameObject, BarrierCount> backStops;
-    for (size_t i = 0; i < backStops.size(); ++i) {
+    std::array<GameObject, ContainerBarrierCount> containerBarriers;
+    for (size_t i = 0; i < containerBarriers.size(); ++i) {
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
-        gameObjectBoxCreateInfo.extents = BackStopExtents[i];
+        gameObjectBoxCreateInfo.extents = ContainerBarrierExtents[i];
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BackStopPositions[i]);
-        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &backStops[i]);
-        physicsWorld.make_static(backStops[i].rigidBody);
+        gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(ContainerBarrierPositions[i]);
+        gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &containerBarriers[i]);
+        physicsWorld.make_static(containerBarriers[i].rigidBody);
     }
 
     // TODO : Documentation
@@ -518,7 +507,7 @@ int main(int, const char* [])
     };
 
     std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
-    const auto PlayAreaWidth = CeilingWidth - WallWidth;
+    const auto PlayAreaWidth = PlayFieldWidth - BarrierThickness;
     const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
     std::unordered_set<GameObject*> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
@@ -681,15 +670,15 @@ int main(int, const char* [])
 
             // TODO : Documentation
             uint32_t liveBallCount = 0;
-            const auto& paddleTransform = paddle.rigidBody.get_transform();
-            auto liveBallMinY = paddleTransform.getOrigin().y();
+            const auto OutOfPlay = -PlayFieldHeight * 0.5f;
+            const auto& paddlePosition = paddle.rigidBody.get_transform().getOrigin();
             for (auto& ball : balls) {
-                const auto& ballTransform = ball.rigidBody.get_transform();
-                if (liveBallMinY < ballTransform.getOrigin().y()) {
+                const auto& ballPosition = ball.rigidBody.get_transform().getOrigin();
+                if (OutOfPlay < ballPosition.y()) {
                     ++liveBallCount;
                     if (physicsWorld.get_collisions().count(dst::physics::make_collision(&ball.rigidBody, &paddle.rigidBody))) {
-                        if (paddleTransform.getOrigin().y() < ballTransform.getOrigin().y()) {
-                            auto impulse = (ballTransform.getOrigin() - paddleTransform.getOrigin()).normalized();
+                        if (paddlePosition.y() < ballPosition.y()) {
+                            auto impulse = (ballPosition - paddlePosition).normalized();
                             impulse *= 64;
                             impulse.setY(64);
                             ball.rigidBody.apply_impulse(impulse);
@@ -710,12 +699,12 @@ int main(int, const char* [])
             celebrationTimer += clock.elapsed<gvk::system::Seconds<float>>();
             if (celebrationTimer < celebrationDuration) {
                 auto index = (size_t)std::round(celebrationTimer / celebrationColorDuration) % celebrationColors.size();
-                for (auto& wall : walls) {
+                for (auto& wall : playFieldBarriers) {
                     wall.color = celebrationColors[index];
                 }
             } else {
                 state = State::GameOver;
-                for (auto& wall : walls) {
+                for (auto& wall : playFieldBarriers) {
                     wall.color = gvk::math::Color::White;
                 }
             }
@@ -793,7 +782,7 @@ int main(int, const char* [])
         // TODO : Documentation
         auto paddleTransform = paddle.rigidBody.get_transform();
         auto paddleX = paddleTransform.getOrigin().x();
-        auto xMax = CeilingWidth * 0.5f - PaddleWidth * 0.5f;
+        auto xMax = PlayFieldWidth * 0.5f - PaddleWidth * 0.5f;
         auto xMin = -xMax;
         paddleTransform.getOrigin().setX(glm::clamp(paddleX, xMin, xMax));
         paddle.rigidBody.set_transform(paddleTransform);
@@ -810,8 +799,9 @@ int main(int, const char* [])
         assert(allocationInfo.pMappedData);
         memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
+        // TODO : Documentation
         paddle.update_uniform_buffer(gfxContext.get_devices()[0]);
-        for (auto& wall : walls) {
+        for (auto& wall : playFieldBarriers) {
             wall.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
         for (auto& brick : bricks) {
@@ -820,8 +810,10 @@ int main(int, const char* [])
         for (auto& ball : balls) {
             ball.update_uniform_buffer(gfxContext.get_devices()[0]);
         }
+
+        // TODO : Documentation
         if (pipeline == wireframePipeline) {
-            for (auto& backStop : backStops) {
+            for (auto& backStop : containerBarriers) {
                 backStop.update_uniform_buffer(gfxContext.get_devices()[0]);
             }
         }
@@ -868,7 +860,7 @@ int main(int, const char* [])
 
             // TODO : Documentation
             paddle.record_cmds(commandBuffer, pipelineLayout);
-            for (auto& wall : walls) {
+            for (auto& wall : playFieldBarriers) {
                 wall.record_cmds(commandBuffer, pipelineLayout);
             }
             for (auto& brick : bricks) {
@@ -877,8 +869,10 @@ int main(int, const char* [])
             for (auto& ball : balls) {
                 ball.record_cmds(commandBuffer, pipelineLayout);
             }
+
+            // TODO : Documentation
             if (pipeline == wireframePipeline) {
-                for (auto& backStop : backStops) {
+                for (auto& backStop : containerBarriers) {
                     backStop.record_cmds(commandBuffer, pipelineLayout);
                 }
             }
