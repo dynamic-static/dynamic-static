@@ -29,8 +29,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static.physics/defines.hpp"
 
+#include "dynamic-static.physics/context.hpp"
+#include "dynamic-static.physics/collider.hpp"
+#include "dynamic-static.physics/rigid-body.hpp"
+#include "dynamic-static.physics/world.hpp"
+#include "dynamic-static.graphics/primitives.hpp"
+
 #include <algorithm>
 #include <iostream>
+#include <vector>
+#include <unordered_map>
 
 class GfxContext final
     : public gvk::Context
@@ -343,4 +351,67 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk:
     vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
     return gvk::Buffer::create(device, &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
+}
+
+VkResult dst_sample_create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
+{
+    std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
+    for (auto& vertex : vertices) {
+        vertex *= radius;
+    }
+    std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles(dst::gfx::primitive::Icosahedron::Triangles.begin(), dst::gfx::primitive::Icosahedron::Triangles.end());
+    std::unordered_map<dst::gfx::primitive::Edge<uint32_t>, uint32_t, dst::gfx::primitive::EdgeHasher<uint32_t>> edges;
+    for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
+        auto triangleCount = (uint32_t)triangles.size();
+        for (uint32_t triangle_i = 0; triangle_i < triangleCount; ++triangle_i) {
+            dst::gfx::primitive::subdivide_triangle(
+                triangles[triangle_i],
+                [&](const dst::gfx::primitive::Edge<uint32_t>& edge)
+                {
+                    auto itr = edges.find(edge);
+                    if (itr == edges.end()) {
+                        vertices.push_back(glm::normalize(vertices[edge[0]] + vertices[edge[1]]) * radius);
+                        itr = edges.insert(itr, { edge, (uint32_t)vertices.size() - 1 });
+                    }
+                    return itr->second;
+                },
+                [&](
+                    const dst::gfx::primitive::Triangle<uint32_t>& subdividedTriangle,
+                    const std::array<dst::gfx::primitive::Triangle<uint32_t>, 3>& newTriangles
+                )
+                {
+                    triangles[triangle_i] = subdividedTriangle;
+                    triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
+                }
+            );
+        }
+    }
+    return pMesh->write(
+        commandBuffer.get<gvk::Device>(),
+        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
+        commandBuffer,
+        VK_NULL_HANDLE,
+        (uint32_t)vertices.size(),
+        vertices.data(),
+        (uint32_t)triangles.size() * 3,
+        triangles[0].data()
+    );
+}
+
+VkResult dst_sample_create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec3& dimensions, gvk::Mesh* pMesh)
+{
+    std::vector<glm::vec3> vertices(dst::gfx::primitive::Cube::Vertices.begin(), dst::gfx::primitive::Cube::Vertices.end());
+    for (auto& vertex : vertices) {
+        vertex *= dimensions;
+    }
+    return pMesh->write(
+        commandBuffer.get<gvk::Device>(),
+        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
+        commandBuffer,
+        VK_NULL_HANDLE,
+        (uint32_t)vertices.size(),
+        vertices.data(),
+        (uint32_t)dst::gfx::primitive::Cube::Triangles.size() * 3,
+        dst::gfx::primitive::Cube::Triangles[0].data()
+    );
 }

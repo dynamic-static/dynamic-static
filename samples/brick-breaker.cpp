@@ -25,86 +25,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "dynamic-static.sample-utilities.hpp"
-#include "dynamic-static.physics/context.hpp"
-#include "dynamic-static.physics/collider.hpp"
-#include "dynamic-static.physics/rigid-body.hpp"
-#include "dynamic-static.physics/world.hpp"
-#include "dynamic-static.graphics/primitives.hpp"
-#include "dynamic-static/finite-state-machine.hpp"
 
-#include <functional>
-#include <iostream>
 #include <map>
-#include <memory>
-#include <set>
-#include <tuple>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include <vector>
-
-VkResult create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
-{
-    std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
-    for (auto& vertex : vertices) {
-        vertex *= radius;
-    }
-    std::vector<dst::gfx::primitive::Triangle<uint32_t>> triangles(dst::gfx::primitive::Icosahedron::Triangles.begin(), dst::gfx::primitive::Icosahedron::Triangles.end());
-    std::unordered_map<dst::gfx::primitive::Edge<uint32_t>, uint32_t, dst::gfx::primitive::EdgeHasher<uint32_t>> edges;
-    for (uint32_t subdivision_i = 0; subdivision_i < subdivisions; ++subdivision_i) {
-        auto triangleCount = (uint32_t)triangles.size();
-        for (uint32_t triangle_i = 0; triangle_i < triangleCount; ++triangle_i) {
-            dst::gfx::primitive::subdivide_triangle(
-                triangles[triangle_i],
-                [&](const dst::gfx::primitive::Edge<uint32_t>& edge)
-                {
-                    auto itr = edges.find(edge);
-                    if (itr == edges.end()) {
-                        vertices.push_back(glm::normalize(vertices[edge[0]] + vertices[edge[1]]) * radius);
-                        itr = edges.insert(itr, { edge, (uint32_t)vertices.size() - 1 });
-                    }
-                    return itr->second;
-                },
-                [&](
-                    const dst::gfx::primitive::Triangle<uint32_t>& subdividedTriangle,
-                    const std::array<dst::gfx::primitive::Triangle<uint32_t>, 3>& newTriangles
-                )
-                {
-                    triangles[triangle_i] = subdividedTriangle;
-                    triangles.insert(triangles.end(), newTriangles.begin(), newTriangles.end());
-                }
-            );
-        }
-    }
-    return pMesh->write(
-        commandBuffer.get<gvk::Device>(),
-        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
-        commandBuffer,
-        VK_NULL_HANDLE,
-        (uint32_t)vertices.size(),
-        vertices.data(),
-        (uint32_t)triangles.size() * 3,
-        triangles[0].data()
-    );
-}
-
-VkResult create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec3& dimensions, gvk::Mesh* pMesh)
-{
-    std::vector<glm::vec3> vertices(dst::gfx::primitive::Cube::Vertices.begin(), dst::gfx::primitive::Cube::Vertices.end());
-    for (auto& vertex : vertices) {
-        vertex *= dimensions;
-    }
-    return pMesh->write(
-        commandBuffer.get<gvk::Device>(),
-        commandBuffer.get<gvk::Device>().get<gvk::QueueFamilies>()[0].queues[0],
-        commandBuffer,
-        VK_NULL_HANDLE,
-        (uint32_t)vertices.size(),
-        vertices.data(),
-        (uint32_t)dst::gfx::primitive::Cube::Triangles.size() * 3,
-        dst::gfx::primitive::Cube::Triangles[0].data()
-    );
-}
 
 VkResult create_pipeline(const gvk::RenderPass& renderPass, VkPolygonMode polygonMode, gvk::Pipeline* pPipeline)
 {
@@ -255,7 +179,7 @@ public:
             auto itr = mBoxResources.find(boxCreateInfo.extents);
             if (itr == mBoxResources.end()) {
                 gvk::Mesh mesh;
-                auto vkResult = create_box_mesh(commandBuffer, { boxCreateInfo.extents.x(), boxCreateInfo.extents.y(), boxCreateInfo.extents.z() }, &mesh);
+                auto vkResult = dst_sample_create_box_mesh(commandBuffer, { boxCreateInfo.extents.x(), boxCreateInfo.extents.y(), boxCreateInfo.extents.z() }, &mesh);
                 assert(vkResult == VK_SUCCESS);
                 (void)vkResult;
                 itr = mBoxResources.insert({ boxCreateInfo.extents, { btBoxShape(boxCreateInfo.extents * 0.5f), mesh } }).first;
@@ -268,7 +192,7 @@ public:
             auto itr = mSphereResources.find(sphereCreateInfo.radius);
             if (itr == mSphereResources.end()) {
                 gvk::Mesh mesh;
-                auto vkResult = create_sphere_mesh(commandBuffer, sphereCreateInfo.radius, 1, &mesh);
+                auto vkResult = dst_sample_create_sphere_mesh(commandBuffer, sphereCreateInfo.radius, 1, &mesh);
                 assert(vkResult == VK_SUCCESS);
                 (void)vkResult;
                 itr = mSphereResources.insert({ sphereCreateInfo.radius, { btSphereShape(sphereCreateInfo.radius), mesh } }).first;
@@ -330,31 +254,6 @@ public:
         }
         return *this;
     }
-
-#if 0
-    void setup_graphics_resources(const gvk::Context& context, const gvk::Mesh& mesh, const gvk::DescriptorSet& descriptorSet, const glm::vec4& color)
-    {
-        mColor = color;
-        mMesh = mesh;
-        mDescriptorSet = descriptorSet;
-        auto vkResult = dst_sample_create_uniform_buffer<ObjectUniforms>(context.get_devices()[0], &mUniformBuffer);
-        assert(vkResult == VK_SUCCESS);
-        auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        descriptorBufferInfo.buffer = mUniformBuffer;
-        auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
-        writeDescriptorSet.descriptorCount = 1;
-        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        writeDescriptorSet.dstSet = descriptorSet;
-        writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-        vkUpdateDescriptorSets(context.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
-    }
-
-    void setup_physics_resources(dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo)
-    {
-        rigidBodyCreateInfo.pUserData = this;
-        dst::physics::RigidBody::create(&rigidBodyCreateInfo, &rigidBody);
-    }
-#endif
 
     void update_uniform_buffer(const gvk::Device& device)
     {
@@ -539,13 +438,6 @@ int main(int, const char* [])
     // TODO : Documentation
     GameObject floor;
     {
-#if 0
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -38, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(FloorWidth, FloorHeight, FloorDepth) * 0.5f);
-        floor.setup_physics_resources(rigidBodyCreateInfo);
-        physicsWorld.make_static(floor.rigidBody);
-#endif
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { FloorWidth, FloorHeight, FloorDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
@@ -602,38 +494,16 @@ int main(int, const char* [])
         gvk::math::Color::Violet,
     };
 
-#if 1
-    gvk::Mesh brickMesh;
-    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { BrickWidth, BrickHeight, BrickDepth }, &brickMesh);
-    assert(vkResult == VK_SUCCESS);
-#endif
-
     std::array<GameObject, BrickRowCount * BrickColumCount> bricks;
     const auto PlayAreaWidth = CeilingWidth - WallWidth;
     const auto BrickAreaWidth = PlayAreaWidth / BrickColumCount;
-    std::set<GameObject*> liveBricks;
+    std::unordered_set<GameObject*> liveBricks;
     for (size_t row_i = 0; row_i < BrickRowColors.size(); ++row_i) {
         auto offset = -PlayAreaWidth * 0.5f + BrickAreaWidth * 0.5f;
         for (size_t brick_i = 0; brick_i < BrickColumCount; ++brick_i) {
             auto& brick = bricks[row_i * BrickColumCount + brick_i];
             btVector3 initialPosition(offset, 30.0f - row_i * BrickHeight * 2.0f, 0);
-#if 0
-            
 
-            gvk::DescriptorSet descriptorSet;
-            vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-            assert(vkResult == VK_SUCCESS);
-            brick.setup_graphics_resources(gfxContext, brickMesh, descriptorSet, BrickRowColors[row_i]);
-
-            dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-            rigidBodyCreateInfo.mass = BrickMass;
-            rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
-            rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
-            brick.setup_physics_resources(rigidBodyCreateInfo);
-
-
-
-#else
             GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
             gameObjectBoxCreateInfo.extents = { BrickWidth, BrickHeight, BrickDepth };
             GameObject::CreateInfo gameObjectCreateInfo { };
@@ -643,13 +513,6 @@ int main(int, const char* [])
             gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &brick);
             brick.color = BrickRowColors[row_i];
 
-            // dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-            // rigidBodyCreateInfo.mass = BrickMass;
-            // rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
-            // gameObjectCreateInfo.rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(BrickWidth, BrickHeight, BrickDepth) * 0.5f);
-            // brick.setup_physics_resources(gameObjectCreateInfo.rigidBodyCreateInfo);
-#endif
-
             offset += BrickAreaWidth;
             physicsWorld.make_static(brick.rigidBody);
             liveBricks.insert(&brick);
@@ -658,30 +521,12 @@ int main(int, const char* [])
     }
 
     // TODO : Documentation
-    gvk::Mesh ballMesh;
-    vkResult = create_sphere_mesh(gfxContext.get_command_buffers()[0], BallRadius, 3, &ballMesh);
-    assert(vkResult == VK_SUCCESS);
     std::array<GameObject, BallCount> balls;
-    std::set<GameObject*> liveBalls;
+    std::unordered_set<GameObject*> liveBalls;
     for (size_t i = 0; i < balls.size(); ++i) {
         auto& ball = balls[i];
-
         btVector3 initialPosition(-16.0f + i * 2.0f, 34, 0);
 
-#if 0
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        ball.setup_graphics_resources(gfxContext, ballMesh, descriptorSet, gvk::math::Color::SlateGray);
-
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.mass = BallMass;
-        rigidBodyCreateInfo.material.restitution = 0.9f;
-        rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
-        rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_sphere_collider(BallRadius);
-        ball.setup_physics_resources(rigidBodyCreateInfo);
-#else
         GameObject::SphereCreateInfo gameObjectSphereCreateInfo { };
         gameObjectSphereCreateInfo.radius = BallRadius;
         GameObject::CreateInfo gameObjectCreateInfo { };
@@ -692,7 +537,6 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(initialPosition);
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &ball);
         ball.color = gvk::math::Color::SlateGray;
-#endif
 
         liveBalls.insert(&ball);
         initialPositions.insert({ (uint64_t)ball.rigidBody.mupRigidBody.get(), initialPosition });
@@ -701,26 +545,8 @@ int main(int, const char* [])
     // TODO : Documentation
     const btScalar PaddleMass = 1;
     const btVector3 PaddlePosition = { 0, -28, 0 };
-    gvk::Mesh paddleMesh;
-    vkResult = create_box_mesh(gfxContext.get_command_buffers()[0], { PaddleWidth, PaddleHeight, PaddleDepth }, &paddleMesh);
-    assert(vkResult == VK_SUCCESS);
     GameObject paddle;
     {
-#if 0
-        gvk::DescriptorSet descriptorSet;
-        vkResult = gvk::DescriptorSet::allocate(gfxContext.get_devices()[0], &descriptorSetAllocateInfo, &descriptorSet);
-        assert(vkResult == VK_SUCCESS);
-        paddle.setup_graphics_resources(gfxContext, paddleMesh, descriptorSet, gvk::math::Color::Brown);
-
-        dst::physics::RigidBody::CreateInfo rigidBodyCreateInfo { };
-        rigidBodyCreateInfo.mass = 1;
-        rigidBodyCreateInfo.linearDamping = 0.4f;
-        rigidBodyCreateInfo.linearFactor = { 1, 0, 0 };
-        rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
-        rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -28, 0 });
-        rigidBodyCreateInfo.pCollisionShape = colliderPool.get_box_collider(btVector3(PaddleWidth, PaddleHeight, PaddleDepth) * 0.5f);
-        paddle.setup_physics_resources(rigidBodyCreateInfo);
-#else
         GameObject::BoxCreateInfo gameObjectBoxCreateInfo { };
         gameObjectBoxCreateInfo.extents = { PaddleWidth, PaddleHeight, PaddleDepth };
         GameObject::CreateInfo gameObjectCreateInfo { };
@@ -731,7 +557,6 @@ int main(int, const char* [])
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectFactory.create_game_object(gfxContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
         paddle.color = gvk::math::Color::Brown;
-#endif
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
 
