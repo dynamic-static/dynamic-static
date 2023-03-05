@@ -23,14 +23,10 @@ dst_add_static_library(
         "${includeDirectory}"
     includeFiles
         "${includePath}/defines.hpp"
-        "${includePath}/collider.hpp"
-        "${includePath}/context.hpp"
         "${includePath}/material.hpp"
         "${includePath}/rigid-body.hpp"
         "${includePath}/world.hpp"
     sourceFiles
-        "${sourcePath}/collider.cpp"
-        "${sourcePath}/context.cpp"
         "${sourcePath}/material.cpp"
         "${sourcePath}/rigid-body.cpp"
         "${sourcePath}/world.cpp"

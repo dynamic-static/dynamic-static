@@ -26,7 +26,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "dynamic-static.physics/collider.hpp"
 #include "dynamic-static.physics/defines.hpp"
 #include "dynamic-static.physics/material.hpp"
 

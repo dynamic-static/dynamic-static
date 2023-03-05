@@ -23,30 +23,11 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
-#if 0
-#include "dynamic-static.physics/collider.hpp"
 
-namespace dst {
-namespace physics {
+#include "dynamic-static/defines.hpp"
 
-btCollisionShape* Collider::Pool::get_box_collider(const btVector3& halfExtents)
+#include "gtest/gtest.h"
+
+TEST(Placeholder, Placeholder)
 {
-    auto itr = mBoxColliders.find(halfExtents);
-    if (itr == mBoxColliders.end()) {
-        itr = mBoxColliders.insert({ halfExtents, btBoxShape(halfExtents) }).first;
-    }
-    return &itr->second;
 }
-
-btCollisionShape* Collider::Pool::get_sphere_collider(btScalar radius)
-{
-    auto itr = mSphereColliders.find(radius);
-    if (itr == mSphereColliders.end()) {
-        itr = mSphereColliders.insert({ radius, btSphereShape(radius) }).first;
-    }
-    return &itr->second;
-}
-
-} // namespace physics
-} // namespace dst
-#endif

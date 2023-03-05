@@ -11,7 +11,6 @@ dst_add_static_library(
         "${includeDirectory}"
     includeFiles
         "${includePath}/defines.hpp"
-        "${includePath}/finite-state-machine.hpp"
     sourceFiles
         "${sourcePath}/placeholder.cpp"
 )
@@ -23,5 +22,5 @@ dst_add_target_test(
     target
         dynamic-static.core
     sourceFiles
-        "${testsPath}/finite-state-machine.tests.cpp"
+        "${testsPath}/placeholder.tests.cpp"
 )
