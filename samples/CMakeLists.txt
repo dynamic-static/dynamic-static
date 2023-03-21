@@ -11,3 +11,4 @@ macro(dst_add_sample target)
 endmacro()
 
 dst_add_sample(brick-breaker)
+# dst_add_sample(shape-shooter)
