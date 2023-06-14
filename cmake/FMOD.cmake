@@ -5,6 +5,7 @@ macro(import_fmod_target target directory)
     set_target_properties(${target} PROPERTIES INCLUDE_DIRECTORIES "${directory}/inc/")
     set_target_properties(${target} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${directory}/inc/")
     set_target_properties(${target} PROPERTIES IMPORTED_LOCATION "${directory}/lib/x64/${target}_vc.lib")
+    set(${target}_SHARED_LIBRARY "${directory}/lib/x64/${target}.dll")
 endmacro()
 
 if(MSVC)
@@ -29,3 +30,4 @@ get_target_property(fsbankIncludeDirectories fsbank INTERFACE_INCLUDE_DIRECTORIE
 message("fsbank INTERFACE_INCLUDE_DIRECTORIES ${fsbankIncludeDirectories}")
 get_target_property(fmodstudioIncludeDirectories fmodstudio INTERFACE_INCLUDE_DIRECTORIES)
 message("fmodstudio INTERFACE_INCLUDE_DIRECTORIES ${fmodstudioIncludeDirectories}")
+list(APPEND fmodSharedLibraries ${fmod_SHARED_LIBRARY} ${fsbank_SHARED_LIBRARY} ${fmodstudio})

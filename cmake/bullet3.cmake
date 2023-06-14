@@ -1,4 +1,9 @@
 
+include_guard()
+
+include(FetchContent)
+
+set(USE_MSVC_RUNTIME_LIBRARY_DLL ON)
 FetchContent_Declare(
     bullet3
     GIT_REPOSITORY "https://github.com/dynamic-static/bullet3.git"

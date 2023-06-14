@@ -3,7 +3,6 @@ include_guard()
 
 include(CMakeParseArguments)
 include(CTest)
-include(FetchContent)
 
 function(dst_create_file_group files)
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
