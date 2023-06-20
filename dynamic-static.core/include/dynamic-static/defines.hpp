@@ -25,3 +25,102 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #pragma once
+
+#include <cassert>
+#include <functional>
+#include <memory>
+#include <unordered_map>
+
+namespace dst {
+
+using TypeId = uint64_t;
+
+template <typename T>
+inline TypeId get_type_id()
+{
+    static T* pId;
+    return (TypeId)&pId;
+}
+
+template <>
+inline TypeId get_type_id<void>()
+{
+    return 0;
+}
+
+template <typename ...UpdateArgsTypes>
+class State
+{
+public:
+    class Machine;
+
+    State() = default;
+    State(State&&) = default;
+    State& operator=(State&&) = default;
+
+    virtual ~State() = 0
+    {
+    }
+
+    virtual void enter(const State* pExiting)
+    {
+        (void)pExiting;
+    }
+
+    virtual void update(State::Machine& stateMachine, UpdateArgsTypes&&...)
+    {
+        (void)stateMachine;
+    }
+
+    virtual void exit(const State* pEntering)
+    {
+        (void)pEntering;
+    }
+
+    class Machine final
+    {
+    public:
+        template <typename StateType, typename ...CtorArgsTypes>
+        inline void add_state(CtorArgsTypes&&... ctorArgs)
+        {
+            auto inserted = mStates.insert({ get_type_id<StateType>(), std::make_unique<StateType>(std::forward<CtorArgsTypes>(ctorArgs)...) }).second;
+            (void)inserted;
+            assert(inserted);
+        }
+
+        template <typename StateType = void>
+        inline void set_state()
+        {
+            auto pExiting = mpState;
+            auto itr = mStates.find(get_type_id<StateType>());
+            auto pEntering = itr != mStates.end() ? itr->second.get() : nullptr;
+
+            if (pExiting) {
+                pExiting->exit(pEntering);
+            }
+
+            mpState = pEntering;
+
+            if (pEntering) {
+                pEntering->enter(pExiting);
+            }
+        }
+
+        inline void update(UpdateArgsTypes&&... updateArgs)
+        {
+            if (mpState) {
+                mpState->update(*this, std::forward<UpdateArgsTypes>(updateArgs)...);
+            }
+        }
+
+    private:
+        std::unordered_map<TypeId, std::unique_ptr<State>> mStates;
+        State* mpState { };
+    };
+
+private:
+    State(const State&) = delete;
+    State& operator=(const State&) = delete;
+};
+
+} // namespace dst

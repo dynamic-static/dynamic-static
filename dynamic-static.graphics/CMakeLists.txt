@@ -9,13 +9,16 @@ dst_add_static_library(
         dynamic-static.graphics
     linkLibraries
         gvk
+        stb
     includeDirectories
         "${includeDirectory}"
     includeFiles
         "${includePath}/defines.hpp"
         "${includePath}/primitives.hpp"
+        "${includePath}/sprite.hpp"
     sourceFiles
         "${sourcePath}/placeholder.cpp"
+        "${sourcePath}/sprite.cpp"
 )
 
 ################################################################################

@@ -2,6 +2,8 @@
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 set(CMAKE_CXX_STANDARD 20)
 project(dynamic-static)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
+include(dynamic-static.build)
 set(DST_IDE_FOLDER "" CACHE STRING "")
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     set(DST_STANDALONE ON)
@@ -26,23 +28,17 @@ option                (DST_CREATE_SOURCE_PACKAGE "" OFF)
 cmake_dependent_option(DST_CREATE_TEST_PACKAGE   "" OFF "DST_BUILD_TESTS" OFF)
 
 ################################################################################
-# CMake utilities
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/dynamic-static.build.cmake")
-
-################################################################################
 # Dependencies
-if(DST_BUILD_TESTS)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/googletest.cmake")
-endif()
-if(DST_BULLET_ENABLED)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/bullet3.cmake")
-endif()
-if(DST_FMOD_ENABLED)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FMOD.cmake")
-endif()
-if(DST_GVK_ENABLED)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/gvk.cmake")
-endif()
+macro(dst_include_depenedency enabled dependency)
+    if(${enabled})
+        include(${dependency})
+    endif()
+endmacro()
+
+dst_include_depenedency(DST_BUILD_TESTS    googletest)
+dst_include_depenedency(DST_BULLET_ENABLED bullet3)
+dst_include_depenedency(DST_FMOD_ENABLED   FMOD)
+dst_include_depenedency(DST_GVK_ENABLED    gvk)
 
 ################################################################################
 # Modules
