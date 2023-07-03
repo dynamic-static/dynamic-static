@@ -26,6 +26,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.sample-utilities.hpp"
 
+#include "dynamic-static/text.hpp"
+#include "dynamic-static.graphics/text.hpp"
+
 #include "stb/stb_image.h"
 
 #include <map>
@@ -330,6 +333,12 @@ int main(int, const char* [])
     shape_shooter::GameInfo gameInfo { };
     gameStateMachine.update(gameInfo);
 
+#if 0
+    dst::Image<> image;
+    auto& texel = image[{ 16, 32 }];
+    (void)texel;
+#endif
+
     // Create a gvk::Context.  This will initialize a VkInstance and VkDevice.
     gvk::Context gvkContext;
     dst_vk_result(dst_sample_create_gvk_context("dynamic-static - Shape Shooter", &gvkContext));
@@ -338,6 +347,16 @@ int main(int, const char* [])
 
     auto images = load_images(gvkContext);
     (void)images;
+
+    std::shared_ptr<dst::text::Font> spFont;
+    dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, &spFont);
+    dst::gfx::Renderer<dst::text::Font> fontRenderer;
+    dst::gfx::Renderer<dst::text::Font>::create(VK_NULL_HANDLE, *spFont, &fontRenderer);
+
+    dst::text::Mesh textMesh;
+    textMesh.set_font(spFont);
+    textMesh.set_text("The quick brown fox");
+    // textMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>();
 
 #if 0
     FMOD::System* pFmodSystem = nullptr;

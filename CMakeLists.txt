@@ -39,6 +39,7 @@ dst_include_depenedency(DST_BUILD_TESTS    googletest)
 dst_include_depenedency(DST_BULLET_ENABLED bullet3)
 dst_include_depenedency(DST_FMOD_ENABLED   FMOD)
 dst_include_depenedency(DST_GVK_ENABLED    gvk)
+dst_include_depenedency(ON                 stb_truetype)
 
 ################################################################################
 # Modules

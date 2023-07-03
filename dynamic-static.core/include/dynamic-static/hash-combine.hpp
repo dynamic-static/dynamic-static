@@ -26,5 +26,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <cassert>
-#include <cstdint>
+#include "dynamic-static/defines.hpp"
+
+#include <functional>
+
+namespace dst {
+
+
+
+} // namespace dst

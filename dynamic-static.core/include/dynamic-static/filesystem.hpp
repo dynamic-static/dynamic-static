@@ -26,5 +26,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <cassert>
-#include <cstdint>
+#include "dynamic-static/defines.hpp"
+
+#include <filesystem>
+#include <vector>
+
+namespace dst {
+
+/**
+TODO : Documentation
+*/
+void read_bytes(const std::filesystem::path& filePath, std::vector<uint8_t>& bytes);
+
+/**
+TODO : Documentation
+*/
+std::vector<uint8_t> read_bytes(const std::filesystem::path& filePath);
+
+} // namespace dst

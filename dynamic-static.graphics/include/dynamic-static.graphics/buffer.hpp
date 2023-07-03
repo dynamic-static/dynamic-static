@@ -26,5 +26,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <cassert>
-#include <cstdint>
+#include "dynamic-static.graphics/defines.hpp"
+
+namespace dst {
+namespace gfx {
+
+class ResizableBuffer final
+{
+public:
+    static VkResult create(const gvk::Device& device, const VkBufferCreateInfo* pCreateInfo, const VmaAllocationCreateInfo* pAllocationCreateInfo, ResizableBuffer* pResizableBuffer);
+    const gvk::Buffer& buffer() const;
+    VkBool32 empty() const;
+    VkDeviceSize size() const;
+    VkResult resize(VkDeviceSize size);
+    void clear();
+
+private:
+    VkDeviceSize mSize { };
+    VmaAllocationCreateInfo mAllocationCreateInfo { };
+    gvk::Buffer mBuffer;
+};
+
+} // namespace gfx
+} // namespace dst

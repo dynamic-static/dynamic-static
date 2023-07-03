@@ -26,5 +26,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <cassert>
-#include <cstdint>
+#include "dynamic-static/defines.hpp"
+
+namespace dst {
+
+using TypeId = uint64_t;
+
+template <typename T>
+inline TypeId get_type_id()
+{
+    static T* pId;
+    return (TypeId)&pId;
+}
+
+template <>
+inline TypeId get_type_id<void>()
+{
+    return 0;
+}
+
+} // namespace dst

@@ -8,17 +8,24 @@ dst_add_static_library(
     target
         dynamic-static.graphics
     linkLibraries
+        dynamic-static.core
         gvk
         stb
     includeDirectories
         "${includeDirectory}"
     includeFiles
+        "${includePath}/buffer.hpp"
+        "${includePath}/mesh.hpp"
         "${includePath}/defines.hpp"
         "${includePath}/primitives.hpp"
         "${includePath}/sprite.hpp"
+        "${includePath}/text.hpp"
     sourceFiles
+        "${sourcePath}/buffer.cpp"
+        "${sourcePath}/mesh.cpp"
         "${sourcePath}/placeholder.cpp"
         "${sourcePath}/sprite.cpp"
+        "${sourcePath}/text.cpp"
 )
 
 ################################################################################
