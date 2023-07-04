@@ -29,6 +29,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static/text.hpp"
 
+namespace gvk {
+
+template <>
+inline auto get_vertex_description<dst::text::Mesh::Vertex>(uint32_t binding)
+{
+    return gvk::get_vertex_input_attribute_descriptions<
+        glm::vec3,
+        glm::vec2,
+        glm::vec4
+    >(binding);
+}
+
+} // namespace gvk
+
 namespace dst {
 namespace gfx {
 
@@ -41,14 +55,14 @@ template <>
 class Renderer<dst::text::Font> final
 {
 public:
-    static VkResult create(const gvk::DescriptorPool& descriptorPool, const dst::text::Font& font, Renderer<dst::text::Font>* pRenderer);
+    static VkResult create(const dst::text::Font& font, const gvk::RenderPass& renderPass, Renderer<dst::text::Font>* pRenderer);
 
     void record_bind_cmds(const gvk::CommandBuffer& commandBuffer);
 
 private:
-    VkResult create_pipline(const gvk::Device& device, const dst::text::Font& font);
+    VkResult create_pipline(const gvk::RenderPass& renderPass, const dst::text::Font& font);
     VkResult create_image_views(const gvk::Device& device, const dst::text::Font& font);
-    VkResult allocate_descriptor_set(const gvk::Device& device, const gvk::DescriptorPool& descriptorPool);
+    VkResult allocate_descriptor_sets(const gvk::Device& device);
     void update_descriptor_set(const gvk::Device& device);
 
     gvk::Pipeline mPipeline;
@@ -58,9 +72,10 @@ private:
 
 template <>
 class Renderer<dst::text::Mesh> final
+    : public dst::text::Mesh::Renderer
 {
 public:
-    static VkResult create(Renderer<dst::text::Mesh>* pRenderer);
+    static VkResult create(const dst::text::Mesh& textMesh, Renderer<dst::text::Mesh>* pRenderer);
 
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer);
 

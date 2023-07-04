@@ -34,6 +34,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <array>
 #include <cassert>
 #include <cstring>
+#include <fstream>
 #include <vector>
 
 namespace dst {
@@ -105,7 +106,7 @@ public:
     {
         clear();
         mExtent = extent;
-        if (mExtent[0] && mExtent[1] && mExtent[2]) {
+        if (mExtent[0] || mExtent[1] || mExtent[2]) {
             mExtent[0] = std::max(1u, extent[0]);
             mExtent[1] = std::max(1u, extent[1]);
             mExtent[2] = std::max(1u, extent[2]);
@@ -124,14 +125,12 @@ private:
     std::vector<TexelType> mTexels { };
 };
 
-#if 0
 inline bool save_png(const char* pFilePath, const Image<>& image)
 {
     assert(pFilePath);
     assert(image.empty());
     stbi_write_png(pFilePath, image.get_extent()[0], image.get_extent()[1], 1, image.data());
 }
-#endif
 
 inline bool load_png(const char* pFilePath, Image<>* pImage)
 {

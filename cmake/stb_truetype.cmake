@@ -35,6 +35,7 @@ macro(add_stb_file stbFile implementationMacro)
 endmacro()
 
 add_stb_file(stb_truetype STB_TRUETYPE_IMPLEMENTATION)
+add_stb_file(stb_image_write STB_IMAGE_WRITE_IMPLEMENTATION)
 
 dst_add_static_library(
     target stb_truetype

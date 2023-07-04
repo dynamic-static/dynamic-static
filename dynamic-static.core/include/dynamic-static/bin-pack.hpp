@@ -144,23 +144,41 @@ inline void bin_pack(BinPackInfo* pInfo, size_t entryCount, BinPackEntry<T>* pEn
     pRoot->cell.height = pInfo->height;
     for (size_t i = 0; i < entryCount; ++i) {
         auto& entry = pEntries[i];
+        auto pPage = pRoot.get();
+        while (!pPage->insert(entry)) {
+            if (!pPage->pNextPage) {
+                pPage->pNextPage = std::make_unique<detail::BinPackNode>();
+                pPage->pNextPage->cell.width = pInfo->width;
+                pPage->pNextPage->cell.height = pInfo->height;
+            }
+            pPage = pPage->pNextPage.get();
+            ++entry.page;
+        }
+        pInfo->pageCount = std::max(pInfo->pageCount, entry.page + 1);
+#if 0
         if (!pRoot->insert(entry)) {
-            int page = 0;
+            auto pPage = pRoot.get();
+            while (pPage->pNextPage) {
+                pPage = pPage->pNextPage;
+                
+            }
+
             auto pNode = pRoot.get();
             while (pNode->pNextPage) {
                 pNode = pNode->pNextPage.get();
-                ++page;
+                ++entry.page;
             }
             if (!pNode->insert(entry)) {
                 // TODO : Auto grow to limit
-                ++page;
                 pNode->pNextPage = std::make_unique<detail::BinPackNode>();
                 pNode->pNextPage->cell.width = pInfo->width;
                 pNode->pNextPage->cell.height = pInfo->height;
                 pNode->pNextPage->insert(entry);
+                ++entry.page;
             }
-            entry.page = page;
+            pInfo->pageCount = std::max(pInfo->pageCount, entry.page + 1);
         }
+#endif
     }
 
     // Remove padding

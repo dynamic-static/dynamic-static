@@ -348,16 +348,6 @@ int main(int, const char* [])
     auto images = load_images(gvkContext);
     (void)images;
 
-    std::shared_ptr<dst::text::Font> spFont;
-    dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, &spFont);
-    dst::gfx::Renderer<dst::text::Font> fontRenderer;
-    dst::gfx::Renderer<dst::text::Font>::create(VK_NULL_HANDLE, *spFont, &fontRenderer);
-
-    dst::text::Mesh textMesh;
-    textMesh.set_font(spFont);
-    textMesh.set_text("The quick brown fox");
-    // textMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>();
-
 #if 0
     FMOD::System* pFmodSystem = nullptr;
     auto fmodResult = FMOD::System_Create(&pFmodSystem);
@@ -420,6 +410,27 @@ int main(int, const char* [])
     wsiManagerCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
     gvk::WsiManager wsiManager;
     dst_vk_result(gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager));
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+
+
+    std::shared_ptr<dst::text::Font> spFont;
+    dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 16, &spFont);
+    dst::gfx::Renderer<dst::text::Font> fontRenderer;
+    dst::gfx::Renderer<dst::text::Font>::create(*spFont, wsiManager.get_render_pass(), &fontRenderer);
+
+    dst::text::Mesh textMesh;
+    textMesh.set_font(spFont);
+    textMesh.set_text("The quick brown fox");
+    textMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(
+        [&](const auto& /*textMesh*/, auto& renderer)
+        {
+            return dst::gfx::Renderer<dst::text::Mesh>::create(textMesh, &renderer);
+        }
+    );
+
+    ///////////////////////////////////////////////////////////////////////////////
 
     while (
         !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&

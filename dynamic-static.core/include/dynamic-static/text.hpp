@@ -37,6 +37,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -95,115 +96,14 @@ public:
         "0123456789"
     };
 
-    inline static void create(const char* pFilePath, const char* pCharacterSet, std::shared_ptr<Font>* pspFont)
-    {
-        assert(pFilePath);
-        assert(pspFont);
-        if (!pCharacterSet) {
-            pCharacterSet = DefaultCharacterSet;
-        }
-        *pspFont = std::make_shared<Font>();
-        auto& font = **pspFont;
-        stbtt_fontinfo fontInfo { };
-        auto ttfBytes = read_bytes(pFilePath);
-        if (stbtt_InitFont(&fontInfo, ttfBytes.data(), 0)) {
-            // auto scale = stbtt_ScaleForPixelHeight(&fontInfo, pFont->mLineHeight);
-            auto scale = stbtt_ScaleForPixelHeight(&fontInfo, 64);
-            int ascent, descent, lineGap;
-            stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
-            font.mAscent = ascent * scale;
-            font.mDescent = descent * scale;
-            font.mLineHeight = lineGap * scale;
-
-            // TODO : Documentation
-            std::set<char> characters;
-            std::vector<BinPackEntry<char>> binPackEntries;
-            auto pChar = pCharacterSet;
-            while (*pChar) {
-                if (characters.insert(*pChar).second) {
-                    // TODO : Remove control characters
-                    // TODO : Remove characters not present in font
-                    int ix0, iy0, ix1, iy1;
-                    stbtt_GetCodepointBitmapBox(&fontInfo, (int)*pChar, scale, scale, &ix0, &iy0, &ix1, &iy1);
-                    BinPackEntry<char> binPackEntry { };
-                    binPackEntry.cell.width = ix1 - ix0;
-                    binPackEntry.cell.height = iy1 - iy0;
-                    binPackEntry.value = *pChar;
-                    binPackEntries.push_back(binPackEntry);
-                }
-                ++pChar;
-            }
-
-            // TODO : Documentation
-            BinPackInfo binPackInfo { };
-            bin_pack(&binPackInfo, binPackEntries.size(), binPackEntries.data());
-
-            // TODO : Documentation
-            font.mAtlas.width = binPackInfo.width;
-            font.mAtlas.height = binPackInfo.height;
-            font.mAtlas.pages.resize(binPackInfo.pageCount, Image<R8G8B8A8Unorm>({ font.mAtlas.width, font.mAtlas.height }));
-
-            // TODO : Documentation
-            for (const auto& binPackEntry : binPackEntries) {
-                // TODO : Documentation
-                assert(binPackEntry.page < font.mAtlas.pages.size());
-                auto& page = font.mAtlas.pages[binPackEntry.page];
-                const auto& cell = binPackEntry.cell;
-                auto u = (uint32_t)cell.x + 2;
-                auto v = (uint32_t)cell.y + 2;
-                auto pData = (unsigned char*)&page[{ u, v }];
-                auto stride = page.get_extent()[0];
-                auto codepoint = (int32_t)binPackEntry.value;
-                stbtt_MakeCodepointBitmap(&fontInfo, pData, cell.width, cell.height, stride, scale, scale, codepoint);
-
-                // TODO : Documentation
-                int advanceWidth, leftSideBearing;
-                stbtt_GetCodepointHMetrics(&fontInfo, codepoint, &advanceWidth, &leftSideBearing);
-                int ix0, iy0, ix1, iy1;
-                stbtt_GetCodepointBitmapBox(&fontInfo, (int)*pChar, scale, scale, &ix0, &iy0, &ix1, &iy1);
-
-                // TODO : Documentation
-                Glyph glyph { };
-                glyph.codepoint = codepoint;
-                glyph.page = binPackEntry.page;
-                glyph.texcoord.x = (cell.x + 2 + cell.width * 0.5f) / (float)page.get_extent()[0];
-                glyph.texcoord.y = (cell.y + 2 + cell.height * 0.5f) / (float)page.get_extent()[1];
-                glyph.extent = { (float)cell.width, (float)cell.height };
-                glyph.offset = { (float)ix0 * scale, (float)iy0 * scale };
-                glyph.xAdvance = (float)advanceWidth * scale;
-                font.mGlyphs.insert({ glyph.codepoint, glyph });
-            }
-
-            // TODO : Documentation
-            for (auto ch0 : characters) {
-                for (auto ch1 : characters) {
-                    auto kerning = stbtt_GetCodepointKernAdvance(&fontInfo, ch0, ch1);
-                    if (kerning) {
-                        // font.mKerningPairs[{ ch0, ch1 }] = kerning * scale;
-                    }
-                }
-            }
-        }
-    }
-
-    inline float get_ascent() const { return mAscent; }
-    inline float get_descent() const { return mDescent; }
-    inline float get_line_height() const { return mLineHeight; }
-    inline float get_base_line() const { return mBaseLine; }
-    inline const Atlas& get_atlas() const { return mAtlas; }
-
-    inline const Glyph& get_glyph(int32_t codepoint) const
-    {
-        static const Glyph NullGlyph;
-        auto itr = mGlyphs.find(codepoint);
-        return itr != mGlyphs.end() ? itr->second : NullGlyph;
-    }
-
-    inline float get_kerning(int32_t lhsCodepoint, int32_t rhsCodepoint) const
-    {
-        auto itr = mKerningPairs.find({ lhsCodepoint, rhsCodepoint });
-        return itr != mKerningPairs.end() ? itr->second : 0;
-    }
+    static void create(const char* pFilePath, const char* pCharacterSet, float size, std::shared_ptr<Font>* pspFont);
+    float get_ascent() const;
+    float get_descent() const;
+    float get_line_height() const;
+    float get_base_line() const;
+    const Atlas& get_atlas() const;
+    const Glyph& get_glyph(int32_t codepoint) const;
+    float get_kerning(int32_t lhsCodepoint, int32_t rhsCodepoint) const;
 
 private:
     float mAscent { };
@@ -214,52 +114,6 @@ private:
     std::unordered_map<int32_t, Glyph> mGlyphs;
     std::map<std::pair<int32_t, int32_t>, float> mKerningPairs;
 };
-
-#if 0
-class Layout final
-{
-public:
-    template <typename AtlasType, typename ProcessGlyphFunctionType>
-    inline void update(const Font& font, const char* pText, ProcessGlyphFunctionType processGlyph)
-    {
-        using vec2 = std::array<float, 2>;
-        auto add = [](const vec2& lhs, const vec2& rhs) { return vec2 { lhs[0] + rhs[0], lhs[1] + rhs[1] }; };
-        auto sub = [](const vec2& lhs, const vec2& rhs) { return vec2 { lhs[0] - rhs[0], lhs[1] - rhs[1] }; };
-        auto mul = [](const vec2& lhs, const vec2& rhs) { return vec2 { lhs[0] * rhs[0], lhs[1] * rhs[1] }; };
-
-        vec2 scale { 1, 1 };
-
-        vec2 cursor { };
-        std::array<vec2, 4> vertices { };
-        std::array<vec2, 4> texcoords { };
-        std::array<uint16_t, 6> indices { };
-
-        char* pPrev = nullptr;
-        while (*pText) {
-            if (pPrev) {
-
-            }
-
-            const auto& glyph = font.get_glyph();
-            auto w = glyph.width * 0.5f;
-            auto h = glyph.height * 0.5f;
-            auto xOffset = glyph.xOffset + w;
-            auto yOffset = glyph.yOffset + h;
-#if 0
-            vec2 extent { glyph.width * 0.5f, glyph.height * 0.5f };
-            vec2 offset { glyph.xOffset + extent[0], glyph.yOffset + extent[1] };
-#endif
-            vertices[0] = add(cursor, mul({ -w + xOffset,  h - yOffset }, scale));
-            vertices[1] = add(cursor, mul({  w + xOffset,  h - yOffset }, scale));
-            vertices[2] = add(cursor, mul({  w + xOffset, -h - yOffset }, scale));
-            vertices[3] = add(cursor, mul({ -w + xOffset, -h - yOffset }, scale));
-            float kerning = 0;
-
-            ++pText;
-        }
-    }
-};
-#endif
 
 class Mesh final
 {
@@ -274,6 +128,7 @@ public:
     class Controller
     {
     public:
+        virtual ~Controller() = 0;
         virtual void update(float deltaTime, const Mesh& mesh, size_t i, std::array<Vertex, 4>& vertices);
         virtual void update(float deltaTime, const Mesh& mesh, std::vector<Vertex>& vertices);
     };
@@ -281,6 +136,7 @@ public:
     class Renderer
     {
     public:
+        virtual ~Renderer() = 0;
         virtual void update(float deltaTime, const Mesh& mesh);
     };
 
@@ -300,55 +156,44 @@ public:
     void set_color(const glm::vec4& color);
     const std::vector<std::unique_ptr<Controller>>& get_controllers() const;
     const std::vector<std::unique_ptr<Renderer>>& get_renderers() const;
-
-    template <typename ControllerType, typename ReturnType, typename ...ControllerCreateArgsTypes>
-    inline ReturnType create_controller(ControllerCreateArgsTypes&&... args)
-    {
-        return create_component(mControllers, std::forward<ControllerCreateArgsTypes>(args)...);
-    }
-
-    inline void destroy_controller(const Controller* pController)
-    {
-        destroy_component(mControllers, pController);
-    }
-
-    template <typename RendererType, typename ReturnType, typename ...RenderCreateArgsTypes>
-    inline ReturnType create_renderer(RenderCreateArgsTypes&&... args)
-    {
-        return create_component(mRenderers, std::forward<RenderCreateArgsTypes>(args)...);
-    }
-
-    inline void destroy_renderer(const Renderer* pRenderer)
-    {
-        destroy_component(mRenderers, pRenderer);
-    }
-
+    void destroy_controller(const Controller* pController);
+    void destroy_renderer(const Renderer* pRenderer);
     void update(float deltaTime);
+
+    template <typename ControllerType, typename CreateControllerFunctionType>
+    inline auto create_controller(CreateControllerFunctionType createController)
+    {
+        return create_component<ControllerType>(mControllers, createController);
+    }
+
+    template <typename RendererType, typename CreateRendererFunctionType>
+    inline auto create_renderer(CreateRendererFunctionType createRenderer)
+    {
+        return create_component<RendererType>(mRenderers, createRenderer);
+    }
 
 private:
     template <typename T>
     void set_member_value(const T& value, T& member);
 
-    template <typename CollectionType, typename ComponentType, typename ...ComponentCreateArgsTypes>
-    inline void create_component(CollectionType& collection, ComponentCreateArgsTypes&&... args)
+    template <typename ComponentType, typename CollectionType, typename CreateComponentFunctionType>
+    inline auto create_component(CollectionType& collection, CreateComponentFunctionType createComponent)
     {
         mUpdate = true;
-        auto pComponent = collection.emplace_back(std::make_unique<ComponentType>()).get();
-        return ComponentType::create(std::forward<ComponentCreateArgsTypes>(args)..., pComponent);
+        collection.push_back(std::make_unique<ComponentType>());
+        // collection.emplace_back(std::make_unique<ComponentType>());
+        return createComponent(const_cast<const Mesh&>(*this), (ComponentType&)*collection.back());
     }
 
-    template <typename CollectionType, typename ComponentType>
+    template <typename ComponentType, typename CollectionType>
     inline void destroy_component(CollectionType& collection, const ComponentType* pComponent)
     {
-        (void)collection;
-        (void)pComponent;
-#if 0
-        auto itr = std::find_if(collection.begin(), collection.end(), [&](auto component) { return component.get() == pComponent; });
+        auto predicate = [&](const auto& upComponent) { return upComponent.get() == pComponent; };
+        auto itr = std::find_if(collection.begin(), collection.end(), predicate);
         if (itr != collection.end()) {
             collection.erase(itr);
             mUpdate = true;
         }
-#endif
     }
 
     std::string mText;
