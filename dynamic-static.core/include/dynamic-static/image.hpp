@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "stb/stb_image.h"
 
+
 #include <algorithm>
 #include <array>
 #include <cassert>
