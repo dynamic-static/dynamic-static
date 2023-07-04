@@ -209,10 +209,20 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
 
 VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Device& device, const dst::text::Font& font)
 {
-    (void)font;
     assert(device);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk_result(VK_ERROR_INITIALIZATION_FAILED);
+        mImageViews.reserve(font.get_atlas().pages.size());
+        for (const auto& page : font.get_atlas().pages) {
+            auto imageCreateInfo = gvk::get_default<VkImageCreateInfo>();
+            imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+            imageCreateInfo.extent.width = page.get_extent()[0];
+            imageCreateInfo.extent.height = page.get_extent()[1];
+            imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
+            gvk::Image image;
+            gvk_result(gvk::Image::create(device, &imageCreateInfo, &allocationCreateInfo, &image));
+        }
     } gvk_result_scope_end;
     return gvkResult;
 }
