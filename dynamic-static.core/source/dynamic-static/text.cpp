@@ -126,6 +126,9 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
         font.mAtlas.height = binPackInfo.height;
         font.mAtlas.pages.resize(binPackInfo.pageCount, Image<R8G8B8A8Unorm>({ font.mAtlas.width, font.mAtlas.height }));
 
+        // TODO : Documentaiton
+        std::vector<uint8_t> bitmap;
+
         // TODO : Documentation
         for (const auto& binPackEntry : binPackEntries) {
 
@@ -135,12 +138,21 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             assert(binPackEntry.page < font.mAtlas.pages.size());
             auto& page = font.mAtlas.pages[binPackEntry.page];
             const auto& cell = binPackEntry.cell;
-            auto u = (uint32_t)cell.x + 2;
-            auto v = (uint32_t)cell.y + 2;
-            auto pData = (unsigned char*)&page[{ u, v }];
-            auto stride = page.get_extent()[0];
+            bitmap.resize((size_t)cell.width * cell.height);
             auto codepoint = (int32_t)binPackEntry.value;
-            stbtt_MakeCodepointBitmap(&fontInfo, pData, cell.width, cell.height, stride, scale, scale, codepoint);
+            stbtt_MakeCodepointBitmap(&fontInfo, bitmap.data(), cell.width, cell.height, cell.width, scale, scale, codepoint);
+
+            // TODO : Documentation
+            for (int y = 0; y < cell.height; ++y) {
+                for (int x = 0; x < cell.width; ++x) {
+                    auto u = (uint32_t)cell.x + 2 + x;
+                    auto v = (uint32_t)cell.y + 2 + y;
+                    auto value = bitmap[(size_t)y * cell.width + x];
+                    auto& texel = page[{ u, v}];
+                    texel[0] = value;
+                    texel[3] = value;
+                }
+            }
 
             // TODO : Documentation
             int advanceWidth, leftSideBearing;
@@ -158,6 +170,11 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             glyph.offset = { (float)ix0 * scale, (float)iy0 * scale };
             glyph.xAdvance = (float)advanceWidth * scale;
             font.mGlyphs.insert({ glyph.codepoint, glyph });
+        }
+
+        for (size_t i = 0; i < font.mAtlas.pages.size(); ++i) {
+            auto filePath = "D:/Development/dynamic-static/dynamic-static/build/atlas/atlas-" + std::to_string(i) + ".png";
+            dst::save_png(filePath.c_str(), font.mAtlas.pages[i]);
         }
 
         // TODO : Documentation

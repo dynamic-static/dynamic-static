@@ -74,11 +74,11 @@ public:
     {
         assert((pLeft == nullptr) == (pRight == nullptr));
         BinPackNode* pNode = nullptr;
-        if (pLeft) {
+        if (pLeft || pRight) {
             auto insertLeft = pLeft->cell.area() < pRight->cell.area();
             pNode = insertLeft ? pLeft->insert(entry) : pRight->insert(entry);
             if (!pNode) {
-                insertLeft ? pRight->insert(entry) : pLeft->insert(entry);
+                pNode = insertLeft ? pRight->insert(entry) : pLeft->insert(entry);
             }
         } else if (!occupied && entry.cell.width <= cell.width && entry.cell.height <= cell.height) {
             pLeft = std::make_unique<BinPackNode>();

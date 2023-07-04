@@ -29,7 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static/defines.hpp"
 
 #include "stb/stb_image.h"
-
+#include "stb/stb_image_write.h"
 
 #include <algorithm>
 #include <array>
@@ -48,6 +48,8 @@ template <typename TexelType = R8G8B8A8Unorm>
 class Image final
 {
 public:
+    using Texel = TexelType;
+
     Image(const Extent3D& extent = { }, const uint8_t* pData = nullptr)
     {
         resize(extent, pData);
@@ -129,8 +131,9 @@ private:
 inline bool save_png(const char* pFilePath, const Image<>& image)
 {
     assert(pFilePath);
-    assert(image.empty());
-    stbi_write_png(pFilePath, image.get_extent()[0], image.get_extent()[1], 1, image.data());
+    assert(!image.empty());
+    auto stride = sizeof(Image<>::Texel) * image.get_extent()[0];
+    return stbi_write_png(pFilePath, (int)image.get_extent()[0], (int)image.get_extent()[1], 4, image.data(), (int)stride);
 }
 
 inline bool load_png(const char* pFilePath, Image<>* pImage)

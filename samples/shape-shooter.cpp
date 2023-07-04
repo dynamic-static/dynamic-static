@@ -416,7 +416,7 @@ int main(int, const char* [])
 
 
     std::shared_ptr<dst::text::Font> spFont;
-    dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 16, &spFont);
+    dst::text::Font::create("C:\\Windows\\Fonts\\alger.ttf", nullptr, 256, &spFont);
     dst::gfx::Renderer<dst::text::Font> fontRenderer;
     dst::gfx::Renderer<dst::text::Font>::create(*spFont, wsiManager.get_render_pass(), &fontRenderer);
 
