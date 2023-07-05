@@ -28,21 +28,59 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <iostream>
 
+template <typename FunctionType>
+inline VkResult dvk_result_scope(FunctionType function)
+{
+    return function();
+}
+
+#ifndef dvk_error
+#define dvk_error(DVK_RESULT, DVK_CALL) \
+assert(DVK_RESULT == VK_SUCCESS && #DVK_CALL);
+#endif
+
+#define dvk_result_scope_begin(DVK_RESULT)  \
+dvk_result_scope([&]()                      \
+{                                           \
+    auto dvkResult = DVK_RESULT;            \
+
+#define dvk_result(DVK_CALL)            \
+{                                       \
+    dvkResult = (DVK_CALL);             \
+    if (dvkResult != VK_SUCCESS) {      \
+        dvk_error(dvkResult, DVK_CALL); \
+        return dvkResult;               \
+    }                                   \
+}
+
+#define dvk_result_scope_end \
+        return dvkResult;    \
+    }                        \
+);
+
 namespace dst {
 namespace gfx {
 
-VkResult Renderer<dst::text::Font>::create(const dst::text::Font& font, const gvk::RenderPass& renderPass, Renderer<dst::text::Font>* pRenderer)
+VkResult Renderer<dst::text::Font>::create(const gvk::Context& context, const gvk::RenderPass& renderPass, const dst::text::Font& font, Renderer<dst::text::Font>* pRenderer)
 {
     assert(renderPass);
     assert(pRenderer);
+    return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        dvk_result(pRenderer->create_pipline(renderPass, font));
+        dvk_result(pRenderer->create_image_views(context, font));
+        dvk_result(pRenderer->allocate_descriptor_sets());
+        pRenderer->update_descriptor_sets();
+    } dvk_result_scope_end;
+#if 0
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         const auto& device = renderPass.get<gvk::Device>();
         gvk_result(pRenderer->create_pipline(renderPass, font));
-        gvk_result(pRenderer->create_image_views(device, font));
+        gvk_result(pRenderer->create_image_views(context, font));
         gvk_result(pRenderer->allocate_descriptor_sets(device));
-        pRenderer->update_descriptor_set(device);
+        pRenderer->update_descriptor_sets(device);
     } gvk_result_scope_end;
     return gvkResult;
+#endif
 }
 
 void Renderer<dst::text::Font>::record_bind_cmds(const gvk::CommandBuffer& commandBuffer)
@@ -52,7 +90,7 @@ void Renderer<dst::text::Font>::record_bind_cmds(const gvk::CommandBuffer& comma
     const auto& dispatchTable = device.get<gvk::DispatchTable>();
     auto bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     dispatchTable.gvkCmdBindPipeline(commandBuffer, bindPoint, mPipeline);
-    dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, mPipeline.get<gvk::PipelineLayout>(), 0, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
+    // dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, mPipeline.get<gvk::PipelineLayout>(), 0, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
 }
 
 static VkResult validate_shader_info(const gvk::spirv::ShaderInfo& shaderInfo)
@@ -80,18 +118,24 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
         vertexShaderInfo.source = R"(
             #version 450
 
-            layout(location = 0) in vec2 inPosition;
-            layout(location = 1) in vec2 inTexCoord;
-            layout(location = 2) in vec4 inColor;
-
-            layout(push_constant) uniform PushConstants
+            layout(set = 0, binding = 0)
+            uniform CameraUniforms
             {
-                vec2 scale;
-                vec2 translation;
-            } pushConstants;
+                mat4 view;
+                mat4 projection;
+            } camera;
 
-            layout(location = 0) out vec2 outTexCoord;
-            layout(location = 1) out vec4 outColor;
+            layout(set = 1, binding = 0)
+            uniform ObjectUniforms
+            {
+                mat4 world;
+            } object;
+
+            layout(location = 0) in vec3 vsPosition;
+            layout(location = 1) in vec2 vsTexcoord;
+            layout(location = 2) in vec4 vsColor;
+            layout(location = 0) out vec2 fsTexcoord;
+            layout(location = 1) out vec4 fsColor;
 
             out gl_PerVertex
             {
@@ -100,9 +144,9 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
 
             void main()
             {
-                gl_Position = vec4(inPosition * pushConstants.scale + pushConstants.translation, 0, 1);
-                outTexCoord = inTexCoord;
-                outColor = inColor;
+                gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
+                fsTexcoord = vsTexcoord;
+                fsColor = vsColor;
             }
         )";
 
@@ -113,16 +157,21 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
         fragmentShaderInfo.source = R"(
             #version 450
 
-            layout(set = 0, binding = 0) uniform sampler2D image;
+            layout(set = 0, binding = 1) uniform sampler2D image;
 
-            layout(location = 0) in vec2 inTexCoord;
-            layout(location = 1) in vec4 inColor;
+            layout(set = 1, binding = 0)
+            uniform ObjectUniforms
+            {
+                mat4 world;
+            } object;
 
-            layout(location = 0) out vec4 outColor;
+            layout(location = 0) in vec2 fsTexcoord;
+            layout(location = 1) in vec4 fsColor;
+            layout(location = 0) out vec4 fragColor;
 
             void main()
             {
-                outColor = texture(image, inTexCoord) * inColor;
+                fragColor = texture(image, fsTexcoord) * fsColor;
             }
         )";
 
@@ -173,8 +222,6 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
 
         auto pipelineMultisampleStateCreateInfo = gvk::get_default<VkPipelineMultisampleStateCreateInfo>();
         pipelineMultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-        auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
-
         auto renderPassCreateInfo = renderPass.get<VkRenderPassCreateInfo>();
         if (renderPassCreateInfo.sType == gvk::get_stype<VkRenderPassCreateInfo>()) {
             for (uint32_t i = 0; i < renderPassCreateInfo.attachmentCount; ++i) {
@@ -186,6 +233,8 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
                 pipelineMultisampleStateCreateInfo.rasterizationSamples = std::max(pipelineMultisampleStateCreateInfo.rasterizationSamples, renderPassCreateInfo2.pAttachments[i].samples);
             }
         }
+
+        auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
 
         gvk::spirv::BindingInfo spirvBindingInfo;
         spirvBindingInfo.add_shader(vertexShaderInfo);
@@ -207,12 +256,16 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
     return gvkResult;
 }
 
-VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Device& device, const dst::text::Font& font)
+VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Context& context, const dst::text::Font& font)
 {
-    assert(device);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        const auto& device = context.get_devices()[0];
+        gvk_result(gvk::Sampler::create(device, &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &mSampler));
+        gvk::Buffer stagingBuffer;
         mImageViews.reserve(font.get_atlas().pages.size());
         for (const auto& page : font.get_atlas().pages) {
+
+            // TODO : Documentation
             auto imageCreateInfo = gvk::get_default<VkImageCreateInfo>();
             imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
             imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -220,35 +273,154 @@ VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Device& device
             imageCreateInfo.extent.height = page.get_extent()[1];
             imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
             auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
+            allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             gvk::Image image;
             gvk_result(gvk::Image::create(device, &imageCreateInfo, &allocationCreateInfo, &image));
+
+            // TODO : Documentation
+            VmaAllocationInfo allocationInfo { };
+            auto vmaAllocator = device.get<VmaAllocator>();
+            vmaGetAllocationInfo(vmaAllocator, image.get<VmaAllocation>(), &allocationInfo);
+            gvk_result(gvk::create_staging_buffer(device, allocationInfo.size, &stagingBuffer));
+
+            // TODO : Documentation
+            uint8_t* pStagingData = nullptr;
+            gvk_result(vmaMapMemory(vmaAllocator, stagingBuffer.get<VmaAllocation>(), (void**)&pStagingData));
+            memcpy(pStagingData, page.data(), page.size_bytes());
+            vmaUnmapMemory(vmaAllocator, stagingBuffer.get<VmaAllocation>());
+
+            // TODO : Documentation
+            gvk_result(gvk::execute_immediately(
+                device,
+                gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
+                context.get_command_buffers()[0],
+                VK_NULL_HANDLE,
+                [&](const auto& commandBuffer)
+                {
+                    // TODO : Documentation
+                    auto imageMemoryBarrier = gvk::get_default<VkImageMemoryBarrier>();
+                    imageMemoryBarrier.srcAccessMask = 0;
+                    imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    imageMemoryBarrier.image = image;
+                    vkCmdPipelineBarrier(
+                        commandBuffer,
+                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        0,
+                        0, nullptr,
+                        0, nullptr,
+                        1, &imageMemoryBarrier
+                    );
+
+                    // TODO : Documentation
+                    auto bufferImageCopy = gvk::get_default<VkBufferImageCopy>();
+                    bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    bufferImageCopy.imageSubresource.layerCount = 1;
+                    bufferImageCopy.imageExtent = imageCreateInfo.extent;
+                    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
+
+                    // TODO : Documentation
+                    imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    vkCmdPipelineBarrier(
+                        commandBuffer,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        0,
+                        0, nullptr,
+                        0, nullptr,
+                        1, &imageMemoryBarrier
+                    );
+                }
+            ));
+
+            // TODO : Documentation
+            auto imageViewCreateInfo = gvk::get_default<VkImageViewCreateInfo>();
+            imageViewCreateInfo.image = image;
+            imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            imageViewCreateInfo.format = imageCreateInfo.format;
+            gvk::ImageView imageView;
+            gvk_result(gvk::ImageView::create(device, &imageViewCreateInfo, nullptr, &imageView));
+            mImageViews.push_back(imageView);
         }
     } gvk_result_scope_end;
     return gvkResult;
 }
 
-VkResult Renderer<dst::text::Font>::allocate_descriptor_sets(const gvk::Device& device)
+VkResult Renderer<dst::text::Font>::allocate_descriptor_sets()
 {
-    assert(device);
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk_result(VK_ERROR_INITIALIZATION_FAILED);
-    } gvk_result_scope_end;
-    return gvkResult;
+    assert(mPipeline);
+    return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
+        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
+        for (const auto& descriptorSetLayout : mPipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
+            vkDescriptorSetLayouts.push_back(descriptorSetLayout);
+            auto descriptorSetLayoutCreateInfo = descriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
+            for (uint32_t i = 0; i < descriptorSetLayoutCreateInfo.bindingCount; ++i) {
+                const auto& descriptorSetLayoutBinding = descriptorSetLayoutCreateInfo.pBindings[i];
+                descriptorPoolSizes.push_back({
+                    descriptorSetLayoutBinding.descriptorType,
+                    descriptorSetLayoutBinding.descriptorCount
+                });
+            }
+        }
+
+        assert(vkDescriptorSetLayouts.empty() == descriptorPoolSizes.empty());
+        if (!vkDescriptorSetLayouts.empty() && !descriptorPoolSizes.empty()) {
+            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+            descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
+            descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
+            gvk::DescriptorPool descriptorPool;
+            dvk_result(gvk::DescriptorPool::create(mPipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+
+            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
+            mDescriptorSets.resize(descriptorSetAllocateInfo.descriptorSetCount);
+            dvk_result(gvk::DescriptorSet::allocate(mPipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, mDescriptorSets.data()));
+        }
+    } dvk_result_scope_end;;
 }
 
-void Renderer<dst::text::Font>::update_descriptor_set(const gvk::Device& device)
+void Renderer<dst::text::Font>::update_descriptor_sets()
 {
-    assert(device);
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites { };
+    descriptorWrites.fill(gvk::get_default<VkWriteDescriptorSet>());
+
+    auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+    descriptorBufferInfo.buffer = VK_NULL_HANDLE;
+    descriptorWrites[0].dstSet = VK_NULL_HANDLE;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
+
+    auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
+    descriptorImageInfo.sampler = mSampler;
+    descriptorImageInfo.imageView = mImageViews[0];
+    descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    descriptorWrites[1].dstSet = VK_NULL_HANDLE;
+    descriptorWrites[1].dstBinding = 0;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].pImageInfo = &descriptorImageInfo;
+
+    const auto& device = mPipeline.get<gvk::Device>();
+    device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 }
 
 VkResult Renderer<dst::text::Mesh>::create(const dst::text::Mesh& textMesh, Renderer<dst::text::Mesh>* pRenderer)
 {
     (void)textMesh;
     assert(pRenderer);
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk_result(VK_ERROR_INITIALIZATION_FAILED);
-    } gvk_result_scope_end;
-    return gvkResult;
+    return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+    } dvk_result_scope_end;
 }
 
 void Renderer<dst::text::Mesh>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer)

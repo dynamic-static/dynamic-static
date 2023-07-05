@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "dynamic-static.graphics/buffer.hpp"
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static/text.hpp"
 
@@ -55,19 +56,20 @@ template <>
 class Renderer<dst::text::Font> final
 {
 public:
-    static VkResult create(const dst::text::Font& font, const gvk::RenderPass& renderPass, Renderer<dst::text::Font>* pRenderer);
+    static VkResult create(const gvk::Context& context, const gvk::RenderPass& renderPass, const dst::text::Font& font, Renderer<dst::text::Font>* pRenderer);
 
     void record_bind_cmds(const gvk::CommandBuffer& commandBuffer);
 
 private:
     VkResult create_pipline(const gvk::RenderPass& renderPass, const dst::text::Font& font);
-    VkResult create_image_views(const gvk::Device& device, const dst::text::Font& font);
-    VkResult allocate_descriptor_sets(const gvk::Device& device);
-    void update_descriptor_set(const gvk::Device& device);
+    VkResult create_image_views(const gvk::Context& context, const dst::text::Font& font);
+    VkResult allocate_descriptor_sets();
+    void update_descriptor_sets();
 
     gvk::Pipeline mPipeline;
+    gvk::Sampler mSampler;
     std::vector<gvk::ImageView> mImageViews;
-    gvk::DescriptorSet mDescriptorSet;
+    std::vector<gvk::DescriptorSet> mDescriptorSets;
 };
 
 template <>
