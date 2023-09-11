@@ -3,15 +3,21 @@ include_guard()
 
 include(FetchContent)
 
+set(DST_GVK_SOURCE_DIR "" CACHE STRING "Local GVK source directory")
+set(DST_GVK_INSTALL_DIR "" CACHE STRING "Local GVK install directory")
+set(DST_GVK_GIT_REPO_URL "https://github.com/dynamic-static/gvk.git")
+set(DST_GVK_VERSION 61a8a84ced06a2696ec292f1222cad8c40fd6797)
 set(GVK_BUILD_COMMAND_STRUCTURES OFF CACHE BOOL "" FORCE)
 set(GVK_BUILD_LAYER              OFF CACHE BOOL "" FORCE)
 set(GVK_BUILD_STATE_TRACKER      OFF CACHE BOOL "" FORCE)
 set(GVK_BUILD_TESTS              OFF CACHE BOOL "" FORCE)
 set(GVK_IDE_FOLDER "${DST_IDE_FOLDER}/external/gvk" CACHE STRING "" FORCE)
-FetchContent_Declare(
-    gvk
-    GIT_REPOSITORY "https://github.com/dynamic-static/gvk.git"
-    GIT_TAG 3ba52a5def2f9d87bda712214a12cbb2e5c7524f
-    GIT_PROGRESS TRUE
-)
+if(DST_GVK_SOURCE_DIR)
+    string(REPLACE "\\" "/" DST_GVK_SOURCE_DIR "${DST_GVK_SOURCE_DIR}")
+    FetchContent_Declare(gvk SOURCE_DIR "${DST_GVK_SOURCE_DIR}")
+    FetchContent_MakeAvailable(gvk)
+else()
+    FetchContent_Declare(gvk GIT_REPOSITORY ${DST_GVK_GIT_REPO_URL} GIT_TAG ${DST_GVK_VERSION})
+    FetchContent_MakeAvailable(gvk)
+endif()
 FetchContent_MakeAvailable(gvk)

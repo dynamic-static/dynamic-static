@@ -172,10 +172,12 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             font.mGlyphs.insert({ glyph.codepoint, glyph });
         }
 
+#if 1
         for (size_t i = 0; i < font.mAtlas.pages.size(); ++i) {
-            auto filePath = "D:/Development/dynamic-static/dynamic-static/build/atlas/atlas-" + std::to_string(i) + ".png";
+            auto filePath = "atlas-" + std::to_string(i) + ".png";
             dst::save_png(filePath.c_str(), font.mAtlas.pages[i]);
         }
+#endif
 
         // TODO : Documentation
         for (auto ch0 : characters) {
@@ -366,9 +368,9 @@ void Mesh::update(float deltaTime)
                 auto kerning = mKerningEnabled && i ? mspFont->get_kerning(mText[i - 1], mText[i]) : 0;
 
                 vertices[0].position = cursor + glm::vec3 { -w + offset.x + kerning,  h - offset.y, 0 };
-                vertices[0].position = cursor + glm::vec3 {  w + offset.x + kerning,  h - offset.y, 0 };
-                vertices[0].position = cursor + glm::vec3 {  w + offset.x + kerning, -h - offset.y, 0 };
-                vertices[0].position = cursor + glm::vec3 { -w + offset.x + kerning, -h - offset.y, 0 };
+                vertices[1].position = cursor + glm::vec3 {  w + offset.x + kerning,  h - offset.y, 0 };
+                vertices[2].position = cursor + glm::vec3 {  w + offset.x + kerning, -h - offset.y, 0 };
+                vertices[3].position = cursor + glm::vec3 { -w + offset.x + kerning, -h - offset.y, 0 };
                 cursor[0] += glyph.xAdvance + mGlyphSpacing;
 
                 const auto& atlas = mspFont->get_atlas();
@@ -391,6 +393,9 @@ void Mesh::update(float deltaTime)
                 indices[3] = vertex_i + 0;
                 indices[4] = vertex_i + 2;
                 indices[5] = vertex_i + 3;
+                // indices[3] = vertex_i + 2;
+                // indices[4] = vertex_i + 3;
+                // indices[5] = vertex_i + 0;
 
                 for (auto& controller : mControllers) {
                     assert(controller);
@@ -401,6 +406,63 @@ void Mesh::update(float deltaTime)
                 mIndices.insert(mIndices.end(), indices.data(), indices.data() + indices.size());
             }
         }
+
+
+#if 0
+        float w = 1.0f * 0.5f;
+        float h = 1.0f * 0.5f;
+        float d = 1.0f * 0.5f;
+        glm::vec4 topColor { 1, 1, 1, 1 };
+        glm::vec4 bottomColor { 1, 1, 1, 1 };
+        mVertices = {
+            // // Top
+            // Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+            // Vertex {{  w,  h, -d }, { 1, 0 }, { topColor }},
+            // Vertex {{  w,  h,  d }, { 1, 1 }, { topColor }},
+            // Vertex {{ -w,  h,  d }, { 0, 1 }, { topColor }},
+            // // Left
+            // Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+            // Vertex {{ -w,  h,  d }, { 0, 0 }, { topColor }},
+            // Vertex {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
+            // Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+            // // Front
+            // Vertex {{ -w,  h, d }, { 0, 0 }, { topColor }},
+            // Vertex {{  w,  h, d }, { 0, 0 }, { topColor }},
+            // Vertex {{  w, -h, d }, { 0, 0 }, { bottomColor }},
+            // Vertex {{ -w, -h, d }, { 0, 0 }, { bottomColor }},
+            // // Right
+            // Vertex {{  w,  h,  d }, { 0, 0 }, { topColor }},
+            // Vertex {{  w,  h, -d }, { 0, 0 }, { topColor }},
+            // Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor}},
+            // Vertex {{  w, -h,  d }, { 0, 0 }, { bottomColor}},
+            // Back
+            Vertex {{  w,  h, -d }, { 0, 0 }, { topColor }},
+            Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+            Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+            Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
+            // // Bottom
+            // Vertex {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
+            // Vertex {{  w, -h,  d }, { 0, 0 }, { bottomColor }},
+            // Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
+            // Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+        };
+        size_t index_i = 0;
+        size_t vertex_i = 0;
+        size_t FaceCount = mVertices.size() / 4;
+        constexpr size_t IndicesPerFace = 6;
+        mIndices.resize(IndicesPerFace * FaceCount);
+        for (size_t face_i = 0; face_i < FaceCount; ++face_i) {
+            mIndices[index_i++] = (uint16_t)(vertex_i + 0);
+            mIndices[index_i++] = (uint16_t)(vertex_i + 1);
+            mIndices[index_i++] = (uint16_t)(vertex_i + 2);
+            mIndices[index_i++] = (uint16_t)(vertex_i + 2);
+            mIndices[index_i++] = (uint16_t)(vertex_i + 3);
+            mIndices[index_i++] = (uint16_t)(vertex_i + 0);
+            vertex_i += 4;
+        }
+#endif
+
+
         for (auto& controller : mControllers) {
             assert(controller);
             controller->update(deltaTime, *this, mVertices);

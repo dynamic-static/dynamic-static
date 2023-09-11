@@ -28,6 +28,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <iostream>
 
+struct CameraUniforms
+{
+    glm::mat4 view { };
+    glm::mat4 projection { };
+};
+
+struct TextMeshUniforms
+{
+    glm::mat4 world { };
+};
+
 template <typename FunctionType>
 inline VkResult dvk_result_scope(FunctionType function)
 {
@@ -58,6 +69,59 @@ dvk_result_scope([&]()                      \
     }                        \
 );
 
+inline VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>& descriptorSets)
+{
+    assert(pipeline);
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        // Use the provided gvk::Pipeline's gvk::PipelineLayout to determine what types
+        //  and how many descriptors we'll need...the samples generally allocate a very
+        //  limited number of descriptors so this works fine...in real world scenario
+        //  you'd likely employ a much more robust strategy for managing descriptors.
+        //  Startegies for managing descriptors are highly application dependent...
+        std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
+        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
+        for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
+            vkDescriptorSetLayouts.push_back(descriptorSetLayout);
+            auto descriptorSetLayoutCreateInfo = descriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
+            for (uint32_t i = 0; i < descriptorSetLayoutCreateInfo.bindingCount; ++i) {
+                const auto& descriptorSetLayoutBinding = descriptorSetLayoutCreateInfo.pBindings[i];
+                descriptorPoolSizes.push_back({
+                    /* .type            = */ descriptorSetLayoutBinding.descriptorType,
+                    /* .descriptorCount = */ descriptorSetLayoutBinding.descriptorCount
+                });
+            }
+        }
+
+        descriptorSets.clear();
+        assert(vkDescriptorSetLayouts.empty() == descriptorPoolSizes.empty());
+        if (!vkDescriptorSetLayouts.empty() && !descriptorPoolSizes.empty()) {
+            // Create a gvk::DescriptorPool...
+            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+            descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
+            descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
+            gvk::DescriptorPool descriptorPool;
+            gvk_result(gvk::DescriptorPool::create(pipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+
+            // And allocate gvk::DescriptorSets...
+            // NOTE : The allocated gvk::DescriptorSets will hold references to the
+            //  gvk::DescriptorPool so there's no need for user code to maintain an
+            //  explicit reference.  A gvk::DescriptorSet's gvk::DescriptorPool can be
+            //  retrieved using descriptorSet.get<gvk::DescriptorPool>().
+            // NOTE : vkResetDescriptorPool() must not be used with gvk::DescriptorSets.
+            // NOTE : A gvk::DescriptorPool may be used to allocate VkDescriptorSets and
+            //  use vkResetDescriptorPool() as normal.
+            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
+            descriptorSets.resize(descriptorSetAllocateInfo.descriptorSetCount);
+            gvk_result(gvk::DescriptorSet::allocate(pipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, descriptorSets.data()));
+        }
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
 namespace dst {
 namespace gfx {
 
@@ -67,30 +131,35 @@ VkResult Renderer<dst::text::Font>::create(const gvk::Context& context, const gv
     assert(pRenderer);
     return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         dvk_result(pRenderer->create_pipline(renderPass, font));
+        dvk_result(gvk::Sampler::create(context.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pRenderer->mSampler));
         dvk_result(pRenderer->create_image_views(context, font));
-        dvk_result(pRenderer->allocate_descriptor_sets());
-        pRenderer->update_descriptor_sets();
+        dvk_result(pRenderer->allocate_descriptor_set());
+        pRenderer->update_descriptor_set();
     } dvk_result_scope_end;
-#if 0
-    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        const auto& device = renderPass.get<gvk::Device>();
-        gvk_result(pRenderer->create_pipline(renderPass, font));
-        gvk_result(pRenderer->create_image_views(context, font));
-        gvk_result(pRenderer->allocate_descriptor_sets(device));
-        pRenderer->update_descriptor_sets(device);
-    } gvk_result_scope_end;
-    return gvkResult;
-#endif
+}
+
+const gvk::Pipeline& Renderer<dst::text::Font>::get_pipeline() const
+{
+    return mPipeline;
+}
+
+const gvk::DescriptorSet& Renderer<dst::text::Font>::get_descriptor_set() const
+{
+    return mDescriptorSet;
 }
 
 void Renderer<dst::text::Font>::record_bind_cmds(const gvk::CommandBuffer& commandBuffer)
 {
+    (void)commandBuffer;
+    assert(false);
+#if 0
     assert(commandBuffer);
     const auto& device = commandBuffer.get<gvk::Device>();
     const auto& dispatchTable = device.get<gvk::DispatchTable>();
     auto bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     dispatchTable.gvkCmdBindPipeline(commandBuffer, bindPoint, mPipeline);
-    // dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, mPipeline.get<gvk::PipelineLayout>(), 0, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
+    dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, mPipeline.get<gvk::PipelineLayout>(), 0, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
+#endif
 }
 
 static VkResult validate_shader_info(const gvk::spirv::ShaderInfo& shaderInfo)
@@ -125,7 +194,7 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
                 mat4 projection;
             } camera;
 
-            layout(set = 1, binding = 0)
+            layout(set = 2, binding = 0)
             uniform ObjectUniforms
             {
                 mat4 world;
@@ -157,9 +226,9 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
         fragmentShaderInfo.source = R"(
             #version 450
 
-            layout(set = 0, binding = 1) uniform sampler2D image;
+            layout(set = 1, binding = 0) uniform sampler2D image;
 
-            layout(set = 1, binding = 0)
+            layout(set = 2, binding = 0)
             uniform ObjectUniforms
             {
                 mat4 world;
@@ -172,6 +241,7 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
             void main()
             {
                 fragColor = texture(image, fsTexcoord) * fsColor;
+                // fragColor = vec4(1, 1, 1, 1);
             }
         )";
 
@@ -351,81 +421,132 @@ VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Context& conte
     return gvkResult;
 }
 
-VkResult Renderer<dst::text::Font>::allocate_descriptor_sets()
+VkResult Renderer<dst::text::Font>::allocate_descriptor_set()
 {
     assert(mPipeline);
     return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
-        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
-        for (const auto& descriptorSetLayout : mPipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
-            vkDescriptorSetLayouts.push_back(descriptorSetLayout);
-            auto descriptorSetLayoutCreateInfo = descriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
-            for (uint32_t i = 0; i < descriptorSetLayoutCreateInfo.bindingCount; ++i) {
-                const auto& descriptorSetLayoutBinding = descriptorSetLayoutCreateInfo.pBindings[i];
-                descriptorPoolSizes.push_back({
-                    descriptorSetLayoutBinding.descriptorType,
-                    descriptorSetLayoutBinding.descriptorCount
-                });
-            }
-        }
-
-        assert(vkDescriptorSetLayouts.empty() == descriptorPoolSizes.empty());
-        if (!vkDescriptorSetLayouts.empty() && !descriptorPoolSizes.empty()) {
-            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
-            descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
-            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
-            descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-            gvk::DescriptorPool descriptorPool;
-            dvk_result(gvk::DescriptorPool::create(mPipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
-
-            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
-            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-            descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
-            descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
-            mDescriptorSets.resize(descriptorSetAllocateInfo.descriptorSetCount);
-            dvk_result(gvk::DescriptorSet::allocate(mPipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, mDescriptorSets.data()));
-        }
-    } dvk_result_scope_end;;
+        std::vector<gvk::DescriptorSet> descriptorSets;
+        dvk_result(dst_sample_allocate_descriptor_sets_HACK(mPipeline, descriptorSets));
+        assert(descriptorSets.size() == 3);
+        mDescriptorSet = descriptorSets[1];
+        assert(mDescriptorSet);
+    } dvk_result_scope_end;
 }
 
-void Renderer<dst::text::Font>::update_descriptor_sets()
+void Renderer<dst::text::Font>::update_descriptor_set()
 {
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites { };
-    descriptorWrites.fill(gvk::get_default<VkWriteDescriptorSet>());
-
-    auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
-    descriptorBufferInfo.buffer = VK_NULL_HANDLE;
-    descriptorWrites[0].dstSet = VK_NULL_HANDLE;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].pBufferInfo = &descriptorBufferInfo;
-
     auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
     descriptorImageInfo.sampler = mSampler;
     descriptorImageInfo.imageView = mImageViews[0];
     descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    descriptorWrites[1].dstSet = VK_NULL_HANDLE;
-    descriptorWrites[1].dstBinding = 0;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrites[1].pImageInfo = &descriptorImageInfo;
-
+    auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+    writeDescriptorSet.dstSet = mDescriptorSet;
+    writeDescriptorSet.descriptorCount = 1;
+    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeDescriptorSet.pImageInfo = &descriptorImageInfo;
     const auto& device = mPipeline.get<gvk::Device>();
-    device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
 }
 
-VkResult Renderer<dst::text::Mesh>::create(const dst::text::Mesh& textMesh, Renderer<dst::text::Mesh>* pRenderer)
+VkResult Renderer<dst::text::Mesh>::create(const gvk::Device& device, const dst::text::Mesh& textMesh, const Renderer<dst::text::Font>& fontRenderer, Renderer<dst::text::Mesh>* pRenderer)
 {
     (void)textMesh;
-    assert(pRenderer);
+    pRenderer->mDevice = device;
     return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        dvk_result(pRenderer->create_uniform_buffer());
+        dvk_result(pRenderer->allocate_descriptor_set(fontRenderer));
+        pRenderer->update_descriptor_set();
     } dvk_result_scope_end;
 }
 
-void Renderer<dst::text::Mesh>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer)
+void Renderer<dst::text::Mesh>::update(float deltaTime, const dst::text::Mesh& textMesh)
 {
-    (void)commandBuffer;
+    (void)deltaTime;
+    assert(mDevice);
+    auto vkResult = dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        const auto& vertices = textMesh.get_vertices();
+        const auto& indices = textMesh.get_indices();
+        mIndexCount = (uint32_t)indices.size();
+        auto vertexDataSize = vertices.size() * sizeof(vertices[0]);
+        mIndexDataOffset = vertexDataSize;
+        auto indexDataSize = indices.size() * sizeof(indices[0]);
+        auto vertexIndexDataSize = vertexDataSize + indexDataSize;
+        if (!mVertexIndexBuffer || mVertexIndexBuffer.get<VkBufferCreateInfo>().size < vertexIndexDataSize) {
+            auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
+            bufferCreateInfo.size = vertexIndexDataSize;
+            bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            VmaAllocationCreateInfo allocationCreateInfo { };
+            allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+            allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+            dvk_result(gvk::Buffer::create(mDevice, &bufferCreateInfo, &allocationCreateInfo, &mVertexIndexBuffer));
+        }
+        if (vertexIndexDataSize) {
+            uint8_t* pVertexIndexData = nullptr;
+            dvk_result(vmaMapMemory(mDevice.get<VmaAllocator>(), mVertexIndexBuffer.get<VmaAllocation>(), (void**)&pVertexIndexData));
+            memcpy(pVertexIndexData, vertices.data(), vertexDataSize);
+            memcpy(pVertexIndexData + vertexDataSize, indices.data(), indexDataSize);
+            dvk_result(vmaFlushAllocation(mDevice.get<VmaAllocator>(), mVertexIndexBuffer.get<VmaAllocation>(), 0, vertexIndexDataSize));
+            vmaUnmapMemory(mDevice.get<VmaAllocator>(), mVertexIndexBuffer.get<VmaAllocation>());
+        }
+
+        TextMeshUniforms uniforms { };
+        uniforms.world = transform.world_from_local();
+        uint8_t* pUniformData = nullptr;
+        dvk_result(vmaMapMemory(mDevice.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), (void**)&pUniformData));
+        memcpy(pUniformData, &uniforms, sizeof(TextMeshUniforms));
+        dvk_result(vmaFlushAllocation(mDevice.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>(), 0, sizeof(TextMeshUniforms)));
+        vmaUnmapMemory(mDevice.get<VmaAllocator>(), mUniformBuffer.get<VmaAllocation>());
+    } dvk_result_scope_end;
+    assert(vkResult == VK_SUCCESS);
+}
+
+void Renderer<dst::text::Mesh>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const Renderer<dst::text::Font>& fontRenderer)
+{
+    assert(commandBuffer);
+    if (mIndexCount) {
+        const auto& dispatchTable = mDevice.get<gvk::DispatchTable>();
+        VkDeviceSize vertexDataOffset = 0;
+        dispatchTable.gvkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertexIndexBuffer.get<const VkBuffer&>(), &vertexDataOffset);
+        dispatchTable.gvkCmdBindIndexBuffer(commandBuffer, mVertexIndexBuffer, mIndexDataOffset, gvk::get_index_type<uint16_t>());
+        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontRenderer.get_pipeline().get<gvk::PipelineLayout>(), 2, 1, &(const VkDescriptorSet&)mDescriptorSet, 0, nullptr);
+        dispatchTable.gvkCmdDrawIndexed(commandBuffer, mIndexCount, 1, 0, 0, 0);
+    }
+}
+
+VkResult Renderer<dst::text::Mesh>::create_uniform_buffer()
+{
+    assert(mDevice);
+    auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
+    bufferCreateInfo.size = sizeof(TextMeshUniforms);
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    VmaAllocationCreateInfo vmaAllocationCreateInfo{ };
+    vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    return gvk::Buffer::create(mDevice, &bufferCreateInfo, &vmaAllocationCreateInfo, &mUniformBuffer);
+}
+
+VkResult Renderer<dst::text::Mesh>::allocate_descriptor_set(const Renderer<dst::text::Font>& fontRenderer)
+{
+    assert(mDevice);
+    return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        std::vector<gvk::DescriptorSet> descriptorSets;
+        dvk_result(dst_sample_allocate_descriptor_sets_HACK(fontRenderer.get_pipeline(), descriptorSets));
+        assert(descriptorSets.size() == 3);
+        mDescriptorSet = descriptorSets[2];
+        assert(mDescriptorSet);
+    } dvk_result_scope_end;
+}
+
+void Renderer<dst::text::Mesh>::update_descriptor_set()
+{
+    auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+    descriptorBufferInfo.buffer = mUniformBuffer;
+    auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+    writeDescriptorSet.dstSet = mDescriptorSet;
+    writeDescriptorSet.descriptorCount = 1;
+    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+    mDevice.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(mDevice, 1, &writeDescriptorSet, 0, nullptr);
 }
 
 } // namespace gfx

@@ -24,9 +24,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(MonoGameSamples)
 FetchContent_GetProperties(MonoGameSamples SOURCE_DIR MonoGameSamples_SOURCE_DIR)
 target_compile_definitions(shape-shooter PRIVATE SHAPE_SHOOTER_CONTENT="${MonoGameSamples_SOURCE_DIR}/NeonShooter/NeonShooter.Core/Content/")
-add_custom_command(
-    TARGET shape-shooter POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${fmodSharedLibraries}
-    $<TARGET_FILE_DIR:shape-shooter>
-)
+# add_custom_command(
+#     TARGET shape-shooter POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#     ${fmodSharedLibraries}
+#     $<TARGET_FILE_DIR:shape-shooter>
+# )

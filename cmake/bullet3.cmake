@@ -3,13 +3,12 @@ include_guard()
 
 include(FetchContent)
 
-set(USE_MSVC_RUNTIME_LIBRARY_DLL ON)
+set(USE_MSVC_RUNTIME_LIBRARY_DLL ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     bullet3
     GIT_REPOSITORY "https://github.com/dynamic-static/bullet3.git"
     GIT_TAG 1f6bcc3ff9394163cc8fae84a982ad9ee66aec77 # 3.24 + tksuoran-cmake-fetchcontent
     GIT_PROGRESS TRUE
-    FETCHCONTENT_UPDATES_DISCONNECTED
 )
 FetchContent_MakeAvailable(bullet3)
 set_target_properties(Bullet2FileLoader PROPERTIES FOLDER "${DST_IDE_FOLDER}/external/bullet3/")

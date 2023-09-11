@@ -57,19 +57,20 @@ class Renderer<dst::text::Font> final
 {
 public:
     static VkResult create(const gvk::Context& context, const gvk::RenderPass& renderPass, const dst::text::Font& font, Renderer<dst::text::Font>* pRenderer);
-
+    const gvk::Pipeline& get_pipeline() const;
+    const gvk::DescriptorSet& get_descriptor_set() const;
     void record_bind_cmds(const gvk::CommandBuffer& commandBuffer);
 
 private:
     VkResult create_pipline(const gvk::RenderPass& renderPass, const dst::text::Font& font);
     VkResult create_image_views(const gvk::Context& context, const dst::text::Font& font);
-    VkResult allocate_descriptor_sets();
-    void update_descriptor_sets();
+    VkResult allocate_descriptor_set();
+    void update_descriptor_set();
 
     gvk::Pipeline mPipeline;
     gvk::Sampler mSampler;
     std::vector<gvk::ImageView> mImageViews;
-    std::vector<gvk::DescriptorSet> mDescriptorSets;
+    gvk::DescriptorSet mDescriptorSet;
 };
 
 template <>
@@ -77,12 +78,22 @@ class Renderer<dst::text::Mesh> final
     : public dst::text::Mesh::Renderer
 {
 public:
-    static VkResult create(const dst::text::Mesh& textMesh, Renderer<dst::text::Mesh>* pRenderer);
-
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer);
+    static VkResult create(const gvk::Device& device, const dst::text::Mesh& textMesh, const Renderer<dst::text::Font>& fontRenderer, Renderer<dst::text::Mesh>* pRenderer);
+    void update(float deltaTime, const dst::text::Mesh& mesh);
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const Renderer<dst::text::Font>& fontRenderer);
+    gvk::math::Transform transform { };
 
 private:
-    gvk::Buffer mBuffer;
+    VkResult create_uniform_buffer();
+    VkResult allocate_descriptor_set(const Renderer<dst::text::Font>& fontRenderer);
+    void update_descriptor_set();
+
+    gvk::Device mDevice;
+    uint32_t mIndexCount{ };
+    VkDeviceSize mIndexDataOffset{ };
+    gvk::Buffer mVertexIndexBuffer;
+    gvk::Buffer mUniformBuffer;
+    gvk::DescriptorSet mDescriptorSet;
 };
 
 } // namespace gfx

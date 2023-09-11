@@ -37,7 +37,7 @@ endmacro()
 
 dst_include_depenedency(DST_BUILD_TESTS    googletest)
 dst_include_depenedency(DST_BULLET_ENABLED bullet3)
-dst_include_depenedency(DST_FMOD_ENABLED   FMOD)
+# dst_include_depenedency(DST_FMOD_ENABLED   FMOD)
 dst_include_depenedency(DST_GVK_ENABLED    gvk)
 dst_include_depenedency(ON                 stb_truetype)
 
@@ -52,7 +52,7 @@ macro(dst_add_module module enabled)
 endmacro()
 
 dst_add_module(dynamic-static.core     ${DST_CORE_ENABLED})
-dst_add_module(dynamic-static.audio    ${DST_AUDIO_ENABLED})
+# dst_add_module(dynamic-static.audio    ${DST_AUDIO_ENABLED})
 dst_add_module(dynamic-static.graphics ${DST_GRAPHICS_ENABLED})
 dst_add_module(dynamic-static.physics  ${DST_PHYSICS_ENABLED})
 
