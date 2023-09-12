@@ -471,6 +471,7 @@ int main(int, const char*[])
         float yRotation = 90.0f;
         float zRotation = 45.0f;
         float guiImageScale = 0.125f;
+        (void)guiImageScale;
 
         gvk::math::Camera camera;
         camera.transform.translation = { 0, 2, -7 };
@@ -481,7 +482,7 @@ int main(int, const char*[])
         // TextMesh
         std::shared_ptr<dst::text::Font> spFont;
         // dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 256, &spFont);
-        dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 32, &spFont);
+        dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 64, &spFont);
         dst::gfx::Renderer<dst::text::Font> fontRenderer;
         dst::gfx::Renderer<dst::text::Font>::create(gvkContext, wsiManager.get_render_pass(), *spFont, &fontRenderer);
 
@@ -496,6 +497,7 @@ int main(int, const char*[])
                 return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], textMesh, fontRenderer, &renderer);
             }
         );
+        pTextMeshRenderer->transform.scale = glm::vec3(0.1f);
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
@@ -579,6 +581,13 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // TextMesh
+#if 0
+            auto textMeshRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3{ 0, 1, 0 });
+            pTextMeshRenderer->transform.rotation = glm::normalize(textMeshRotationY * pTextMeshRenderer->transform.rotation);
+#else
+            auto textMeshRotationY = glm::angleAxis(yRotation, glm::vec3 { 0, 1, 0 });
+            pTextMeshRenderer->transform.rotation = glm::normalize(textMeshRotationY);
+#endif
             textMesh.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
@@ -636,6 +645,7 @@ int main(int, const char*[])
                     // Call guiRenderer.begin_gui().  Note that all ImGui widgets must be handled
                     //  between calls to begin_gui()/end_gui()
                     guiRenderer.begin_gui(guiRendererBeginInfo);
+#if 0
                     ImGui::ShowDemoWindow();
                     ImGui::DragFloat("anchor", &anchor, 0.01f);
                     ImGui::DragFloat("amplitude", &amplitude, 0.1f);
@@ -645,6 +655,12 @@ int main(int, const char*[])
                     ImGui::DragFloat("guiImageScale", &guiImageScale, 0.005f, 0.01f, 0.5f);
                     ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
                     ImGui::Image(guiDescriptorSets[0], guiImageExtent);
+#else
+                    float textScale = pTextMeshRenderer->transform.scale.x;
+                    if (ImGui::DragFloat("Text Scale", &textScale)) {
+                        pTextMeshRenderer->transform.scale = glm::vec3(textScale);
+                    }
+#endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
 

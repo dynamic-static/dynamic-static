@@ -306,6 +306,9 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
 
         auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
 
+        auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
+        pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+
         gvk::spirv::BindingInfo spirvBindingInfo;
         spirvBindingInfo.add_shader(vertexShaderInfo);
         spirvBindingInfo.add_shader(fragmentShaderInfo);
@@ -319,6 +322,7 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
         graphicsPipelineCreateInfo.pColorBlendState = &pipelineColorBlendStateCreateInfo;
         graphicsPipelineCreateInfo.pMultisampleState = &pipelineMultisampleStateCreateInfo;
         graphicsPipelineCreateInfo.pDepthStencilState = &pipelineDepthStencilStateCreateInfo;
+        graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationStateCreateInfo;
         graphicsPipelineCreateInfo.layout = pipelineLayout;
         graphicsPipelineCreateInfo.renderPass = renderPass;
         gvk_result(gvk::Pipeline::create(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
