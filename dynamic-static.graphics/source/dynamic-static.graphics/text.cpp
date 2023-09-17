@@ -510,7 +510,7 @@ void Renderer<dst::text::Mesh>::record_draw_cmds(const gvk::CommandBuffer& comma
     if (mIndexCount) {
         const auto& dispatchTable = mDevice.get<gvk::DispatchTable>();
         VkDeviceSize vertexDataOffset = 0;
-        dispatchTable.gvkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertexIndexBuffer.get<const VkBuffer&>(), &vertexDataOffset);
+        dispatchTable.gvkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertexIndexBuffer.get<VkBuffer>(), &vertexDataOffset);
         dispatchTable.gvkCmdBindIndexBuffer(commandBuffer, mVertexIndexBuffer, mIndexDataOffset, gvk::get_index_type<uint16_t>());
         dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontRenderer.get_pipeline().get<gvk::PipelineLayout>(), 2, 1, &(const VkDescriptorSet&)mDescriptorSet, 0, nullptr);
         dispatchTable.gvkCmdDrawIndexed(commandBuffer, mIndexCount, 1, 0, 0, 0);

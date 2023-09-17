@@ -206,7 +206,7 @@ public:
             auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
             descriptorSetAllocateInfo.descriptorPool = mDescriptorPool;
             descriptorSetAllocateInfo.descriptorSetCount = 1;
-            descriptorSetAllocateInfo.pSetLayouts = &mDescriptorSetLayout.get<const VkDescriptorSetLayout&>();
+            descriptorSetAllocateInfo.pSetLayouts = &mDescriptorSetLayout.get<VkDescriptorSetLayout>();
             dst_vk_result(gvk::DescriptorSet::allocate(mDescriptorPool.get<gvk::Device>(), &descriptorSetAllocateInfo, &pGameObject->mDescriptorSet));
 
             // Update the GameObject's DescriptorSet to reference the uniform Buffer.
@@ -262,7 +262,7 @@ public:
     {
         // Bind this GameObject's DescriptorSet (which references the uniform Buffer)
         //  then record the gvk::Mesh's draw cmds.
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &mDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &mDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
         mMesh.record_cmds(commandBuffer);
     }
 
@@ -398,7 +398,7 @@ int main(int, const char* [])
     auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
     descriptorSetAllocateInfo.descriptorPool = descriptorPool;
     descriptorSetAllocateInfo.descriptorSetCount = 1;
-    descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout.get<const VkDescriptorSetLayout&>();
+    descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout.get<VkDescriptorSetLayout>();
     gvk::DescriptorSet cameraDescriptorSet;
     dst_vk_result(gvk::DescriptorSet::allocate(gvkContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet));
 
@@ -876,7 +876,7 @@ int main(int, const char* [])
             //  same Camera this binding will be used for all subsequent draw calls in this
             //  RenderPass.
             const auto& pipelineLayout = pipeline.get<gvk::PipelineLayout>();
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet.get<const VkDescriptorSet&>(), 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
 
             // Record draw calls for all of the GameObjects.
             paddle.record_draw_cmds(commandBuffer, pipelineLayout);

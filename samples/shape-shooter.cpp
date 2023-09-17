@@ -585,8 +585,7 @@ int main(int, const char*[])
             auto textMeshRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3{ 0, 1, 0 });
             pTextMeshRenderer->transform.rotation = glm::normalize(textMeshRotationY * pTextMeshRenderer->transform.rotation);
 #else
-            auto textMeshRotationY = glm::angleAxis(yRotation, glm::vec3 { 0, 1, 0 });
-            pTextMeshRenderer->transform.rotation = glm::normalize(textMeshRotationY);
+            pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3 { 0, 1, 0 });
 #endif
             textMesh.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////

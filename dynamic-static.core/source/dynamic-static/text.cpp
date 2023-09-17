@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static/text.hpp"
 
+#include "stb/stb_truetype.h"
+
 #include <iostream>
 
 namespace dst {
@@ -90,10 +92,9 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
     stbtt_fontinfo fontInfo { };
     auto ttfBytes = read_bytes(pFilePath);
     if (stbtt_InitFont(&fontInfo, ttfBytes.data(), 0)) {
-        // auto scale = stbtt_ScaleForPixelHeight(&fontInfo, pFont->mLineHeight);
-        auto scale = stbtt_ScaleForPixelHeight(&fontInfo, size);
         int ascent, descent, lineGap;
         stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+        auto scale = stbtt_ScaleForPixelHeight(&fontInfo, size);
         font.mAscent = ascent * scale;
         font.mDescent = descent * scale;
         font.mLineHeight = lineGap * scale;
@@ -122,17 +123,19 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
         bin_pack(&binPackInfo, binPackEntries.size(), binPackEntries.data());
 
         // TODO : Documentation
-        font.mAtlas.width = binPackInfo.width;
-        font.mAtlas.height = binPackInfo.height;
-        font.mAtlas.pages.resize(binPackInfo.pageCount, Image<R8G8B8A8Unorm>({ font.mAtlas.width, font.mAtlas.height }));
+        font.mAtlas.extent.x = (uint32_t)binPackInfo.width;
+        font.mAtlas.extent.y = (uint32_t)binPackInfo.height;
+        font.mAtlas.pages.resize(binPackInfo.pageCount, Image<R8G8B8A8Unorm>({ font.mAtlas.extent.x, font.mAtlas.extent.y }));
 
         // TODO : Documentaiton
         std::vector<uint8_t> bitmap;
 
+        std::cout << "ascent : " << font.mAscent << std::endl;
         // TODO : Documentation
         for (const auto& binPackEntry : binPackEntries) {
 
-            std::cout << binPackEntry.value << " : " << binPackEntry.cell.width << " : " << binPackEntry.cell.height << " : " << binPackEntry.page << std::endl;
+            std::cout << "--------" << std::endl;
+            // std::cout << binPackEntry.value << " : " << binPackEntry.cell.width << " : " << binPackEntry.cell.height << " : " << binPackEntry.page << std::endl;
 
             // TODO : Documentation
             assert(binPackEntry.page < font.mAtlas.pages.size());
@@ -145,11 +148,13 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             // TODO : Documentation
             for (int y = 0; y < cell.height; ++y) {
                 for (int x = 0; x < cell.width; ++x) {
-                    auto u = (uint32_t)cell.x + 2 + x;
-                    auto v = (uint32_t)cell.y + 2 + y;
+                    auto u = (uint32_t)cell.x + x;
+                    auto v = (uint32_t)cell.y + y;
                     auto value = bitmap[(size_t)y * cell.width + x];
-                    auto& texel = page[{ u, v}];
+                    auto& texel = page[{ u, v }];
                     texel[0] = value;
+                    texel[1] = value;
+                    texel[2] = value;
                     texel[3] = value;
                 }
             }
@@ -158,18 +163,22 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             int advanceWidth, leftSideBearing;
             stbtt_GetCodepointHMetrics(&fontInfo, codepoint, &advanceWidth, &leftSideBearing);
             int ix0, iy0, ix1, iy1;
-            stbtt_GetCodepointBitmapBox(&fontInfo, (int)*pChar, scale, scale, &ix0, &iy0, &ix1, &iy1);
+            stbtt_GetCodepointBitmapBox(&fontInfo, codepoint, scale, scale, &ix0, &iy0, &ix1, &iy1);
 
             // TODO : Documentation
             Glyph glyph { };
             glyph.codepoint = codepoint;
             glyph.page = binPackEntry.page;
-            glyph.texcoord.x = (cell.x + 2 + cell.width * 0.5f) / (float)page.get_extent()[0];
-            glyph.texcoord.y = (cell.y + 2 + cell.height * 0.5f) / (float)page.get_extent()[1];
+            glyph.texcoord.x = (cell.x + cell.width * 0.5f) / (float)page.get_extent()[0];
+            glyph.texcoord.y = (cell.y + cell.height * 0.5f) / (float)page.get_extent()[1];
             glyph.extent = { (float)cell.width, (float)cell.height };
-            glyph.offset = { (float)ix0 * scale, (float)iy0 * scale };
+            glyph.offset = { (float)leftSideBearing * scale, -iy1 };
             glyph.xAdvance = (float)advanceWidth * scale;
             font.mGlyphs.insert({ glyph.codepoint, glyph });
+
+            std::cout << (char)glyph.codepoint << std::endl;
+            std::cout << "    extent : { " << glyph.extent.x << ", " << glyph.extent.y << " } " << std::endl;
+            std::cout << "    offset : { " << glyph.offset.x << ", " << glyph.offset.y << " } " << std::endl;
         }
 
 #if 1
@@ -184,7 +193,7 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             for (auto ch1 : characters) {
                 auto kerning = stbtt_GetCodepointKernAdvance(&fontInfo, ch0, ch1);
                 if (kerning) {
-                    // font.mKerningPairs[{ ch0, ch1 }] = kerning * scale;
+                    font.mKerningPairs[{ ch0, ch1 }] = kerning * scale;
                 }
             }
         }
@@ -355,20 +364,12 @@ void Mesh::update(float deltaTime)
         mVertices.clear();
         mIndices.clear();
         if (mspFont && !mText.empty()) {
+            const auto& atlas = mspFont->get_atlas();
             glm::vec3 cursor { };
             std::array<Vertex, 4> vertices { };
-            std::array<uint16_t, 6> indices { };
             mVertices.reserve(mText.size() * vertices.size());
-            mIndices.reserve(mText.size() * indices.size());
-            auto baseLine = mspFont->get_base_line();
-            (void)baseLine;
             for (size_t i = 0; i < mText.size(); ++i) {
                 const auto& glyph = mspFont->get_glyph(mText[i]);
-                auto w = glyph.extent.x * 0.5f;
-                auto h = glyph.extent.y * 0.5f;
-                auto offset = glyph.offset + glm::vec2 { w, h };
-                auto kerning = mKerningEnabled && i ? mspFont->get_kerning(mText[i - 1], mText[i]) : 0;
-                (void)kerning;
 
                 /*
                               .
@@ -384,72 +385,25 @@ void Mesh::update(float deltaTime)
                                               3        2
                 */
 
-#if 0
-                vertices[0].position = cursor + glm::vec3 { -w + offset.x + kerning,  h - offset.y, 0 };
-                vertices[1].position = cursor + glm::vec3 {  w + offset.x + kerning,  h - offset.y, 0 };
-                vertices[2].position = cursor + glm::vec3 {  w + offset.x + kerning, -h - offset.y, 0 };
-                vertices[3].position = cursor + glm::vec3 { -w + offset.x + kerning, -h - offset.y, 0 };
-#else
-
-
-
-                // vertices[0].position = cursor + glm::vec3 {              0 + offset.x, glyph.extent.y - offset.y, 0 };
-                // vertices[1].position = cursor + glm::vec3 { glyph.extent.x + offset.x, glyph.extent.y - offset.y, 0 };
-                // vertices[2].position = cursor + glm::vec3 { glyph.extent.x + offset.x,              0 - offset.y, 0 };
-                // vertices[3].position = cursor + glm::vec3 {              0 + offset.x,              0 - offset.y, 0 };
-
-                std::cout << (char)glyph.codepoint << " yOffset : " << glyph.offset.y << std::endl;
-
-                auto yOffset = glyph.offset.y;
-                (void)yOffset;
-
-                vertices[0].position = cursor + glm::vec3 { glyph.offset.x,                  glyph.extent.y, 0 };
-                vertices[1].position = cursor + glm::vec3 { glyph.offset.x + glyph.extent.x, glyph.extent.y, 0 };
-                vertices[2].position = cursor + glm::vec3 { glyph.offset.x + glyph.extent.x,              0, 0 };
-                vertices[3].position = cursor + glm::vec3 { glyph.offset.x,                               0, 0 };
-#endif
-
+                auto kerning = mKerningEnabled && i ? mspFont->get_kerning(mText[i - 1], mText[i]) : 0;
+                vertices[0].position = cursor + glm::vec3 { glyph.offset.x +                  kerning, glyph.offset.y + glyph.extent.y, 0 };
+                vertices[1].position = cursor + glm::vec3 { glyph.offset.x + glyph.extent.x + kerning, glyph.offset.y + glyph.extent.y, 0 };
+                vertices[2].position = cursor + glm::vec3 { glyph.offset.x + glyph.extent.x + kerning, glyph.offset.y +              0, 0 };
+                vertices[3].position = cursor + glm::vec3 { glyph.offset.x +                  kerning, glyph.offset.y +              0, 0 };
                 cursor[0] += glyph.xAdvance + mGlyphSpacing;
 
-                const auto& atlas = mspFont->get_atlas();
+
                 auto u = (glyph.extent.x / atlas.width) * 0.5f;
                 auto v = (glyph.extent.y / atlas.height) * 0.5f;
-                (void)u;
-                (void)v;
-
-#if 0
                 vertices[0].texcoord = glyph.texcoord + glm::vec2 { -u, -v };
                 vertices[1].texcoord = glyph.texcoord + glm::vec2 {  u, -v };
                 vertices[2].texcoord = glyph.texcoord + glm::vec2 {  u,  v };
                 vertices[3].texcoord = glyph.texcoord + glm::vec2 { -u,  v };
-#else
-                // vertices[0].texcoord = { 0, 0 };
-                // vertices[1].texcoord = { 1, 0 };
-                // vertices[2].texcoord = { 1, 1 };
-                // vertices[3].texcoord = { 0, 1 };
-                vertices[0].texcoord = glyph.texcoord + glm::vec2 { -u, -v };
-                vertices[1].texcoord = glyph.texcoord + glm::vec2 {  u, -v };
-                vertices[2].texcoord = glyph.texcoord + glm::vec2 {  u,  v };
-                vertices[3].texcoord = glyph.texcoord + glm::vec2 { -u,  v };
-#endif
 
                 vertices[0].color = mColor;
                 vertices[1].color = mColor;
                 vertices[2].color = mColor;
                 vertices[3].color = mColor;
-
-#if 0
-                auto vertex_i = (uint16_t)vertices.size();
-                indices[0] = vertex_i + 0;
-                indices[1] = vertex_i + 1;
-                indices[2] = vertex_i + 2;
-                indices[3] = vertex_i + 0;
-                indices[4] = vertex_i + 2;
-                indices[5] = vertex_i + 3;
-                // indices[3] = vertex_i + 2;
-                // indices[4] = vertex_i + 3;
-                // indices[5] = vertex_i + 0;
-#endif
 
                 for (auto& controller : mControllers) {
                     assert(controller);
@@ -457,57 +411,8 @@ void Mesh::update(float deltaTime)
                 }
 
                 mVertices.insert(mVertices.end(), vertices.data(), vertices.data() + vertices.size());
-                mIndices.insert(mIndices.end(), indices.data(), indices.data() + indices.size());
             }
         }
-
-
-#if 0
-        float w = 1.0f * 0.5f;
-        float h = 1.0f * 0.5f;
-        float d = 1.0f * 0.5f;
-        glm::vec4 topColor { 1, 1, 1, 1 };
-        glm::vec4 bottomColor { 1, 1, 1, 1 };
-        mVertices = {
-            // // Top
-            // Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-            // Vertex {{  w,  h, -d }, { 1, 0 }, { topColor }},
-            // Vertex {{  w,  h,  d }, { 1, 1 }, { topColor }},
-            // Vertex {{ -w,  h,  d }, { 0, 1 }, { topColor }},
-            // // Left
-            // Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-            // Vertex {{ -w,  h,  d }, { 0, 0 }, { topColor }},
-            // Vertex {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-            // // Front
-            // Vertex {{ -w,  h, d }, { 0, 0 }, { topColor }},
-            // Vertex {{  w,  h, d }, { 0, 0 }, { topColor }},
-            // Vertex {{  w, -h, d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{ -w, -h, d }, { 0, 0 }, { bottomColor }},
-            // // Right
-            // Vertex {{  w,  h,  d }, { 0, 0 }, { topColor }},
-            // Vertex {{  w,  h, -d }, { 0, 0 }, { topColor }},
-            // Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor}},
-            // Vertex {{  w, -h,  d }, { 0, 0 }, { bottomColor}},
-            // Back
-            // Vertex {{  w,  h, -d }, { 0, 0 }, { topColor }},
-            // Vertex {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-            // Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
-            // // Bottom
-            // Vertex {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{  w, -h,  d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
-            // Vertex {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-
-            Vertex {{  w,  h, 0 }, { 0, 0 }, { topColor }},
-            Vertex {{ -w,  h, 0 }, { 1, 0 }, { topColor }},
-            Vertex {{ -w, -h, 0 }, { 1, 1 }, { bottomColor }},
-            Vertex {{  w, -h, 0 }, { 0, 1 }, { bottomColor }},
-        };
-
-#endif
-
 
         size_t index_i = 0;
         size_t vertex_i = 0;
@@ -523,8 +428,6 @@ void Mesh::update(float deltaTime)
             mIndices[index_i++] = (uint16_t)(vertex_i + 0);
             vertex_i += 4;
         }
-
-
 
         for (auto& controller : mControllers) {
             assert(controller);

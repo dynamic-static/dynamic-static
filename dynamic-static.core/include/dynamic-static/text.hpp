@@ -32,7 +32,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static/image.hpp"
 
 #include "glm/glm.hpp"
-#include "stb/stb_truetype.h"
 
 #include <algorithm>
 #include <array>
@@ -81,8 +80,7 @@ struct Glyph
 class Atlas final
 {
 public:
-    uint32_t width { };
-    uint32_t height { };
+    glm::uvec2 extent { };
     std::vector<Image<R8G8B8A8Unorm>> pages;
 };
 
