@@ -175,10 +175,6 @@ void Font::create(const char* pFilePath, const char* pCharacterSet, float size, 
             glyph.offset = { (float)leftSideBearing * scale, -iy1 };
             glyph.xAdvance = (float)advanceWidth * scale;
             font.mGlyphs.insert({ glyph.codepoint, glyph });
-
-            std::cout << (char)glyph.codepoint << std::endl;
-            std::cout << "    extent : { " << glyph.extent.x << ", " << glyph.extent.y << " } " << std::endl;
-            std::cout << "    offset : { " << glyph.offset.x << ", " << glyph.offset.y << " } " << std::endl;
         }
 
 #if 1
@@ -393,8 +389,8 @@ void Mesh::update(float deltaTime)
                 cursor[0] += glyph.xAdvance + mGlyphSpacing;
 
 
-                auto u = (glyph.extent.x / atlas.width) * 0.5f;
-                auto v = (glyph.extent.y / atlas.height) * 0.5f;
+                auto u = (glyph.extent.x / atlas.extent.x) * 0.5f;
+                auto v = (glyph.extent.y / atlas.extent.y) * 0.5f;
                 vertices[0].texcoord = glyph.texcoord + glm::vec2 { -u, -v };
                 vertices[1].texcoord = glyph.texcoord + glm::vec2 {  u, -v };
                 vertices[2].texcoord = glyph.texcoord + glm::vec2 {  u,  v };
