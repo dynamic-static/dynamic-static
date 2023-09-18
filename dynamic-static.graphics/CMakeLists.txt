@@ -18,12 +18,14 @@ dst_add_static_library(
         "${includePath}/mesh.hpp"
         "${includePath}/defines.hpp"
         "${includePath}/primitives.hpp"
+        "${includePath}/renderer.hpp"
         "${includePath}/sprite.hpp"
         "${includePath}/text.hpp"
     sourceFiles
         "${sourcePath}/buffer.cpp"
         "${sourcePath}/mesh.cpp"
         "${sourcePath}/placeholder.cpp"
+        "${sourcePath}/renderer.cpp"
         "${sourcePath}/sprite.cpp"
         "${sourcePath}/text.cpp"
 )

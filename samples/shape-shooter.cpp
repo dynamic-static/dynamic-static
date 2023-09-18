@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static/text.hpp"
 #include "dynamic-static.graphics/text.hpp"
+#include "dynamic-static.graphics/sprite.hpp"
 
 #include "stb/stb_image.h"
 
@@ -498,6 +499,25 @@ int main(int, const char*[])
             }
         );
         pTextMeshRenderer->transform.scale = glm::vec3(0.1f);
+        ///////////////////////////////////////////////////////////////////////////////
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Sprites
+        static const std::array<const char*, 8> SpriteFilePaths {
+            SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Player.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
+            SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
+        };
+        dst::gfx::Renderer<dst::gfx::Sprite>::CreateInfo spriteRendererCreateInfo { };
+        spriteRendererCreateInfo.filePathCount = (uint32_t)SpriteFilePaths.size();
+        spriteRendererCreateInfo.ppFilePaths = SpriteFilePaths.data();
+        dst::gfx::Renderer<dst::gfx::Sprite> spriteRenderer;
+        gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, spriteRendererCreateInfo, &spriteRenderer));
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
