@@ -29,36 +29,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static.graphics/renderer.hpp"
 
+#include "gvk-math.hpp"
+
+#include <set>
 #include <unordered_map>
 
 namespace dst {
 namespace gfx {
 
-class Sprite final
+struct Sprite
 {
-public:
-    class Pool final
-    {
-    public:
-        struct CreateInfo
-        {
-            uint32_t filePathCount { };
-            const char* pFilePaths { };
-        };
-
-        Pool() = default;
-        static void create(const CreateInfo& createInfo, Pool* pPool);
-
-    private:
-        Pool(const Pool&) = delete;
-        Pool& operator=(const Pool&) = delete;
-    };
-
-    Sprite() = default;
-
-private:
-    Sprite(const Sprite&) = delete;
-    Sprite& operator=(const Sprite&) = delete;
+    glm::vec4 color { gvk::math::Color::White };
+    gvk::math::Transform transform { };
+    uint64_t textureId { 0 };
 };
 
 template <>
@@ -71,12 +54,25 @@ public:
         const char* const* ppFilePaths { };
     };
 
-    static VkResult create(const gvk::Context& gvkContext, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer);
+    static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer);
     ~Renderer();
     void reset();
+    void begin_sprite_batch(const gvk::math::Camera& camera);
+    void submit(const Sprite& sprite);
+    void end_sprite_batch();
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer) const;
 
 private:
+    VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
+    VkResult create_image_views(const gvk::Context& gvkContext, const CreateInfo& createInfo);
+    VkResult allocate_descriptor_sets(const gvk::Context& gvkContext);
+    void update_descriptor_sets(const gvk::Context& gvkContext);
+
     std::unordered_map<std::string, gvk::ImageView> mImages;
+    gvk::DescriptorSet mCameraDescriptorSet;
+    gvk::DescriptorSet mSpriteDescriptorSet;
+    gvk::Pipeline mPipeline;
+    uint32_t mSpriteCount{ 0 };
 };
 
 } // namespace gfx

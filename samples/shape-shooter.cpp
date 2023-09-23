@@ -517,7 +517,7 @@ int main(int, const char*[])
         spriteRendererCreateInfo.filePathCount = (uint32_t)SpriteFilePaths.size();
         spriteRendererCreateInfo.ppFilePaths = SpriteFilePaths.data();
         dst::gfx::Renderer<dst::gfx::Sprite> spriteRenderer;
-        gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, spriteRendererCreateInfo, &spriteRenderer));
+        gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, wsiManager.get_render_pass(), spriteRendererCreateInfo, &spriteRenderer));
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;

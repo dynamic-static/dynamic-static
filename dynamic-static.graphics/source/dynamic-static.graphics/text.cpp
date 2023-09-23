@@ -69,7 +69,7 @@ dvk_result_scope([&]()                      \
     }                        \
 );
 
-inline VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>& descriptorSets)
+static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>& descriptorSets)
 {
     assert(pipeline);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {

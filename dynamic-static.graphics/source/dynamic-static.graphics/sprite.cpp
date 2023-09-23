@@ -29,8 +29,59 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "gvk-handles.hpp"
 
+#include <algorithm>
+#include <iostream>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <malloc.h>
+#else
+#include <errno.h>
+#include <stdlib.h>
+#endif // defined(_WIN32) || defined(_WIN64)
+
 namespace dst {
 namespace gfx {
+
+/**
+Allocates memory on a given alignment boundary
+@param [in] size The size of the requested allocation
+@param [in] The alignment value, which must be a multiple of sizeof(void*) and an integer power of 2
+@return A pointer to the memory block that was allocated or nullptr if the operation failed
+*/
+inline void* aligned_malloc(size_t size, size_t alignment)
+{
+    void* ptr = nullptr;
+    #if defined(_WIN32) || defined(_WIN64)
+    ptr = _aligned_malloc(size, alignment);
+    #else
+    // NOTE : https://man7.org/linux/man-pages/man3/posix_memalign.3.html
+    ptr = nullptr;
+    switch (posix_memalign(&ptr, alignment, size)) {
+    case EINVAL: {
+        assert(false && "The alignment argument was not a power of tow, or was not a multiple of sizeof(void*)");
+    } break;
+    case ENOMEM: {
+        assert(false && "There was insufficient memory to fulfill the allocation");
+    } break;
+    default: {
+    } break;
+    }
+    #endif // defined(_WIN32) || defined(_WIN64)
+    return ptr;
+}
+
+/**
+Frees a block of memory that was allocated with dst::gfx::aligned_malloc()
+@param [in] ptr A pointer to the memory block to free
+*/
+inline void aligned_free(void* ptr)
+{
+    #if defined(_WIN32) || defined(_WIN64)
+    _aligned_free(ptr);
+    #else
+    free(ptr);
+    #endif // defined(_WIN32) || defined(_WIN64)
+}
 
 VkResult load_image(const gvk::Context& gvkContext, const char* pFilePath, gvk::Buffer* pStagingBuffer, gvk::ImageView* pImageView)
 {
@@ -119,19 +170,17 @@ VkResult load_image(const gvk::Context& gvkContext, const char* pFilePath, gvk::
     return gvkResult;
 }
 
-VkResult Renderer<Sprite>::create(const gvk::Context& gvkContext, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer)
+VkResult Renderer<Sprite>::create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer)
 {
     assert(createInfo.filePathCount);
     assert(createInfo.ppFilePaths);
     assert(pRenderer);
     pRenderer->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk::Buffer stagingBuffer;
-        for (uint32_t i = 0; i < createInfo.filePathCount; ++i) {
-            gvk::ImageView imageView;
-            gvk_result(load_image(gvkContext, createInfo.ppFilePaths[i], &stagingBuffer, &imageView));
-            pRenderer->mImages[createInfo.ppFilePaths[i]] = imageView;
-        }
+        gvk_result(pRenderer->create_pipeline(gvkContext, renderPass));
+        gvk_result(pRenderer->create_image_views(gvkContext, createInfo));
+        // pRenderer->allocate_descriptor_sets(gvkContext);
+        // pRenderer->update_descriptor_sets(gvkContext);
     } gvk_result_scope_end;
     return gvkResult;
 }
@@ -144,6 +193,241 @@ Renderer<Sprite>::~Renderer()
 void Renderer<Sprite>::reset()
 {
     mImages.clear();
+}
+
+void Renderer<Sprite>::begin_sprite_batch(const gvk::math::Camera& camera)
+{
+    // Update camera descriptor set
+    mSpriteCount = 0;
+    (void)camera;
+}
+
+void Renderer<Sprite>::submit(const Sprite& sprite)
+{
+    ++mSpriteCount;
+    (void)sprite;
+}
+
+void Renderer<Sprite>::end_sprite_batch()
+{
+    // Update descriptor set if buffer changed
+    // Update descriptor set if textures changed
+}
+
+void Renderer<Sprite>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer) const
+{
+    if (mSpriteCount) {
+        auto bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        const auto& pipelineLayout = mPipeline.get<gvk::PipelineLayout>();
+        const auto& dispatchTable = commandBuffer.get<gvk::Device>().get<gvk::DispatchTable>();
+        dispatchTable.gvkCmdBindPipeline(commandBuffer, bindPoint, mPipeline);
+        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 1, 1, &mSpriteDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+        dispatchTable.gvkCmdDraw(commandBuffer, 4, mSpriteCount, 0, 0);
+    }
+}
+
+static VkResult validate_shader_info(const gvk::spirv::ShaderInfo& shaderInfo)
+{
+    if (!shaderInfo.errors.empty()) {
+        for (const auto& error : shaderInfo.errors) {
+            std::cerr << error << std::endl;
+        }
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    return VK_SUCCESS;
+}
+
+VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass)
+{
+    assert(gvkContext);
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        auto vertexShaderInfo = gvk::get_default<gvk::spirv::ShaderInfo>();
+        vertexShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
+        vertexShaderInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertexShaderInfo.lineOffset = __LINE__;
+        vertexShaderInfo.source = R"(
+            #version 460
+
+            struct Sprite
+            {
+                vec2 extent;
+                vec2 uvMin;
+                vec2 uvMax;
+                vec4 color;
+                mat4 world;
+            };
+
+            layout(set = 0, binding = 0)
+            uniform Camera
+            {
+                mat4 view;
+                mat4 projection;
+            } camera;
+
+            layout(std140, set = 1, binding = 0)
+            readonly buffer SpriteBuffer
+            {
+                Sprite sprites[];
+            } spriteBuffer;
+
+            vec4 Vertices[4] = vec4[](
+                vec4(-0.5,  0.5, 0, 1),
+                vec4( 0.5,  0.5, 0, 1),
+                vec4(-0.5, -0.5, 0, 1),
+                vec4( 0.5, -0.5, 0, 1)
+            );
+
+            layout(location = 0) out vec2 fsTexcoord;
+            layout(location = 1) out vec4 fsColor;
+
+            out gl_PerVertex
+            {
+                vec4 gl_Position;
+            };
+
+            void main()
+            {
+                Sprite sprite = spriteBuffer.sprites[gl_InstanceIndex];
+                vec4 position = Vertices[gl_VertexIndex] * vec4(sprite.extent, 0, 1);
+                gl_Position = camera.projection * camera.view * sprite.world * position;
+                vec2 texcoords[4] = vec2[](
+                    vec2(sprite.uvMin.x, sprite.uvMax.y),
+                    vec2(sprite.uvMax.x, sprite.uvMax.y),
+                    vec2(sprite.uvMin.x, sprite.uvMin.y),
+                    vec2(sprite.uvMax.x, sprite.uvMin.y)
+                );
+                fsTexcoord = texcoords[gl_VertexIndex];
+                fsColor = sprite.color;
+            }
+        )";
+
+        auto fragmentShaderInfo = gvk::get_default<gvk::spirv::ShaderInfo>();
+        fragmentShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
+        fragmentShaderInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragmentShaderInfo.lineOffset = __LINE__;
+        fragmentShaderInfo.source = R"(
+            #version 450
+
+            layout(set = 1, binding = 1) uniform sampler2D image;
+
+            layout(location = 0) in vec2 fsTexcoord;
+            layout(location = 1) in vec4 fsColor;
+            layout(location = 0) out vec4 fragColor;
+
+            void main()
+            {
+                fragColor = texture(image, fsTexcoord) * fsColor;
+                // fragColor = vec4(1, 1, 1, 1);
+            }
+        )";
+
+        gvk::spirv::Context spirvContext;
+        gvk_result(gvk::spirv::Context::create(&gvk::get_default<gvk::spirv::Context::CreateInfo>(), &spirvContext));
+        auto vsVkResult = spirvContext.compile(&vertexShaderInfo);
+        auto fsVkResult = spirvContext.compile(&fragmentShaderInfo);
+        vsVkResult = validate_shader_info(vertexShaderInfo);
+        fsVkResult = validate_shader_info(fragmentShaderInfo);
+        gvk_result(vsVkResult);
+        gvk_result(fsVkResult);
+
+        auto vertexShaderModuleCreateInfo = gvk::get_default<VkShaderModuleCreateInfo>();
+        vertexShaderModuleCreateInfo.codeSize = vertexShaderInfo.spirv.size() * sizeof(uint32_t);
+        vertexShaderModuleCreateInfo.pCode = !vertexShaderInfo.spirv.empty() ? vertexShaderInfo.spirv.data() : nullptr;
+        gvk::ShaderModule vertexShaderModule;
+        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &vertexShaderModuleCreateInfo, nullptr, &vertexShaderModule));
+        auto vertexPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
+        vertexPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertexPipelineShaderStageCreateInfo.module = vertexShaderModule;
+
+        auto fragmentShaderModuleCreateInfo = gvk::get_default<VkShaderModuleCreateInfo>();
+        fragmentShaderModuleCreateInfo.codeSize = fragmentShaderInfo.spirv.size() * sizeof(uint32_t);
+        fragmentShaderModuleCreateInfo.pCode = !fragmentShaderInfo.spirv.empty() ? fragmentShaderInfo.spirv.data() : nullptr;
+        gvk::ShaderModule fragmentShaderModule;
+        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &fragmentShaderModuleCreateInfo, nullptr, &fragmentShaderModule));
+        auto fragmentPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
+        fragmentPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragmentPipelineShaderStageCreateInfo.module = fragmentShaderModule;
+
+        std::array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
+            vertexPipelineShaderStageCreateInfo,
+            fragmentPipelineShaderStageCreateInfo,
+        };
+
+        auto pipelineInputAssemblyStateCreateInfo = gvk::get_default<VkPipelineInputAssemblyStateCreateInfo>();
+        pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+
+        auto pipelineColorBlendAttachmentState = gvk::get_default<VkPipelineColorBlendAttachmentState>();
+        pipelineColorBlendAttachmentState.blendEnable = VK_TRUE;
+        auto pipelineColorBlendStateCreateInfo = gvk::get_default<VkPipelineColorBlendStateCreateInfo>();
+        pipelineColorBlendStateCreateInfo.pAttachments = &pipelineColorBlendAttachmentState;
+
+        auto pipelineMultisampleStateCreateInfo = gvk::get_default<VkPipelineMultisampleStateCreateInfo>();
+        pipelineMultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        auto renderPassCreateInfo = renderPass.get<VkRenderPassCreateInfo>();
+        if (renderPassCreateInfo.sType == gvk::get_stype<VkRenderPassCreateInfo>()) {
+            for (uint32_t i = 0; i < renderPassCreateInfo.attachmentCount; ++i) {
+                pipelineMultisampleStateCreateInfo.rasterizationSamples = std::max(pipelineMultisampleStateCreateInfo.rasterizationSamples, renderPassCreateInfo.pAttachments[i].samples);
+            }
+        } else {
+            auto renderPassCreateInfo2 = renderPass.get<VkRenderPassCreateInfo2>();
+            for (uint32_t i = 0; i < renderPassCreateInfo2.attachmentCount; ++i) {
+                pipelineMultisampleStateCreateInfo.rasterizationSamples = std::max(pipelineMultisampleStateCreateInfo.rasterizationSamples, renderPassCreateInfo2.pAttachments[i].samples);
+            }
+        }
+
+        auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
+
+        auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
+        pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+
+        gvk::spirv::BindingInfo spirvBindingInfo;
+        spirvBindingInfo.add_shader(vertexShaderInfo);
+        spirvBindingInfo.add_shader(fragmentShaderInfo);
+        gvk::PipelineLayout pipelineLayout;
+        gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get_devices()[0], spirvBindingInfo, nullptr, &pipelineLayout));
+
+        auto graphicsPipelineCreateInfo = gvk::get_default<VkGraphicsPipelineCreateInfo>();
+        graphicsPipelineCreateInfo.stageCount = (uint32_t)pipelineShaderStageCreateInfos.size();
+        graphicsPipelineCreateInfo.pStages = pipelineShaderStageCreateInfos.data();
+        graphicsPipelineCreateInfo.pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo;
+        graphicsPipelineCreateInfo.pColorBlendState = &pipelineColorBlendStateCreateInfo;
+        graphicsPipelineCreateInfo.pMultisampleState = &pipelineMultisampleStateCreateInfo;
+        graphicsPipelineCreateInfo.pDepthStencilState = &pipelineDepthStencilStateCreateInfo;
+        graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationStateCreateInfo;
+        graphicsPipelineCreateInfo.layout = pipelineLayout;
+        graphicsPipelineCreateInfo.renderPass = renderPass;
+        gvk_result(gvk::Pipeline::create(gvkContext.get_devices()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+VkResult Renderer<Sprite>::create_image_views(const gvk::Context& gvkContext, const CreateInfo& createInfo)
+{
+    assert(gvkContext);
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        gvk::Buffer stagingBuffer;
+        for (uint32_t i = 0; i < createInfo.filePathCount; ++i) {
+            gvk::ImageView imageView;
+            gvk_result(load_image(gvkContext, createInfo.ppFilePaths[i], &stagingBuffer, &imageView));
+            mImages[createInfo.ppFilePaths[i]] = imageView;
+        }
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+VkResult Renderer<Sprite>::allocate_descriptor_sets(const gvk::Context& gvkContext)
+{
+    (void)gvkContext;
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        gvk_result(VK_ERROR_INITIALIZATION_FAILED);
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+void Renderer<Sprite>::update_descriptor_sets(const gvk::Context& gvkContext)
+{
+    (void)gvkContext;
 }
 
 } // namespace gfx
