@@ -519,6 +519,7 @@ int main(int, const char*[])
         dst::gfx::Renderer<dst::gfx::Sprite> spriteRenderer;
         gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, wsiManager.get_render_pass(), spriteRendererCreateInfo, &spriteRenderer));
         int spriteCount = 8;
+        auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
@@ -616,6 +617,7 @@ int main(int, const char*[])
             spriteRenderer.begin_sprite_batch();
             for (int i = 0; i < spriteCount; ++i) {
                 dst::gfx::Sprite sprite { };
+                sprite.color = spriteColor;
                 sprite.transform.translation.x = (float)i;
                 spriteRenderer.submit(sprite);
             }
@@ -692,6 +694,7 @@ int main(int, const char*[])
                         pTextMeshRenderer->transform.scale = glm::vec3(textScale);
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
+                    ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }

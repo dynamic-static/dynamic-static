@@ -261,7 +261,7 @@ void Renderer<Sprite>::submit(const Sprite& sprite)
     GlSprite glSprite { };
     glSprite.extent.x = 1;
     glSprite.extent.y = 3;
-    // glSprite.color = sprite.color;
+    glSprite.color = sprite.color;
     glSprite.model = sprite.transform.world_from_local();
     mSprites.push_back(glSprite);
 }
@@ -349,8 +349,8 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
             struct Sprite
             {
                 vec4 extent;
-                vec2 uvMin;
-                vec2 uvMax;
+                vec4 uvMin;
+                vec4 uvMax;
                 vec4 color;
                 mat4 model;
             };
@@ -388,17 +388,14 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
                 vec4 position = Vertices[gl_VertexIndex];
                 position.xy *= sprite.extent.xy;
                 gl_Position = camera.projection * camera.view * sprite.model * position;
-                // gl_Position = camera.projection * camera.view * position;
-                // vec2 texcoords[4] = vec2[](
-                //     vec2(sprite.uvMin.x, sprite.uvMax.y),
-                //     vec2(sprite.uvMax.x, sprite.uvMax.y),
-                //     vec2(sprite.uvMin.x, sprite.uvMin.y),
-                //     vec2(sprite.uvMax.x, sprite.uvMin.y)
-                // );
-                // fsTexcoord = texcoords[gl_VertexIndex];
-                // fsColor = sprite.color;
-                fsTexcoord = vec2(1, 1);
-                fsColor = vec4(1, 1, 1, 1);
+                vec2 texcoords[4] = vec2[](
+                    vec2(sprite.uvMin.x, sprite.uvMax.y),
+                    vec2(sprite.uvMax.x, sprite.uvMax.y),
+                    vec2(sprite.uvMin.x, sprite.uvMin.y),
+                    vec2(sprite.uvMax.x, sprite.uvMin.y)
+                );
+                fsTexcoord = texcoords[gl_VertexIndex];
+                fsColor = sprite.color;
             }
         )";
 
@@ -418,7 +415,7 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
             void main()
             {
                 // fragColor = texture(image, fsTexcoord) * fsColor;
-                fragColor = vec4(1, 1, 1, 1);
+                fragColor = fsColor;
             }
         )";
 

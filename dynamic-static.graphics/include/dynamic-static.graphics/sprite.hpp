@@ -70,8 +70,8 @@ private:
     struct GlSprite
     {
         glm::vec4 extent { };
-        glm::vec2 uvMin { };
-        glm::vec2 uvMax { };
+        glm::vec4 uvMin { };
+        glm::vec4 uvMax { };
         glm::vec4 color { };
         glm::mat4 model { };
     };
