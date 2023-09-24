@@ -41,7 +41,7 @@ struct Sprite
 {
     glm::vec4 color { gvk::math::Color::White };
     gvk::math::Transform transform { };
-    uint64_t textureId { 0 };
+    uint32_t textureId { 0 };
 };
 
 template <>

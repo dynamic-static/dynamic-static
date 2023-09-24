@@ -619,6 +619,7 @@ int main(int, const char*[])
                 dst::gfx::Sprite sprite { };
                 sprite.color = spriteColor;
                 sprite.transform.translation.x = (float)i;
+                sprite.textureId = i % SpriteFilePaths.size();
                 spriteRenderer.submit(sprite);
             }
             spriteRenderer.end_sprite_batch();

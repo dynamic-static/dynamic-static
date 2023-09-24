@@ -266,7 +266,7 @@ void Renderer<Sprite>::submit(const Sprite& sprite)
 {
     GlSprite glSprite { };
     glSprite.extent = { 1, 2, 0, 1 };
-    glSprite.uvMin = { 0, 0, 0, 0 };
+    glSprite.uvMin = { 0, 0, 0, (float)sprite.textureId };
     glSprite.uvMax = { 1, 1, 0, 0 };
     glSprite.color = sprite.color;
     glSprite.model = sprite.transform.world_from_local();
@@ -458,7 +458,6 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
             void main()
             {
                 fragColor = texture(images[nonuniformEXT(int(fsTexindex))], fsTexcoord) * fsColor;
-                fragColor = fsColor;
             }
         )";
 
