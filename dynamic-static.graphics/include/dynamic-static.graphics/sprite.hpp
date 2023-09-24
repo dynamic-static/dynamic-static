@@ -57,22 +57,30 @@ public:
     static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer);
     ~Renderer();
     void reset();
-    void begin_sprite_batch(const gvk::math::Camera& camera);
+    void begin_sprite_batch();
     void submit(const Sprite& sprite);
     void end_sprite_batch();
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer) const;
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
 
 private:
     VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
     VkResult create_image_views(const gvk::Context& gvkContext, const CreateInfo& createInfo);
-    VkResult allocate_descriptor_sets(const gvk::Context& gvkContext);
-    void update_descriptor_sets(const gvk::Context& gvkContext);
+    VkResult allocate_descriptor_set(const gvk::Context& gvkContext);
 
-    std::unordered_map<std::string, gvk::ImageView> mImages;
-    gvk::DescriptorSet mCameraDescriptorSet;
-    gvk::DescriptorSet mSpriteDescriptorSet;
+    struct GlSprite
+    {
+        glm::vec4 extent { };
+        glm::vec2 uvMin { };
+        glm::vec2 uvMax { };
+        glm::vec4 color { };
+        glm::mat4 model { };
+    };
+
     gvk::Pipeline mPipeline;
-    uint32_t mSpriteCount{ 0 };
+    gvk::Buffer mStorageBuffer;
+    std::unordered_map<std::string, gvk::ImageView> mImages;
+    gvk::DescriptorSet mDescriptorSet;
+    std::vector<GlSprite> mSprites;
 };
 
 } // namespace gfx

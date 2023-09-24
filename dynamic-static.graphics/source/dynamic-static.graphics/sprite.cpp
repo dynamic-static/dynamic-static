@@ -39,6 +39,59 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdlib.h>
 #endif // defined(_WIN32) || defined(_WIN64)
 
+static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>& descriptorSets)
+{
+    assert(pipeline);
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        // Use the provided gvk::Pipeline's gvk::PipelineLayout to determine what types
+        //  and how many descriptors we'll need...the samples generally allocate a very
+        //  limited number of descriptors so this works fine...in real world scenario
+        //  you'd likely employ a much more robust strategy for managing descriptors.
+        //  Startegies for managing descriptors are highly application dependent...
+        std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
+        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts;
+        for (const auto& descriptorSetLayout : pipeline.get<gvk::PipelineLayout>().get<gvk::DescriptorSetLayouts>()) {
+            vkDescriptorSetLayouts.push_back(descriptorSetLayout);
+            auto descriptorSetLayoutCreateInfo = descriptorSetLayout.get<VkDescriptorSetLayoutCreateInfo>();
+            for (uint32_t i = 0; i < descriptorSetLayoutCreateInfo.bindingCount; ++i) {
+                const auto& descriptorSetLayoutBinding = descriptorSetLayoutCreateInfo.pBindings[i];
+                descriptorPoolSizes.push_back({
+                    /* .type            = */ descriptorSetLayoutBinding.descriptorType,
+                    /* .descriptorCount = */ descriptorSetLayoutBinding.descriptorCount
+                });
+            }
+        }
+
+        descriptorSets.clear();
+        assert(vkDescriptorSetLayouts.empty() == descriptorPoolSizes.empty());
+        if (!vkDescriptorSetLayouts.empty() && !descriptorPoolSizes.empty()) {
+            // Create a gvk::DescriptorPool...
+            auto descriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+            descriptorPoolCreateInfo.maxSets = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorPoolCreateInfo.poolSizeCount = (uint32_t)descriptorPoolSizes.size();
+            descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
+            gvk::DescriptorPool descriptorPool;
+            gvk_result(gvk::DescriptorPool::create(pipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+
+            // And allocate gvk::DescriptorSets...
+            // NOTE : The allocated gvk::DescriptorSets will hold references to the
+            //  gvk::DescriptorPool so there's no need for user code to maintain an
+            //  explicit reference.  A gvk::DescriptorSet's gvk::DescriptorPool can be
+            //  retrieved using descriptorSet.get<gvk::DescriptorPool>().
+            // NOTE : vkResetDescriptorPool() must not be used with gvk::DescriptorSets.
+            // NOTE : A gvk::DescriptorPool may be used to allocate VkDescriptorSets and
+            //  use vkResetDescriptorPool() as normal.
+            auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+            descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
+            descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
+            descriptorSets.resize(descriptorSetAllocateInfo.descriptorSetCount);
+            gvk_result(gvk::DescriptorSet::allocate(pipeline.get<gvk::Device>(), &descriptorSetAllocateInfo, descriptorSets.data()));
+        }
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
 namespace dst {
 namespace gfx {
 
@@ -179,8 +232,7 @@ VkResult Renderer<Sprite>::create(const gvk::Context& gvkContext, const gvk::Ren
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         gvk_result(pRenderer->create_pipeline(gvkContext, renderPass));
         gvk_result(pRenderer->create_image_views(gvkContext, createInfo));
-        // pRenderer->allocate_descriptor_sets(gvkContext);
-        // pRenderer->update_descriptor_sets(gvkContext);
+        gvk_result(pRenderer->allocate_descriptor_set(gvkContext));
     } gvk_result_scope_end;
     return gvkResult;
 }
@@ -192,38 +244,83 @@ Renderer<Sprite>::~Renderer()
 
 void Renderer<Sprite>::reset()
 {
+    mPipeline.reset();
+    mStorageBuffer.reset();
     mImages.clear();
+    mDescriptorSet.reset();
+    mSprites.clear();
 }
 
-void Renderer<Sprite>::begin_sprite_batch(const gvk::math::Camera& camera)
+void Renderer<Sprite>::begin_sprite_batch()
 {
-    // Update camera descriptor set
-    mSpriteCount = 0;
-    (void)camera;
+    mSprites.clear();
 }
 
 void Renderer<Sprite>::submit(const Sprite& sprite)
 {
-    ++mSpriteCount;
-    (void)sprite;
+    GlSprite glSprite { };
+    glSprite.extent.x = 1;
+    glSprite.extent.y = 3;
+    // glSprite.color = sprite.color;
+    glSprite.model = sprite.transform.world_from_local();
+    mSprites.push_back(glSprite);
 }
 
 void Renderer<Sprite>::end_sprite_batch()
 {
-    // Update descriptor set if buffer changed
-    // Update descriptor set if textures changed
+    assert(mPipeline);
+    if (!mSprites.empty()) {
+        gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+            const auto& device = mPipeline.get<gvk::Device>();
+            auto size = (VkDeviceSize)(mSprites.size() * sizeof(GlSprite));
+            auto bufferCreateInfo = mStorageBuffer ? mStorageBuffer.get<VkBufferCreateInfo>() : gvk::get_default<VkBufferCreateInfo>();
+            if (bufferCreateInfo.size < size) {
+                // HACK :
+                gvk_result(device.get<gvk::DispatchTable>().gvkDeviceWaitIdle(device));
+
+                // Create VkBuffer
+                bufferCreateInfo.size = size;
+                bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+                auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
+                allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+                allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+                gvk_result(gvk::Buffer::create(device, &bufferCreateInfo, &allocationCreateInfo, &mStorageBuffer));
+
+                // Update VkDescriptorSet
+                auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+                descriptorBufferInfo.buffer = mStorageBuffer;
+                auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+                writeDescriptorSet.dstSet = mDescriptorSet;
+                writeDescriptorSet.descriptorCount = 1;
+                writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+                device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+            }
+
+            // Update VkBuffer
+            auto vmaAllocator = device.get<VmaAllocator>();
+            auto vmaAllocation = mStorageBuffer.get<VmaAllocation>();
+            uint8_t* pData = nullptr;
+            gvk_result(vmaMapMemory(vmaAllocator, vmaAllocation, (void**)&pData));
+            memcpy(pData, mSprites.data(), size);
+            gvk_result(vmaFlushAllocation(vmaAllocator, vmaAllocation, 0, size));
+            vmaUnmapMemory(vmaAllocator, vmaAllocation);
+        } gvk_result_scope_end;
+        assert(gvkResult == VK_SUCCESS);
+    }
 }
 
-void Renderer<Sprite>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer) const
+void Renderer<Sprite>::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const
 {
-    if (mSpriteCount) {
+    if (!mSprites.empty()) {
         auto bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         const auto& pipelineLayout = mPipeline.get<gvk::PipelineLayout>();
         const auto& dispatchTable = commandBuffer.get<gvk::Device>().get<gvk::DispatchTable>();
         dispatchTable.gvkCmdBindPipeline(commandBuffer, bindPoint, mPipeline);
-        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 1, 1, &mSpriteDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-        dispatchTable.gvkCmdDraw(commandBuffer, 4, mSpriteCount, 0, 0);
+        std::array<glm::mat4, 2> cameraMatrices { camera.view(), camera.projection() };
+        dispatchTable.gvkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(cameraMatrices), cameraMatrices.data());
+        dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mSprites.size(), 0, 0);
     }
 }
 
@@ -251,31 +348,30 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
 
             struct Sprite
             {
-                vec2 extent;
+                vec4 extent;
                 vec2 uvMin;
                 vec2 uvMax;
                 vec4 color;
-                mat4 world;
+                mat4 model;
             };
 
-            layout(set = 0, binding = 0)
-            uniform Camera
+            layout(push_constant) uniform Camera
             {
                 mat4 view;
                 mat4 projection;
             } camera;
 
-            layout(std140, set = 1, binding = 0)
+            layout(std140, set = 0, binding = 0)
             readonly buffer SpriteBuffer
             {
                 Sprite sprites[];
             } spriteBuffer;
 
             vec4 Vertices[4] = vec4[](
-                vec4(-0.5,  0.5, 0, 1),
-                vec4( 0.5,  0.5, 0, 1),
-                vec4(-0.5, -0.5, 0, 1),
-                vec4( 0.5, -0.5, 0, 1)
+                vec4(-0.45,  0.5, 0, 1),
+                vec4( 0.45,  0.5, 0, 1),
+                vec4(-0.45, -0.5, 0, 1),
+                vec4( 0.45, -0.5, 0, 1)
             );
 
             layout(location = 0) out vec2 fsTexcoord;
@@ -289,16 +385,20 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
             void main()
             {
                 Sprite sprite = spriteBuffer.sprites[gl_InstanceIndex];
-                vec4 position = Vertices[gl_VertexIndex] * vec4(sprite.extent, 0, 1);
-                gl_Position = camera.projection * camera.view * sprite.world * position;
-                vec2 texcoords[4] = vec2[](
-                    vec2(sprite.uvMin.x, sprite.uvMax.y),
-                    vec2(sprite.uvMax.x, sprite.uvMax.y),
-                    vec2(sprite.uvMin.x, sprite.uvMin.y),
-                    vec2(sprite.uvMax.x, sprite.uvMin.y)
-                );
-                fsTexcoord = texcoords[gl_VertexIndex];
-                fsColor = sprite.color;
+                vec4 position = Vertices[gl_VertexIndex];
+                position.xy *= sprite.extent.xy;
+                gl_Position = camera.projection * camera.view * sprite.model * position;
+                // gl_Position = camera.projection * camera.view * position;
+                // vec2 texcoords[4] = vec2[](
+                //     vec2(sprite.uvMin.x, sprite.uvMax.y),
+                //     vec2(sprite.uvMax.x, sprite.uvMax.y),
+                //     vec2(sprite.uvMin.x, sprite.uvMin.y),
+                //     vec2(sprite.uvMax.x, sprite.uvMin.y)
+                // );
+                // fsTexcoord = texcoords[gl_VertexIndex];
+                // fsColor = sprite.color;
+                fsTexcoord = vec2(1, 1);
+                fsColor = vec4(1, 1, 1, 1);
             }
         )";
 
@@ -309,7 +409,7 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
         fragmentShaderInfo.source = R"(
             #version 450
 
-            layout(set = 1, binding = 1) uniform sampler2D image;
+            // layout(set = 0, binding = 1) uniform sampler2D image;
 
             layout(location = 0) in vec2 fsTexcoord;
             layout(location = 1) in vec4 fsColor;
@@ -317,8 +417,8 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
 
             void main()
             {
-                fragColor = texture(image, fsTexcoord) * fsColor;
-                // fragColor = vec4(1, 1, 1, 1);
+                // fragColor = texture(image, fsTexcoord) * fsColor;
+                fragColor = vec4(1, 1, 1, 1);
             }
         )";
 
@@ -416,18 +516,16 @@ VkResult Renderer<Sprite>::create_image_views(const gvk::Context& gvkContext, co
     return gvkResult;
 }
 
-VkResult Renderer<Sprite>::allocate_descriptor_sets(const gvk::Context& gvkContext)
+VkResult Renderer<Sprite>::allocate_descriptor_set(const gvk::Context& gvkContext)
 {
     (void)gvkContext;
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk_result(VK_ERROR_INITIALIZATION_FAILED);
+        std::vector<gvk::DescriptorSet> descriptorSets;
+        gvk_result(dst_sample_allocate_descriptor_sets_HACK(mPipeline, descriptorSets));
+        assert(descriptorSets.size() == 1);
+        mDescriptorSet = descriptorSets[0];
     } gvk_result_scope_end;
     return gvkResult;
-}
-
-void Renderer<Sprite>::update_descriptor_sets(const gvk::Context& gvkContext)
-{
-    (void)gvkContext;
 }
 
 } // namespace gfx

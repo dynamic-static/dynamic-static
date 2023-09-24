@@ -518,6 +518,7 @@ int main(int, const char*[])
         spriteRendererCreateInfo.ppFilePaths = SpriteFilePaths.data();
         dst::gfx::Renderer<dst::gfx::Sprite> spriteRenderer;
         gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, wsiManager.get_render_pass(), spriteRendererCreateInfo, &spriteRenderer));
+        int spriteCount = 8;
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
@@ -610,6 +611,17 @@ int main(int, const char*[])
             textMesh.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
+            ///////////////////////////////////////////////////////////////////////////////
+            // Sprites
+            spriteRenderer.begin_sprite_batch();
+            for (int i = 0; i < spriteCount; ++i) {
+                dst::gfx::Sprite sprite { };
+                sprite.transform.translation.x = (float)i;
+                spriteRenderer.submit(sprite);
+            }
+            spriteRenderer.end_sprite_batch();
+            ///////////////////////////////////////////////////////////////////////////////
+
             wsiManager.update();
             auto swapchain = wsiManager.get_swapchain();
             if (swapchain) {
@@ -679,6 +691,7 @@ int main(int, const char*[])
                     if (ImGui::DragFloat("Text Scale", &textScale)) {
                         pTextMeshRenderer->transform.scale = glm::vec3(textScale);
                     }
+                    ImGui::InputInt("spriteCount", &spriteCount);
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
@@ -733,9 +746,9 @@ int main(int, const char*[])
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)floorDescriptorSet, 0, nullptr);
                     floorMesh.record_cmds(commandBuffer);
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    cubeMesh.record_cmds(commandBuffer);
+                    // vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
+                    // vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
+                    // cubeMesh.record_cmds(commandBuffer);
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // TextMesh
@@ -744,6 +757,11 @@ int main(int, const char*[])
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, fontPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)fontDescriptorSet, 0, nullptr);
                     pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
+                    ///////////////////////////////////////////////////////////////////////////////
+
+                    ///////////////////////////////////////////////////////////////////////////////
+                    // Sprites
+                    spriteRenderer.record_draw_cmds(commandBuffer, camera);
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 
