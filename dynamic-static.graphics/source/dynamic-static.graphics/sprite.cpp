@@ -39,7 +39,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdlib.h>
 #endif // defined(_WIN32) || defined(_WIN64)
 
-static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, std::vector<gvk::DescriptorSet>& descriptorSets)
+static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pipeline, uint32_t descriptorCount, std::vector<gvk::DescriptorSet>& descriptorSets)
 {
     assert(pipeline);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
@@ -73,6 +73,11 @@ static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pi
             gvk::DescriptorPool descriptorPool;
             gvk_result(gvk::DescriptorPool::create(pipeline.get<gvk::Device>(), &descriptorPoolCreateInfo, nullptr, &descriptorPool));
 
+            // TODO : Extension
+            auto descriptorSetVariableDescriptorCountAllocateInfo = gvk::get_default<VkDescriptorSetVariableDescriptorCountAllocateInfo>();
+            descriptorSetVariableDescriptorCountAllocateInfo.descriptorSetCount = 1;
+            descriptorSetVariableDescriptorCountAllocateInfo.pDescriptorCounts = &descriptorCount;
+
             // And allocate gvk::DescriptorSets...
             // NOTE : The allocated gvk::DescriptorSets will hold references to the
             //  gvk::DescriptorPool so there's no need for user code to maintain an
@@ -82,6 +87,7 @@ static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pi
             // NOTE : A gvk::DescriptorPool may be used to allocate VkDescriptorSets and
             //  use vkResetDescriptorPool() as normal.
             auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+            descriptorSetAllocateInfo.pNext = &descriptorSetVariableDescriptorCountAllocateInfo;
             descriptorSetAllocateInfo.descriptorPool = descriptorPool;
             descriptorSetAllocateInfo.descriptorSetCount = (uint32_t)vkDescriptorSetLayouts.size();
             descriptorSetAllocateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
@@ -230,8 +236,8 @@ VkResult Renderer<Sprite>::create(const gvk::Context& gvkContext, const gvk::Ren
     assert(pRenderer);
     pRenderer->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        gvk_result(pRenderer->create_pipeline(gvkContext, renderPass));
         gvk_result(pRenderer->create_image_views(gvkContext, createInfo));
+        gvk_result(pRenderer->create_pipeline(gvkContext, renderPass));
         gvk_result(pRenderer->allocate_descriptor_set(gvkContext));
     } gvk_result_scope_end;
     return gvkResult;
@@ -259,8 +265,9 @@ void Renderer<Sprite>::begin_sprite_batch()
 void Renderer<Sprite>::submit(const Sprite& sprite)
 {
     GlSprite glSprite { };
-    glSprite.extent.x = 1;
-    glSprite.extent.y = 3;
+    glSprite.extent = { 1, 2, 0, 1 };
+    glSprite.uvMin = { 0, 0, 0, 0 };
+    glSprite.uvMax = { 1, 1, 0, 0 };
     glSprite.color = sprite.color;
     glSprite.model = sprite.transform.world_from_local();
     mSprites.push_back(glSprite);
@@ -286,6 +293,7 @@ void Renderer<Sprite>::end_sprite_batch()
                 allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
                 gvk_result(gvk::Buffer::create(device, &bufferCreateInfo, &allocationCreateInfo, &mStorageBuffer));
 
+#if 0
                 // Update VkDescriptorSet
                 auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
                 descriptorBufferInfo.buffer = mStorageBuffer;
@@ -295,6 +303,36 @@ void Renderer<Sprite>::end_sprite_batch()
                 writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
                 device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+#endif
+
+                std::array<VkWriteDescriptorSet, 2> writeDescriptorSets {
+                    gvk::get_default<VkWriteDescriptorSet>(),
+                    gvk::get_default<VkWriteDescriptorSet>(),
+                };
+                // Storage buffer
+                auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+                descriptorBufferInfo.buffer = mStorageBuffer;
+                writeDescriptorSets[0].dstSet = mDescriptorSet;
+                writeDescriptorSets[0].dstBinding = 0;
+                writeDescriptorSets[0].descriptorCount = 1;
+                writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writeDescriptorSets[0].pBufferInfo = &descriptorBufferInfo;
+                // Image array
+                std::vector<VkDescriptorImageInfo> descriptorImageInfos;
+                descriptorImageInfos.reserve(mImages.size());
+                for (const auto& image : mImages) {
+                    auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
+                    descriptorImageInfo.sampler = mSampler;
+                    descriptorImageInfo.imageView = image.second;
+                    descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    descriptorImageInfos.push_back(descriptorImageInfo);
+                }
+                writeDescriptorSets[1].dstSet = mDescriptorSet;
+                writeDescriptorSets[1].dstBinding = 1;
+                writeDescriptorSets[1].descriptorCount = (uint32_t)mImages.size();
+                writeDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                writeDescriptorSets[1].pImageInfo = descriptorImageInfos.data();
+                device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
             }
 
             // Update VkBuffer
@@ -374,8 +412,9 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
                 vec4( 0.45, -0.5, 0, 1)
             );
 
-            layout(location = 0) out vec2 fsTexcoord;
-            layout(location = 1) out vec4 fsColor;
+            layout(location = 0) out float fsTexindex;
+            layout(location = 1) out vec2 fsTexcoord;
+            layout(location = 2) out vec4 fsColor;
 
             out gl_PerVertex
             {
@@ -385,8 +424,7 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
             void main()
             {
                 Sprite sprite = spriteBuffer.sprites[gl_InstanceIndex];
-                vec4 position = Vertices[gl_VertexIndex];
-                position.xy *= sprite.extent.xy;
+                vec4 position = Vertices[gl_VertexIndex] * sprite.extent;
                 gl_Position = camera.projection * camera.view * sprite.model * position;
                 vec2 texcoords[4] = vec2[](
                     vec2(sprite.uvMin.x, sprite.uvMax.y),
@@ -394,6 +432,7 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
                     vec2(sprite.uvMin.x, sprite.uvMin.y),
                     vec2(sprite.uvMax.x, sprite.uvMin.y)
                 );
+                fsTexindex = sprite.uvMin.w;
                 fsTexcoord = texcoords[gl_VertexIndex];
                 fsColor = sprite.color;
             }
@@ -406,15 +445,19 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
         fragmentShaderInfo.source = R"(
             #version 450
 
-            // layout(set = 0, binding = 1) uniform sampler2D image;
+            #extension GL_EXT_nonuniform_qualifier : enable
 
-            layout(location = 0) in vec2 fsTexcoord;
-            layout(location = 1) in vec4 fsColor;
+            layout(set = 0, binding = 1) uniform sampler2D images[];
+
+            layout(location = 0) in float fsTexindex;
+            layout(location = 1) in vec2 fsTexcoord;
+            layout(location = 2) in vec4 fsColor;
+
             layout(location = 0) out vec4 fragColor;
 
             void main()
             {
-                // fragColor = texture(image, fsTexcoord) * fsColor;
+                fragColor = texture(images[nonuniformEXT(int(fsTexindex))], fsTexcoord) * fsColor;
                 fragColor = fsColor;
             }
         )";
@@ -481,6 +524,17 @@ VkResult Renderer<Sprite>::create_pipeline(const gvk::Context& gvkContext, const
         gvk::spirv::BindingInfo spirvBindingInfo;
         spirvBindingInfo.add_shader(vertexShaderInfo);
         spirvBindingInfo.add_shader(fragmentShaderInfo);
+
+        // TODO : It would be good to figure out how to get this info from SPIRV-Cross
+        std::array<VkDescriptorBindingFlags, 2> descriptorBindingFlags { 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT };
+        auto descriptorSetLayoutBindingFlagsCreateInfo = gvk::get_default<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
+        descriptorSetLayoutBindingFlagsCreateInfo.bindingCount = (uint32_t)descriptorBindingFlags.size();
+        descriptorSetLayoutBindingFlagsCreateInfo.pBindingFlags = descriptorBindingFlags.data();
+        auto descriptorSetLayoutCreateInfo = gvk::get_default<VkDescriptorSetLayoutCreateInfo>();
+        descriptorSetLayoutCreateInfo.pNext = &descriptorSetLayoutBindingFlagsCreateInfo;
+        spirvBindingInfo.descriptorSetLayoutCreateInfos[0] = descriptorSetLayoutCreateInfo;
+        spirvBindingInfo.descriptorSetLayoutBindings[0][1].descriptorCount = (uint32_t)mImages.size();
+
         gvk::PipelineLayout pipelineLayout;
         gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get_devices()[0], spirvBindingInfo, nullptr, &pipelineLayout));
 
@@ -509,6 +563,7 @@ VkResult Renderer<Sprite>::create_image_views(const gvk::Context& gvkContext, co
             gvk_result(load_image(gvkContext, createInfo.ppFilePaths[i], &stagingBuffer, &imageView));
             mImages[createInfo.ppFilePaths[i]] = imageView;
         }
+        gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &mSampler));
     } gvk_result_scope_end;
     return gvkResult;
 }
@@ -518,7 +573,7 @@ VkResult Renderer<Sprite>::allocate_descriptor_set(const gvk::Context& gvkContex
     (void)gvkContext;
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         std::vector<gvk::DescriptorSet> descriptorSets;
-        gvk_result(dst_sample_allocate_descriptor_sets_HACK(mPipeline, descriptorSets));
+        gvk_result(dst_sample_allocate_descriptor_sets_HACK(mPipeline, (uint32_t)mImages.size(), descriptorSets));
         assert(descriptorSets.size() == 1);
         mDescriptorSet = descriptorSets[0];
     } gvk_result_scope_end;

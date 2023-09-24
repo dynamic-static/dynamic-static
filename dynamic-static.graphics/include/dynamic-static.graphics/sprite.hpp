@@ -63,8 +63,8 @@ public:
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
 
 private:
-    VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
     VkResult create_image_views(const gvk::Context& gvkContext, const CreateInfo& createInfo);
+    VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
     VkResult allocate_descriptor_set(const gvk::Context& gvkContext);
 
     struct GlSprite
@@ -79,6 +79,7 @@ private:
     gvk::Pipeline mPipeline;
     gvk::Buffer mStorageBuffer;
     std::unordered_map<std::string, gvk::ImageView> mImages;
+    gvk::Sampler mSampler;
     gvk::DescriptorSet mDescriptorSet;
     std::vector<GlSprite> mSprites;
 };

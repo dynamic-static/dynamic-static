@@ -127,7 +127,7 @@ int main(int, const char*[])
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         // Create a gvk::Context.  This will initialize a VkInstance and VkDevice.
-        gvk::Context gvkContext;
+        DstSampleGvkContext gvkContext;
         gvk_result(dst_sample_create_gvk_context("dynamic-static - Shape Shooter", &gvkContext));
         auto gvkDevice = gvkContext.get_devices()[0];
         auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];

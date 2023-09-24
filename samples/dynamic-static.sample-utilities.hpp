@@ -63,15 +63,53 @@ static VkBool32 dst_sample_debug_utils_messenger_callback(
 {
     (void)messageTypes;
     (void)pUserData;
+    bool error = false;
     if (pCallbackData && pCallbackData->pMessage) {
         if (messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
             std::cerr << pCallbackData->pMessage << std::endl;
+            error = true;
         } else {
             std::cout << pCallbackData->pMessage << std::endl;
         }
     }
+    if (error) {
+        error = false;
+    }
     return VK_FALSE;
 }
+
+class DstSampleGvkContext final
+    : public gvk::Context
+{
+public:
+    VkResult create_devices(const VkDeviceCreateInfo* pDeviceCreateInfo, const VkAllocationCallbacks* pAllocator) override final
+    {
+        assert(pDeviceCreateInfo);
+        auto deviceCreateInfo = *pDeviceCreateInfo;
+
+#if 1
+        auto physicalDeviceDescriptorIndexingFeatures = gvk::get_default<VkPhysicalDeviceDescriptorIndexingFeatures>();
+        physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+        physicalDeviceDescriptorIndexingFeatures.pNext = (void*)deviceCreateInfo.pNext;
+        deviceCreateInfo.pNext = &physicalDeviceDescriptorIndexingFeatures;
+#endif
+#if 0
+        auto physicalDeviceVulkan12Features = gvk::get_default<VkPhysicalDeviceVulkan12Features>();
+        physicalDeviceVulkan12Features.runtimeDescriptorArray = VK_TRUE;
+        physicalDeviceVulkan12Features.pNext = (void*)deviceCreateInfo.pNext;
+        deviceCreateInfo.pNext = &physicalDeviceVulkan12Features;
+#endif
+
+        std::vector<const char*> extensions(deviceCreateInfo.ppEnabledExtensionNames, deviceCreateInfo.ppEnabledExtensionNames + deviceCreateInfo.enabledExtensionCount);
+        extensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+        deviceCreateInfo.enabledExtensionCount = (uint32_t)extensions.size();
+        deviceCreateInfo.ppEnabledExtensionNames = extensions.data();
+
+        return gvk::Context::create_devices(&deviceCreateInfo, pAllocator);
+    }
+};
 
 inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk::Context* pGfxContext)
 {
