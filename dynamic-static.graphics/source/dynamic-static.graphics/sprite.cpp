@@ -257,6 +257,11 @@ void Renderer<Sprite>::reset()
     mSprites.clear();
 }
 
+const std::vector<std::pair<std::string, gvk::ImageView>>& Renderer<Sprite>::get_images() const
+{
+    return mImages;
+}
+
 void Renderer<Sprite>::begin_sprite_batch()
 {
     mSprites.clear();
@@ -264,9 +269,11 @@ void Renderer<Sprite>::begin_sprite_batch()
 
 void Renderer<Sprite>::submit(const Sprite& sprite)
 {
+    // TODO : Cache this...
+    const auto& imageCreateInfo = mImages[sprite.imageIndex].second.get<gvk::Image>().get<VkImageCreateInfo>();
     GlSprite glSprite { };
-    glSprite.extent = { 1, 2, 0, 1 };
-    glSprite.uvMin = { 0, 0, 0, (float)sprite.textureId };
+    glSprite.extent = { imageCreateInfo.extent.width, imageCreateInfo.extent.height, 0, 1 };
+    glSprite.uvMin = { 0, 0, 0, (float)sprite.imageIndex };
     glSprite.uvMax = { 1, 1, 0, 0 };
     glSprite.color = sprite.color;
     glSprite.model = sprite.transform.world_from_local();
@@ -557,10 +564,12 @@ VkResult Renderer<Sprite>::create_image_views(const gvk::Context& gvkContext, co
     assert(gvkContext);
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         gvk::Buffer stagingBuffer;
+        mImages.resize(createInfo.filePathCount);
         for (uint32_t i = 0; i < createInfo.filePathCount; ++i) {
             gvk::ImageView imageView;
             gvk_result(load_image(gvkContext, createInfo.ppFilePaths[i], &stagingBuffer, &imageView));
-            mImages[createInfo.ppFilePaths[i]] = imageView;
+            mImages[i].first = createInfo.ppFilePaths[i];
+            mImages[i].second = imageView;
         }
         gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &mSampler));
     } gvk_result_scope_end;

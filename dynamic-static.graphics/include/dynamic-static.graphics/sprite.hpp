@@ -32,16 +32,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "gvk-math.hpp"
 
 #include <set>
-#include <unordered_map>
+#include <vector>
 
 namespace dst {
 namespace gfx {
 
 struct Sprite
 {
+    uint32_t imageIndex { 0 };
     glm::vec4 color { gvk::math::Color::White };
     gvk::math::Transform transform { };
-    uint32_t textureId { 0 };
 };
 
 template <>
@@ -57,6 +57,7 @@ public:
     static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, Renderer<Sprite>* pRenderer);
     ~Renderer();
     void reset();
+    const std::vector<std::pair<std::string, gvk::ImageView>>& get_images() const;
     void begin_sprite_batch();
     void submit(const Sprite& sprite);
     void end_sprite_batch();
@@ -78,7 +79,7 @@ private:
 
     gvk::Pipeline mPipeline;
     gvk::Buffer mStorageBuffer;
-    std::unordered_map<std::string, gvk::ImageView> mImages;
+    std::vector<std::pair<std::string, gvk::ImageView>> mImages;
     gvk::Sampler mSampler;
     gvk::DescriptorSet mDescriptorSet;
     std::vector<GlSprite> mSprites;

@@ -619,7 +619,8 @@ int main(int, const char*[])
                 dst::gfx::Sprite sprite { };
                 sprite.color = spriteColor;
                 sprite.transform.translation.x = (float)i;
-                sprite.textureId = i % SpriteFilePaths.size();
+                sprite.transform.scale *= 0.1f;
+                sprite.imageIndex = i % SpriteFilePaths.size();
                 spriteRenderer.submit(sprite);
             }
             spriteRenderer.end_sprite_batch();
@@ -765,7 +766,10 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Sprites
-                    spriteRenderer.record_draw_cmds(commandBuffer, camera);
+                    auto spriteCamera = camera;
+                    spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
+                    //spriteCamera.fieldOfView = viewport.width;
+                    spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 
