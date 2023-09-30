@@ -27,58 +27,5 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "dynamic-static.graphics/defines.hpp"
+#include "dynamic-static.graphics/renderer.hpp"
 
-namespace dst {
-namespace gfx {
-
-struct Point
-{
-    glm::vec4 position{ 0, 0, 0, 1 };
-    glm::vec4 color{ gvk::math::Color::White };
-    glm::vec4 width{ 1 };
-};
-
-/*
-TODO : Documentation
-*/
-class LineRenderer final
-{
-public:
-    class CreateInfo final
-    {
-    public:
-    };
-
-    LineRenderer() = default;
-    static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, LineRenderer* pRenderer);
-    ~LineRenderer();
-    void reset();
-
-    void begin_line_batch();
-    void submit(uint32_t pointCount, const Point* pPoints);
-    void end_line_batch();
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
-
-private:
-    VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
-    VkResult allocate_descriptor_set(const gvk::Context& gvkContext);
-
-    gvk::Pipeline mPipeline;
-    gvk::Buffer mStorageBuffer;
-    gvk::DescriptorSet mDescriptorSet;
-    std::vector<Point> mPoints;
-
-    LineRenderer(const LineRenderer&) = delete;
-    LineRenderer& operator=(const LineRenderer&) = delete;
-};
-
-/*
-TODO : Documentation
-*/
-template <typename T>
-class Renderer final
-{
-};
-
-} // namespace gfx
-} // namespace dst

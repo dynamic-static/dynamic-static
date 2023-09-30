@@ -522,6 +522,18 @@ int main(int, const char*[])
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
+        ///////////////////////////////////////////////////////////////////////////////
+        // Lines
+        dst::gfx::LineRenderer::CreateInfo lineRendererCreateInfo{ };
+        dst::gfx::LineRenderer lineRenderer;
+        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer));
+        std::vector<dst::gfx::Point> points(8);
+        for (int i = 0; i < points.size(); ++i) {
+            points[i].position.x = (float)i;
+            points[i].position.y = (float)(i % 2 ? i * 0.5f : i * -0.5f);
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+
         gvk::system::Clock clock;
         while (
             !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
@@ -619,11 +631,19 @@ int main(int, const char*[])
                 dst::gfx::Sprite sprite { };
                 sprite.color = spriteColor;
                 sprite.transform.translation.x = (float)i;
+                sprite.transform.translation.y = cubeTransform.translation.y;
                 sprite.transform.scale *= 0.1f;
                 sprite.imageIndex = i % SpriteFilePaths.size();
                 spriteRenderer.submit(sprite);
             }
             spriteRenderer.end_sprite_batch();
+            ///////////////////////////////////////////////////////////////////////////////
+
+            ///////////////////////////////////////////////////////////////////////////////
+            // Lines
+            lineRenderer.begin_line_batch();
+            lineRenderer.submit((uint32_t)points.size(), points.data());
+            lineRenderer.end_line_batch();
             ///////////////////////////////////////////////////////////////////////////////
 
             wsiManager.update();
@@ -751,9 +771,9 @@ int main(int, const char*[])
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)floorDescriptorSet, 0, nullptr);
                     floorMesh.record_cmds(commandBuffer);
-                    // vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
-                    // vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    // cubeMesh.record_cmds(commandBuffer);
+                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
+                    cubeMesh.record_cmds(commandBuffer);
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // TextMesh
@@ -770,6 +790,11 @@ int main(int, const char*[])
                     spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
                     spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
+                    ///////////////////////////////////////////////////////////////////////////////
+
+                    ///////////////////////////////////////////////////////////////////////////////
+                    // Lines
+                    lineRenderer.record_draw_cmds(commandBuffer, camera);
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

@@ -15,6 +15,7 @@ dst_add_static_library(
         "${includeDirectory}"
     includeFiles
         "${includePath}/buffer.hpp"
+        "${includePath}/line-renderer.hpp"
         "${includePath}/mesh.hpp"
         "${includePath}/defines.hpp"
         "${includePath}/primitives.hpp"
@@ -23,6 +24,7 @@ dst_add_static_library(
         "${includePath}/text.hpp"
     sourceFiles
         "${sourcePath}/buffer.cpp"
+        "${sourcePath}/line-renderer.cpp"
         "${sourcePath}/mesh.cpp"
         "${sourcePath}/placeholder.cpp"
         "${sourcePath}/renderer.cpp"
