@@ -527,10 +527,25 @@ int main(int, const char*[])
         dst::gfx::LineRenderer::CreateInfo lineRendererCreateInfo{ };
         dst::gfx::LineRenderer lineRenderer;
         gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer));
-        std::vector<dst::gfx::Point> points(8);
+        std::vector<dst::gfx::Point> points(4);
         for (int i = 0; i < points.size(); ++i) {
             points[i].position.x = (float)i;
             points[i].position.y = (float)(i % 2 ? i * 0.5f : i * -0.5f);
+        }
+        points[0].color.r = 1;
+        points[1].color.g = 1;
+        points[2].color.b = 1;
+        auto curveBegin = points.back().position;
+        const int AdditionalPointCount = 64;
+        points.reserve(points.size() + AdditionalPointCount);
+        for (int i = 0; i < AdditionalPointCount; ++i) {
+            auto t = (float)i / (float)AdditionalPointCount;
+            dst::gfx::Point point{ };
+            point.position = curveBegin;
+            point.position.x += t * 4;
+            point.position.y += 0.5f * std::sin(4 * t);
+            point.width.r = glm::lerp(0.01f, 0.1f, t);
+            points.push_back(point);
         }
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -717,6 +732,14 @@ int main(int, const char*[])
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
                     ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
+                    for (uint32_t i = 0; i < points.size(); ++i) {
+                        auto positionStr = "position[" + std::to_string(i) + "]";
+                        ImGui::DragFloat3(positionStr.c_str(), &points[i].position[0]);
+                        auto colorStr = "color[" + std::to_string(i) + "]";
+                        ImGui::ColorPicker4(colorStr.c_str(), &points[i].color[0]);
+                        auto widthStr = "width[" + std::to_string(i) + "]";
+                        ImGui::DragFloat(widthStr.c_str(), &points[i].width[0]);
+                    }
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
@@ -755,9 +778,9 @@ int main(int, const char*[])
                 renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
                 vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
                 {
-                    VkRect2D scissor { { }, renderPassBeginInfo.renderArea.extent };
+                    VkRect2D scissor{ { }, renderPassBeginInfo.renderArea.extent };
                     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-                    VkViewport viewport { 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
+                    VkViewport viewport{ 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
                     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
                     // Bind the gvk::math::Camera uniform gvk::Buffer and the floor resources then
@@ -794,7 +817,8 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Lines
-                    lineRenderer.record_draw_cmds(commandBuffer, camera);
+                    const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
+                    lineRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

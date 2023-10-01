@@ -35,7 +35,7 @@ struct Point
 {
     glm::vec4 position{ 0, 0, 0, 1 };
     glm::vec4 color{ gvk::math::Color::White };
-    glm::vec4 width{ 1 };
+    glm::vec4 width{ 0.01f };
 };
 
 /*
@@ -57,7 +57,7 @@ public:
     void begin_line_batch();
     void submit(uint32_t pointCount, const Point* pPoints);
     void end_line_batch();
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const;
 
 private:
     VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
