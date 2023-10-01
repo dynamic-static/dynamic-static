@@ -524,30 +524,53 @@ int main(int, const char*[])
 
         ///////////////////////////////////////////////////////////////////////////////
         // Lines
-        dst::gfx::LineRenderer::CreateInfo lineRendererCreateInfo{ };
-        dst::gfx::LineRenderer lineRenderer;
-        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer));
-        std::vector<dst::gfx::Point> points(4);
-        for (int i = 0; i < points.size(); ++i) {
-            points[i].position.x = (float)i;
-            points[i].position.y = (float)(i % 2 ? i * 0.5f : i * -0.5f);
+        auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
+        dst::gfx::LineRenderer lineRenderer0;
+        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer0));
+        std::vector<dst::gfx::Point> points0(4);
+        for (int i = 0; i < points0.size(); ++i) {
+            points0[i].position.x = (float)i;
+            points0[i].position.y = (float)(i % 2 ? i * 0.5f : i * -0.5f);
         }
-        points[0].color.r = 1;
-        points[1].color.g = 1;
-        points[2].color.b = 1;
-        auto curveBegin = points.back().position;
+        points0[0].color.r = 1;
+        points0[1].color.g = 1;
+        points0[2].color.b = 1;
+        auto curveBegin = points0.back().position;
         const int AdditionalPointCount = 64;
-        points.reserve(points.size() + AdditionalPointCount);
+        points0.reserve(points0.size() + AdditionalPointCount);
         for (int i = 0; i < AdditionalPointCount; ++i) {
             auto t = (float)i / (float)AdditionalPointCount;
             dst::gfx::Point point{ };
             point.position = curveBegin;
             point.position.x += t * 4;
             point.position.y += 0.5f * std::sin(4 * t);
-            point.width.r = glm::lerp(1.0f, 8.0f, t);
-            points.push_back(point);
+            point.width.r = glm::lerp(4.0f, 16.0f, t);
+            points0.push_back(point);
         }
-        ///////////////////////////////////////////////////////////////////////////////
+
+        lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
+        dst::gfx::LineRenderer lineRenderer1;
+        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer1));
+        std::vector<dst::gfx::Point> points1;
+        const float SpiralHeight = 16;
+        const int SpiralPointCount = 1024;
+        points1.reserve(SpiralPointCount);
+        for (int i = 0; i < SpiralPointCount; ++i) {
+            auto t = i / (float)SpiralPointCount;
+            auto angle = t * 2.0f * glm::pi<float>() * SpiralHeight;
+            dst::gfx::Point point{ };
+            point.position.x = std::cos(angle) * t;
+            point.position.y = t * SpiralHeight;
+            point.position.z = std::sin(angle) * t;
+            point.color.r = t * 0.25f;
+            point.color.b = t;
+            if (t < 0.5f) {
+                point.width.r = glm::lerp(1.0f, 32.0f, t);
+            } else {
+                point.width.r = glm::lerp(32.0f, 1.0f, t);
+            }
+            points1.push_back(point);
+        }
 
         gvk::system::Clock clock;
         while (
@@ -656,9 +679,8 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // Lines
-            lineRenderer.begin_line_batch();
-            lineRenderer.submit((uint32_t)points.size(), points.data());
-            lineRenderer.end_line_batch();
+            lineRenderer0.submit((uint32_t)points0.size(), points0.data());
+            lineRenderer1.submit((uint32_t)points1.size(), points1.data());
             ///////////////////////////////////////////////////////////////////////////////
 
             wsiManager.update();
@@ -732,13 +754,13 @@ int main(int, const char*[])
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
                     ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
-                    for (uint32_t i = 0; i < points.size(); ++i) {
+                    for (uint32_t i = 0; i < points0.size(); ++i) {
                         auto positionStr = "position[" + std::to_string(i) + "]";
-                        ImGui::DragFloat3(positionStr.c_str(), &points[i].position[0]);
+                        ImGui::DragFloat3(positionStr.c_str(), &points0[i].position[0]);
                         auto colorStr = "color[" + std::to_string(i) + "]";
-                        ImGui::ColorPicker4(colorStr.c_str(), &points[i].color[0]);
+                        ImGui::ColorPicker4(colorStr.c_str(), &points0[i].color[0]);
                         auto widthStr = "width[" + std::to_string(i) + "]";
-                        ImGui::DragFloat(widthStr.c_str(), &points[i].width[0]);
+                        ImGui::DragFloat(widthStr.c_str(), &points0[i].width[0]);
                     }
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
@@ -818,7 +840,8 @@ int main(int, const char*[])
                     ///////////////////////////////////////////////////////////////////////////////
                     // Lines
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
-                    lineRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

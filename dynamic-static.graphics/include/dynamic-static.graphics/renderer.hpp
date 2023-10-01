@@ -35,7 +35,7 @@ struct Point
 {
     glm::vec4 position{ 0, 0, 0, 1 };
     glm::vec4 color{ gvk::math::Color::White };
-    glm::vec4 width{ 1 };
+    glm::vec4 width{ 4 };
 };
 
 /*
@@ -50,13 +50,14 @@ public:
     };
 
     LineRenderer() = default;
+    static VkResult create(const gvk::Context& gvkContext, const gvk::Pipeline& pipeline, const CreateInfo& createInfo, LineRenderer* pRenderer);
     static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, LineRenderer* pRenderer);
     ~LineRenderer();
     void reset();
 
-    void begin_line_batch();
+    const gvk::Pipeline get_pipeline() const;
+
     void submit(uint32_t pointCount, const Point* pPoints);
-    void end_line_batch();
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const;
 
 private:
@@ -66,7 +67,7 @@ private:
     gvk::Pipeline mPipeline;
     gvk::Buffer mStorageBuffer;
     gvk::DescriptorSet mDescriptorSet;
-    std::vector<Point> mPoints;
+    uint32_t mPointCount{ };
 
     LineRenderer(const LineRenderer&) = delete;
     LineRenderer& operator=(const LineRenderer&) = delete;

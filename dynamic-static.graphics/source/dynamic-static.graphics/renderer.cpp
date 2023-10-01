@@ -101,9 +101,23 @@ static VkResult dst_sample_allocate_descriptor_sets_HACK(const gvk::Pipeline& pi
 namespace dst {
 namespace gfx {
 
+VkResult LineRenderer::create(const gvk::Context& gvkContext, const gvk::Pipeline& pipeline, const CreateInfo& createInfo, LineRenderer* pRenderer)
+{
+    (void)createInfo;
+    assert(pipeline);
+    assert(pRenderer);
+    pRenderer->reset();
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        pRenderer->mPipeline = pipeline;
+        gvk_result(pRenderer->allocate_descriptor_set(gvkContext));
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
 VkResult LineRenderer::create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo& createInfo, LineRenderer* pRenderer)
 {
     (void)createInfo;
+    assert(renderPass);
     assert(pRenderer);
     pRenderer->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
@@ -125,25 +139,19 @@ void LineRenderer::reset()
     mDescriptorSet.reset();
 }
 
-void LineRenderer::begin_line_batch()
+const gvk::Pipeline LineRenderer::get_pipeline() const
 {
-    mPoints.clear();
+    return mPipeline;
 }
 
 void LineRenderer::submit(uint32_t pointCount, const Point* pPoints)
 {
-    if (pointCount && pPoints) {
-        mPoints.insert(mPoints.end(), pPoints, pPoints + pointCount);
-    }
-}
-
-void LineRenderer::end_line_batch()
-{
     assert(mPipeline);
-    if (!mPoints.empty()) {
+    mPointCount = pPoints ? pointCount : 0;
+    if (mPointCount) {
         gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
             const auto& device = mPipeline.get<gvk::Device>();
-            auto size = (VkDeviceSize)(mPoints.size() * sizeof(Point));
+            auto size = (VkDeviceSize)(mPointCount * sizeof(Point));
             auto bufferCreateInfo = mStorageBuffer ? mStorageBuffer.get<VkBufferCreateInfo>() : gvk::get_default<VkBufferCreateInfo>();
             if (bufferCreateInfo.size < size) {
                 // HACK :
@@ -157,46 +165,16 @@ void LineRenderer::end_line_batch()
                 allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
                 gvk_result(gvk::Buffer::create(device, &bufferCreateInfo, &allocationCreateInfo, &mStorageBuffer));
 
-#if 0
                 // Update VkDescriptorSet
                 auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
                 descriptorBufferInfo.buffer = mStorageBuffer;
                 auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
                 writeDescriptorSet.dstSet = mDescriptorSet;
+                writeDescriptorSet.dstBinding = 0;
                 writeDescriptorSet.descriptorCount = 1;
                 writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
                 device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-#endif
-
-                std::array<VkWriteDescriptorSet, 1> writeDescriptorSets {
-                    gvk::get_default<VkWriteDescriptorSet>(),
-                    // gvk::get_default<VkWriteDescriptorSet>(),
-                };
-                // Storage buffer
-                auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
-                descriptorBufferInfo.buffer = mStorageBuffer;
-                writeDescriptorSets[0].dstSet = mDescriptorSet;
-                writeDescriptorSets[0].dstBinding = 0;
-                writeDescriptorSets[0].descriptorCount = 1;
-                writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                writeDescriptorSets[0].pBufferInfo = &descriptorBufferInfo;
-                // // Image array
-                // std::vector<VkDescriptorImageInfo> descriptorImageInfos;
-                // descriptorImageInfos.reserve(mImages.size());
-                // for (const auto& image : mImages) {
-                //     auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
-                //     descriptorImageInfo.sampler = mSampler;
-                //     descriptorImageInfo.imageView = image.second;
-                //     descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                //     descriptorImageInfos.push_back(descriptorImageInfo);
-                // }
-                // writeDescriptorSets[1].dstSet = mDescriptorSet;
-                // writeDescriptorSets[1].dstBinding = 1;
-                // writeDescriptorSets[1].descriptorCount = (uint32_t)mImages.size();
-                // writeDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                // writeDescriptorSets[1].pImageInfo = descriptorImageInfos.data();
-                device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
             }
 
             // Update VkBuffer
@@ -204,7 +182,7 @@ void LineRenderer::end_line_batch()
             auto vmaAllocation = mStorageBuffer.get<VmaAllocation>();
             uint8_t* pData = nullptr;
             gvk_result(vmaMapMemory(vmaAllocator, vmaAllocation, (void**)&pData));
-            memcpy(pData, mPoints.data(), size);
+            memcpy(pData, pPoints, size);
             gvk_result(vmaFlushAllocation(vmaAllocator, vmaAllocation, 0, size));
             vmaUnmapMemory(vmaAllocator, vmaAllocation);
         } gvk_result_scope_end;
@@ -214,7 +192,7 @@ void LineRenderer::end_line_batch()
 
 void LineRenderer::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const
 {
-    if (!mPoints.empty()) {
+    if (mPointCount) {
         auto bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         const auto& pipelineLayout = mPipeline.get<gvk::PipelineLayout>();
         const auto& dispatchTable = commandBuffer.get<gvk::Device>().get<gvk::DispatchTable>();
@@ -230,7 +208,7 @@ void LineRenderer::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, con
         pushConstants.resolution = resolution;
         dispatchTable.gvkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConstants), &pushConstants);
         dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mPoints.size() - 1, 0, 1);
+        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mPointCount - 1, 0, 1);
     }
 }
 
@@ -344,7 +322,6 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 vec2 pt = mix(pt0, pt1, position.z);
                 vec4 clip = mix(clip0, clip1, position.z);
                 gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
-
                 fsColor = mix(point0.color, point1.color, position.z);
                 ///////////////////////////////////////////////////////////////////////////////
             }
