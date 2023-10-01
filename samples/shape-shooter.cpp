@@ -553,7 +553,7 @@ int main(int, const char*[])
         gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer1));
         std::vector<dst::gfx::Point> points1;
         const float SpiralHeight = 16;
-        const int SpiralPointCount = 1024;
+        const int SpiralPointCount = 512;
         points1.reserve(SpiralPointCount);
         for (int i = 0; i < SpiralPointCount; ++i) {
             auto t = i / (float)SpiralPointCount;
@@ -564,11 +564,6 @@ int main(int, const char*[])
             point.position.z = std::sin(angle) * t;
             point.color.r = t * 0.25f;
             point.color.b = t;
-            if (t < 0.5f) {
-                point.width.r = glm::lerp(1.0f, 32.0f, t);
-            } else {
-                point.width.r = glm::lerp(32.0f, 1.0f, t);
-            }
             points1.push_back(point);
         }
 
@@ -754,6 +749,12 @@ int main(int, const char*[])
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
                     ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
+                    auto spiralWidth = points1.begin()->width.r;
+                    if (ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f)) {
+                        for (uint32_t i = 0; i < points1.size(); ++i) {
+                            points1[i].width.r = spiralWidth;
+                        }
+                    }
                     for (uint32_t i = 0; i < points0.size(); ++i) {
                         auto positionStr = "position[" + std::to_string(i) + "]";
                         ImGui::DragFloat3(positionStr.c_str(), &points0[i].position[0]);
