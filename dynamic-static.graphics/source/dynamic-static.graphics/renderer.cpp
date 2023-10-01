@@ -133,9 +133,7 @@ void LineRenderer::begin_line_batch()
 void LineRenderer::submit(uint32_t pointCount, const Point* pPoints)
 {
     if (pointCount && pPoints) {
-        mPoints.insert(mPoints.end(), pPoints[0]);
         mPoints.insert(mPoints.end(), pPoints, pPoints + pointCount);
-        mPoints.insert(mPoints.end(), pPoints[pointCount - 1]);
     }
 }
 
@@ -232,7 +230,7 @@ void LineRenderer::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, con
         pushConstants.resolution = resolution;
         dispatchTable.gvkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConstants), &pushConstants);
         dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mPoints.size() - 2, 0, 1);
+        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mPoints.size() - 1, 0, 1);
     }
 }
 
@@ -266,7 +264,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
             };
 
             vec4 Vertices[4] = vec4[](
-                vec4(0, 0.5, 0, 1),       vec4(1,  0.5, 0, 1),
+                vec4(0, 0.5, 0, 1),       vec4(1,  0.5, 1, 1),
                 /*
                                  +--------+
                                  |        |
@@ -274,7 +272,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                                  |        |
                                  +--------+
                 */
-                vec4(0, -0.5, 0, 1),      vec4(1, -0.5, 0, 1)
+                vec4(0, -0.5, 0, 1),      vec4(1, -0.5, 1, 1)
             );
 
             layout(push_constant) uniform Camera
@@ -299,89 +297,55 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
             void main()
             {
                 ///////////////////////////////////////////////////////////////////////////////
-                // Point point = pointBuffer.points[gl_InstanceIndex];
-                // vec4 position = point.position + Vertices[gl_VertexIndex];
-                // gl_Position = camera.projection * camera.view * position;
-                // fsColor = point.color;
-                ///////////////////////////////////////////////////////////////////////////////
-
-                ///////////////////////////////////////////////////////////////////////////////
-                // Point point = pointBuffer.points[gl_InstanceIndex];
-                // Point next = pointBuffer.points[gl_InstanceIndex + 1];
-                // 
-                // // vec4 p0 = camera.projection * camera.view * point.position;
-                // // vec4 p1 = camera.projection * camera.view * next.position;
-                // vec4 p0 = point.position;
-                // vec4 p1 = next.position;
-                // 
-                // vec3 segment = p1.xyz - p0.xyz;
-                // vec3 normal = normalize(cross(segment, vec3(0, 0, 1)));
-                // vec4 vertices[4] = vec4[](
-                //     vec4(p0.xyz + normal * point.width.r, 1),
-                //     vec4(p0.xyz - normal * point.width.r, 1),
-                //     vec4(p1.xyz + normal * next.width.r,  1),
-                //     vec4(p1.xyz - normal * next.width.r,  1)
-                // );
-                // vec4 colors[4] = vec4[](
-                //     point.color,
-                //     point.color,
-                //     next.color,
-                //     next.color
-                // );
-                // gl_Position = camera.projection * camera.view * vertices[gl_VertexIndex];
-                // fsColor = colors[gl_VertexIndex];
-                ///////////////////////////////////////////////////////////////////////////////
-
-                ///////////////////////////////////////////////////////////////////////////////
-                // Point point = pointBuffer.points[gl_InstanceIndex];
-                // Point next = pointBuffer.points[gl_InstanceIndex + 1];
-                // vec4 p0 = camera.projection * camera.view * point.position;
-                // vec4 p1 = camera.projection * camera.view * next.position;
+                // Point point0 = pointBuffer.points[gl_InstanceIndex];
+                // Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
+                // vec4 p0 = point0.position;
+                // vec4 p1 = point1.position;
                 // vec2 segment = p1.xy - p0.xy;
                 // vec2 perpendicular = normalize(vec2(segment.y, -segment.x));
                 // vec4 vertices[4] = vec4[](
-                //     p0 + vec4(-0.1 / camera.resolution.x,  0.1 / camera.resolution.y, 0, 1),
-                //     p0 + vec4( 0.1 / camera.resolution.x,  0.1 / camera.resolution.y, 0, 1),
-                //     p0 + vec4(-0.1 / camera.resolution.x, -0.1 / camera.resolution.y, 0, 1),
-                //     p0 + vec4( 0.1 / camera.resolution.x, -0.1 / camera.resolution.y, 0, 1)
+                //     vec4(p0.xy - perpendicular * point0.width.r, 0, 1),
+                //     vec4(p1.xy - perpendicular * point1.width.r, 0, 1),
+                //     vec4(p0.xy + perpendicular * point0.width.r, 0, 1),
+                //     vec4(p1.xy + perpendicular * point1.width.r, 0, 1)
                 // );
-                // // vertices[0].xy += perpendicular * point.width.r;
-                // // vertices[1].xy += perpendicular * next.width.r;
-                // // vertices[2].xy -= perpendicular * point.width.r;
-                // // vertices[3].xy -= perpendicular * next.width.r;
+                // gl_Position = camera.projection * camera.view * vertices[gl_VertexIndex];
                 // vec4 colors[4] = vec4[](
-                //     point.color,
-                //     next.color,
-                //     point.color,
-                //     next.color
+                //     point0.color,
+                //     point1.color,
+                //     point0.color,
+                //     point1.color
                 // );
-                // gl_Position = vertices[gl_VertexIndex];
-                // fsColor = colors[gl_VertexIndex];
+                // vec4 color = vec4(camera.resolution, 0, 0);
+                // color *= 0.00000000000000000000000000001;
+                // fsColor = colors[gl_VertexIndex] + color;
                 ///////////////////////////////////////////////////////////////////////////////
 
                 ///////////////////////////////////////////////////////////////////////////////
+                vec3 vertices[4] = vec3[](
+                    vec3(0.0,  0.5, 0.0), vec3(1.0,  0.5, 1.0),
+                    vec3(0.0, -0.5, 0.0), vec3(1.0, -0.5, 1.0)
+                );
+
                 Point point0 = pointBuffer.points[gl_InstanceIndex];
                 Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
-                vec4 p0 = point0.position;
-                vec4 p1 = point1.position;
-                vec2 segment = p1.xy - p0.xy;
-                vec2 perpendicular = normalize(vec2(segment.y, -segment.x));
-                vec4 vertices[4] = vec4[](
-                    vec4(p0.xy - perpendicular * point0.width.r, 0, 1),
-                    vec4(p1.xy - perpendicular * point1.width.r, 0, 1),
-                    vec4(p0.xy + perpendicular * point0.width.r, 0, 1),
-                    vec4(p1.xy + perpendicular * point1.width.r, 0, 1)
-                );
-                gl_Position = camera.projection * camera.view * vertices[gl_VertexIndex];
-                vec4 colors[4] = vec4[](
-                    point0.color,
-                    point1.color,
-                    point0.color,
-                    point1.color
-                );
-                vec4 color = vec4(camera.resolution, 0, 0);
-                color *= 0.00000000000000000000000000001;
-                fsColor = colors[gl_VertexIndex] + color;
+
+                vec4 clip0 = camera.projection * camera.view * point0.position;
+                vec4 clip1 = camera.projection * camera.view * point1.position;
+
+                vec2 screen0 = camera.resolution * (0.5 * clip0.xy / clip0.w + 0.5);
+                vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
+
+                vec3 position = vertices[gl_VertexIndex];
+                vec2 xBasis = normalize(screen1 - screen0);
+                vec2 yBasis = vec2(xBasis.y, -xBasis.x);
+                vec2 pt0 = screen0 + point0.width.r * (position.x * xBasis + position.y * yBasis);
+                vec2 pt1 = screen1 + point1.width.r * (position.x * xBasis + position.y * yBasis);
+                vec2 pt = mix(pt0, pt1, position.z);
+                vec4 clip = mix(clip0, clip1, position.z);
+                gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
+
+                fsColor = mix(point0.color, point1.color, position.z);
                 ///////////////////////////////////////////////////////////////////////////////
             }
         )";

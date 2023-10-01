@@ -35,7 +35,7 @@ struct Point
 {
     glm::vec4 position{ 0, 0, 0, 1 };
     glm::vec4 color{ gvk::math::Color::White };
-    glm::vec4 width{ 0.01f };
+    glm::vec4 width{ 1 };
 };
 
 /*

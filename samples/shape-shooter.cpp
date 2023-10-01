@@ -544,7 +544,7 @@ int main(int, const char*[])
             point.position = curveBegin;
             point.position.x += t * 4;
             point.position.y += 0.5f * std::sin(4 * t);
-            point.width.r = glm::lerp(0.01f, 0.1f, t);
+            point.width.r = glm::lerp(1.0f, 8.0f, t);
             points.push_back(point);
         }
         ///////////////////////////////////////////////////////////////////////////////
