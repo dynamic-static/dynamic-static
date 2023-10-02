@@ -123,7 +123,7 @@ VkResult create_mesh(
     );
 }
 
-void create_spiral(int pointCount, int height, const glm::vec4& color0, const glm::vec4& color1, std::vector<dst::gfx::Point>& points)
+void create_spiral(int pointCount, int height, float width, const glm::vec4& color0, const glm::vec4& color1, std::vector<dst::gfx::Point>& points)
 {
     points.resize(pointCount);
     for (int i = 0; i < pointCount; ++i) {
@@ -134,6 +134,7 @@ void create_spiral(int pointCount, int height, const glm::vec4& color0, const gl
         point.position.y = t * height;
         point.position.z = std::sin(angle) * t;
         point.color = glm::lerp(color0, color1, t);
+        point.width.r = width;
     }
 }
 
@@ -563,14 +564,16 @@ int main(int, const char*[])
         }
 
         lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
+        lineRendererCreateInfo.capVertexCount = 4;
         dst::gfx::LineRenderer lineRenderer1;
         gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer1));
         std::vector<dst::gfx::Point> points1;
         int spiralPointCount = 512;
         int spiralHeight = 16;
+        float spiralWidth = 8;
         glm::vec4 spiralColor0 = gvk::math::Color::AliceBlue;
         glm::vec4 spiralColor1 = gvk::math::Color::MediumPurple;
-        create_spiral(spiralPointCount, spiralHeight, spiralColor0, spiralColor1, points1);
+        create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
 
         gvk::system::Clock clock;
         while (
@@ -754,19 +757,17 @@ int main(int, const char*[])
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
                     ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
-                    auto spiralWidth = points1.begin()->width.r;
                     if (ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f)) {
                         for (uint32_t i = 0; i < points1.size(); ++i) {
                             points1[i].width.r = spiralWidth;
                         }
                     }
-
                     bool spiralPointCountUpdated = ImGui::InputInt("spiralPointCount", &spiralPointCount);
                     bool spiralHeightUpdate = ImGui::InputInt("spiralHeight", &spiralHeight);
                     bool spiralColor1Updated = ImGui::ColorPicker4("spiralColor1", &spiralColor1[0]);
                     bool spiralColor0Updated = ImGui::ColorPicker4("spiralColor0", &spiralColor0[0]);
                     if (spiralPointCountUpdated || spiralHeightUpdate || spiralColor0Updated || spiralColor1Updated) {
-                        create_spiral(spiralPointCount, spiralHeight, spiralColor0, spiralColor1, points1);
+                        create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
                     }
 
                     // for (uint32_t i = 0; i < points0.size(); ++i) {

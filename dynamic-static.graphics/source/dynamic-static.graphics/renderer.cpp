@@ -289,10 +289,10 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
                 vec2 xBasis = normalize(screen1 - screen0);
                 vec2 yBasis = vec2(xBasis.y, -xBasis.x);
-                // vec2 pt0 = screen0 + point0.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
-                // vec2 pt1 = screen1 + point1.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
-                vec2 pt0 = screen0 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point0.width.r);
-                vec2 pt1 = screen1 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point1.width.r);
+                vec2 pt0 = screen0 + point0.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                vec2 pt1 = screen1 + point1.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                // vec2 pt0 = screen0 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point0.width.r);
+                // vec2 pt1 = screen1 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point1.width.r);
                 vec2 pt = mix(pt0, pt1, vsPosition.z);
                 vec4 clip = mix(clip0, clip1, vsPosition.z);
                 gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
@@ -382,7 +382,8 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data();
 
         auto pipelineInputAssemblyStateCreateInfo = gvk::get_default<VkPipelineInputAssemblyStateCreateInfo>();
-        pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+        // pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+        pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
         auto pipelineColorBlendAttachmentState = gvk::get_default<VkPipelineColorBlendAttachmentState>();
         pipelineColorBlendAttachmentState.blendEnable = VK_TRUE;
@@ -447,12 +448,33 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
 VkResult LineRenderer::create_vertex_buffer(const gvk::Context& gvkContext, uint32_t capVertexCount)
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        // std::vector<glm::vec3> vertices{
+        //     { 0.0f,  0.5f, 0.0f }, { 1.0f,  0.5f, 1.0f },
+        //     { 0.0f, -0.5f, 0.0f }, { 1.0f, -0.5f, 1.0f },
+        // };
         std::vector<glm::vec3> vertices{
-            { 0.0f,  0.5f, 0.0f }, { 1.0f,  0.5f, 1.0f },
-            { 0.0f, -0.5f, 0.0f }, { 1.0f, -0.5f, 1.0f },
+            { 0.0f, -0.5f, 0.0f },
+            { 0.0f, -0.5f, 1.0f },
+            { 0.0f,  0.5f, 1.0f },
+            { 0.0f, -0.5f, 0.0f },
+            { 0.0f,  0.5f, 1.0f },
+            { 0.0f,  0.5f, 0.0f },
         };
         if (capVertexCount) {
-            // TODO :
+            for (uint32_t i = 0; i < capVertexCount; ++i) {
+                auto theta0 = glm::pi<float>() * 0.5f + ((float)(i + 0) * glm::pi<float>()) / (float)capVertexCount;
+                auto theta1 = glm::pi<float>() * 0.5f + ((float)(i + 1) * glm::pi<float>()) / (float)capVertexCount;
+                vertices.push_back({ 0, 0, 0 });
+                vertices.push_back({ 0.5f * std::cos(theta0), 0.5f * std::sin(theta0), 0 });
+                vertices.push_back({ 0.5f * std::cos(theta1), 0.5f * std::sin(theta1), 0 });
+            }
+            for (uint32_t i = 0; i < capVertexCount; ++i) {
+                auto theta0 = (3 * glm::pi<float>()) * 0.5f + ((float)(i + 0) * glm::pi<float>()) / (float)capVertexCount;
+                auto theta1 = (3 * glm::pi<float>()) * 0.5f + ((float)(i + 1) * glm::pi<float>()) / (float)capVertexCount;
+                vertices.push_back({ 0, 0, 1 });
+                vertices.push_back({ 0.5f * std::cos(theta0), 0.5f * std::sin(theta0), 1 });
+                vertices.push_back({ 0.5f * std::cos(theta1), 0.5f * std::sin(theta1), 1 });
+            }
         }
         mVertexCount = (uint32_t)vertices.size();
 
