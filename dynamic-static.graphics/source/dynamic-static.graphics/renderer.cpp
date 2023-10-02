@@ -122,6 +122,7 @@ VkResult LineRenderer::create(const gvk::Context& gvkContext, const gvk::RenderP
     pRenderer->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         gvk_result(pRenderer->create_pipeline(gvkContext, renderPass));
+        gvk_result(pRenderer->create_vertex_buffer(gvkContext, createInfo.capVertexCount));
         gvk_result(pRenderer->allocate_descriptor_set(gvkContext));
     } gvk_result_scope_end;
     return gvkResult;
@@ -208,7 +209,9 @@ void LineRenderer::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, con
         pushConstants.resolution = resolution;
         dispatchTable.gvkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConstants), &pushConstants);
         dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &mDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-        dispatchTable.gvkCmdDraw(commandBuffer, 4, (uint32_t)mPointCount - 1, 0, 1);
+        VkDeviceSize vertexOffset = 0;
+        dispatchTable.gvkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVertexBuffer.get<VkBuffer>(), &vertexOffset);
+        dispatchTable.gvkCmdDraw(commandBuffer, mVertexCount, (uint32_t)mPointCount - 1, 0, 0);
     }
 }
 
@@ -243,17 +246,10 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 vec4 width;
             };
 
-            vec4 Vertices[4] = vec4[](
-                vec4(0, 0.5, 0, 1),       vec4(1,  0.5, 1, 1),
-                /*
-                                 +--------+
-                                 |        |
-                                 |        |
-                                 |        |
-                                 +--------+
-                */
-                vec4(0, -0.5, 0, 1),      vec4(1, -0.5, 1, 1)
-            );
+            layout(std140, set = 0, binding = 0) readonly buffer PointBuffer
+            {
+                Point points[];
+            } pointBuffer;
 
             layout(push_constant) uniform Camera
             {
@@ -262,10 +258,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 vec2 resolution;
             } camera;
 
-            layout(std140, set = 0, binding = 0) readonly buffer PointBuffer
-            {
-                Point points[];
-            } pointBuffer;
+            layout(location = 0) in vec3 vsPosition;
 
             layout(location = 0) out vec4 fsColor;
 
@@ -286,58 +279,27 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
 
             void main()
             {
+#if 1
                 ///////////////////////////////////////////////////////////////////////////////
-                // vec3 vertices[4] = vec3[](
-                //     vec3(0.0,  0.5, 0.0), vec3(1.0,  0.5, 1.0),
-                //     vec3(0.0, -0.5, 0.0), vec3(1.0, -0.5, 1.0)
-                // );
-                // 
-                // Point point0 = pointBuffer.points[gl_InstanceIndex];
-                // Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
-                // 
-                // vec4 clip0 = camera.projection * camera.view * point0.position;
-                // vec4 clip1 = camera.projection * camera.view * point1.position;
-                // 
-                // vec2 screen0 = camera.resolution * (0.5 * clip0.xy / clip0.w + 0.5);
-                // vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
-                // 
-                // vec3 position = vertices[gl_VertexIndex];
-                // vec2 xBasis = normalize(screen1 - screen0);
-                // vec2 yBasis = vec2(xBasis.y, -xBasis.x);
-                // vec2 pt0 = screen0 + point0.width.r * (position.x * xBasis + position.y * yBasis);
-                // vec2 pt1 = screen1 + point1.width.r * (position.x * xBasis + position.y * yBasis);
-                // vec2 pt = mix(pt0, pt1, position.z);
-                // vec4 clip = mix(clip0, clip1, position.z);
-                // gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
-                // fsColor = mix(point0.color, point1.color, position.z);
+                Point point0 = pointBuffer.points[gl_InstanceIndex];
+                Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
+                vec4 clip0 = camera.projection * camera.view * point0.position;
+                vec4 clip1 = camera.projection * camera.view * point1.position;
+                vec2 screen0 = camera.resolution * (0.5 * clip0.xy / clip0.w + 0.5);
+                vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
+                vec2 xBasis = normalize(screen1 - screen0);
+                vec2 yBasis = vec2(xBasis.y, -xBasis.x);
+                // vec2 pt0 = screen0 + point0.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                // vec2 pt1 = screen1 + point1.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                vec2 pt0 = screen0 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point0.width.r);
+                vec2 pt1 = screen1 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point1.width.r);
+                vec2 pt = mix(pt0, pt1, vsPosition.z);
+                vec4 clip = mix(clip0, clip1, vsPosition.z);
+                gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
+                fsColor = mix(point0.color, point1.color, vsPosition.z);
+                fsColor.r += 1;
                 ///////////////////////////////////////////////////////////////////////////////
-
-                ///////////////////////////////////////////////////////////////////////////////
-                // vec3 vertices[4] = vec3[](
-                //     vec3(0.0,  0.5, 0.0), vec3(0.0,  0.5, 1.0),
-                //     vec3(0.0, -0.5, 0.0), vec3(0.0, -0.5, 1.0)
-                // );
-                // 
-                // Point point0 = pointBuffer.points[gl_InstanceIndex];
-                // Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
-                // 
-                // vec4 clip0 = camera.projection * camera.view * point0.position;
-                // vec4 clip1 = camera.projection * camera.view * point1.position;
-                // 
-                // vec2 screen0 = camera.resolution * (0.5 * clip0.xy / clip0.w + 0.5);
-                // vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
-                // 
-                // vec3 position = vertices[gl_VertexIndex];
-                // vec2 xBasis = normalize(screen1 - screen0);
-                // vec2 yBasis = vec2(xBasis.y, -xBasis.x);
-                // vec2 pt0 = screen0 + (position.x * xBasis + position.y * yBasis * point0.width.r);
-                // vec2 pt1 = screen1 + (position.x * xBasis + position.y * yBasis * point0.width.r);
-                // vec2 pt = mix(pt0, pt1, position.z);
-                // vec4 clip = mix(clip0, clip1, position.z);
-                // gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
-                // fsColor = mix(point0.color, point1.color, position.z);
-                ///////////////////////////////////////////////////////////////////////////////
-
+#else
                 ///////////////////////////////////////////////////////////////////////////////
                 Point point0 = pointBuffer.points[gl_InstanceIndex];
                 Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
@@ -358,6 +320,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 gl_Position = vec4(clip.w * ((2.0 * position.xy) / camera.resolution - 1.0), clip.z, clip.w);
                 fsColor = mix(point0.color, point1.color, position.z);
                 ///////////////////////////////////////////////////////////////////////////////
+#endif
             }
         )";
 
@@ -410,6 +373,14 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
             fragmentPipelineShaderStageCreateInfo,
         };
 
+        VkVertexInputBindingDescription vertexInputBindingDescription{ 0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX };
+        auto vertexInputAttributeDescriptions = gvk::get_vertex_description<glm::vec3>(0);
+        auto pipelineVertexInputStateCreateInfo = gvk::get_default<VkPipelineVertexInputStateCreateInfo>();
+        pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+        pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
+        pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = (uint32_t)vertexInputAttributeDescriptions.size();
+        pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data();
+
         auto pipelineInputAssemblyStateCreateInfo = gvk::get_default<VkPipelineInputAssemblyStateCreateInfo>();
         pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
@@ -433,6 +404,9 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         }
 
         auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
+        pipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
+        pipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
+        pipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
         auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
         pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
@@ -457,6 +431,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         auto graphicsPipelineCreateInfo = gvk::get_default<VkGraphicsPipelineCreateInfo>();
         graphicsPipelineCreateInfo.stageCount = (uint32_t)pipelineShaderStageCreateInfos.size();
         graphicsPipelineCreateInfo.pStages = pipelineShaderStageCreateInfos.data();
+        graphicsPipelineCreateInfo.pVertexInputState = &pipelineVertexInputStateCreateInfo;
         graphicsPipelineCreateInfo.pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo;
         graphicsPipelineCreateInfo.pColorBlendState = &pipelineColorBlendStateCreateInfo;
         graphicsPipelineCreateInfo.pMultisampleState = &pipelineMultisampleStateCreateInfo;
@@ -465,6 +440,49 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         graphicsPipelineCreateInfo.layout = pipelineLayout;
         graphicsPipelineCreateInfo.renderPass = renderPass;
         gvk_result(gvk::Pipeline::create(gvkContext.get_devices()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+VkResult LineRenderer::create_vertex_buffer(const gvk::Context& gvkContext, uint32_t capVertexCount)
+{
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        std::vector<glm::vec3> vertices{
+            { 0.0f,  0.5f, 0.0f }, { 1.0f,  0.5f, 1.0f },
+            { 0.0f, -0.5f, 0.0f }, { 1.0f, -0.5f, 1.0f },
+        };
+        if (capVertexCount) {
+            // TODO :
+        }
+        mVertexCount = (uint32_t)vertices.size();
+
+        gvk::Buffer stagingBuffer;
+        auto vertexDataSize = mVertexCount * sizeof(glm::vec3);
+        gvk_result(gvk::create_staging_buffer(gvkContext.get_devices()[0], vertexDataSize, &stagingBuffer));
+        uint8_t* pVertexData = nullptr;
+        gvk_result(vmaMapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>(), (void**)&pVertexData));
+        memcpy(pVertexData, vertices.data(), vertexDataSize);
+        vmaUnmapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>());
+
+        auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
+        bufferCreateInfo.size = vertexDataSize;
+        bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
+        allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        gvk_result(gvk::Buffer::create(gvkContext.get_devices()[0], &bufferCreateInfo, &allocationCreateInfo, &mVertexBuffer));
+
+        gvk_result(gvk::execute_immediately(
+            gvkContext.get_devices()[0],
+            gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0],
+            gvkContext.get_command_buffers()[0],
+            VK_NULL_HANDLE,
+            [&](auto commandBuffer)
+            {
+                auto bufferCopy = gvk::get_default<VkBufferCopy>();
+                bufferCopy.size = vertexDataSize;
+                gvkContext.get_devices()[0].get<gvk::DispatchTable>().gvkCmdCopyBuffer(commandBuffer, stagingBuffer, mVertexBuffer, 1, &bufferCopy);
+            }
+        ));
     } gvk_result_scope_end;
     return gvkResult;
 }

@@ -47,6 +47,7 @@ public:
     class CreateInfo final
     {
     public:
+        uint32_t capVertexCount{ 0 };
     };
 
     LineRenderer() = default;
@@ -62,11 +63,14 @@ public:
 
 private:
     VkResult create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass);
+    VkResult create_vertex_buffer(const gvk::Context& gvkContext, uint32_t capVertexCount);
     VkResult allocate_descriptor_set(const gvk::Context& gvkContext);
 
     gvk::Pipeline mPipeline;
+    gvk::Buffer mVertexBuffer;
     gvk::Buffer mStorageBuffer;
     gvk::DescriptorSet mDescriptorSet;
+    uint32_t mVertexCount{ };
     uint32_t mPointCount{ };
 
     LineRenderer(const LineRenderer&) = delete;
