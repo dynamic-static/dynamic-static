@@ -166,9 +166,12 @@ void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vecto
     }
     for (auto& point : points) {
         point.color.r = (point.position.x + extent.x * 0.5f) / extent.x;
-        point.color.g = (point.position.z + extent.y * 0.5f) / extent.y;
-        point.color.b = 1;
+        point.color.g = 0;
+        point.color.b = (point.position.z + extent.y * 0.5f) / extent.y;
         point.position.y = (std::sin(point.position.x) + std::sin(point.position.z)) * 0.5f;
+        if (point.width.r) {
+            point.width.r = glm::lerp(point.width.r, 32.0f, point.color.r);
+        }
     }
 }
 
