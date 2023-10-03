@@ -291,13 +291,10 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
                 vec2 yBasis = vec2(xBasis.y, -xBasis.x);
                 vec2 pt0 = screen0 + point0.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
                 vec2 pt1 = screen1 + point1.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
-                // vec2 pt0 = screen0 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point0.width.r);
-                // vec2 pt1 = screen1 + (vsPosition.x * xBasis + vsPosition.y * yBasis * point1.width.r);
                 vec2 pt = mix(pt0, pt1, vsPosition.z);
                 vec4 clip = mix(clip0, clip1, vsPosition.z);
                 gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
                 fsColor = mix(point0.color, point1.color, vsPosition.z);
-                fsColor.r += 1;
                 ///////////////////////////////////////////////////////////////////////////////
 #else
                 ///////////////////////////////////////////////////////////////////////////////

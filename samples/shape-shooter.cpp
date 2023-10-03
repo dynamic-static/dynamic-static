@@ -134,7 +134,41 @@ void create_spiral(int pointCount, int height, float width, const glm::vec4& col
         point.position.y = t * height;
         point.position.z = std::sin(angle) * t;
         point.color = glm::lerp(color0, color1, t);
-        point.width.r = width;
+        point.width.r = t * width;
+    }
+}
+
+void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vector<dst::gfx::Point>& points)
+{
+    points.clear();
+    auto halfExtent = extent * 0.5f;
+    auto cellExtent = extent / cellCount;
+    auto makePoint = [](auto v) { return dst::gfx::Point{ glm::vec4 { v.x, 0, v.y, 1 } }; };
+    for (uint32_t y = 0; y < cellCount.y; ++y) {
+        for (uint32_t x = 0; x < cellCount.x; ++x) {
+            auto i = points.size();
+            points.push_back({ });
+            points.back().width.r = 0;
+            auto corner = -extent * 0.5f + cellExtent * glm::vec2{ x, y };
+            if (!x) {
+                points.push_back(makePoint(corner));
+            }
+            points.push_back(makePoint(corner + glm::vec2{ 0, cellExtent.y }));
+            points.push_back(makePoint(corner + cellExtent));
+            points.push_back(makePoint(corner + glm::vec2{ cellExtent.x, 0 }));
+            if (!y) {
+                points.push_back(makePoint(corner));
+            }
+            points[i].position = points[i + 1].position;
+            points.push_back(points.back());
+            points.back().width.r = 0;
+        }
+    }
+    for (auto& point : points) {
+        point.color.r = (point.position.x + extent.x * 0.5f) / extent.x;
+        point.color.g = (point.position.z + extent.y * 0.5f) / extent.y;
+        point.color.b = 1;
+        point.position.y = (std::sin(point.position.x) + std::sin(point.position.z)) * 0.5f;
     }
 }
 
@@ -575,6 +609,15 @@ int main(int, const char*[])
         glm::vec4 spiralColor1 = gvk::math::Color::MediumPurple;
         create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
 
+        lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
+        lineRendererCreateInfo.capVertexCount = 4;
+        dst::gfx::LineRenderer gridRenderer;
+        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &gridRenderer));
+        std::vector<dst::gfx::Point> gridPoints;
+        glm::vec2 gridExtent{ 64, 32 };
+        glm::vec2 gridCellCount{ 128, 64 };
+        create_grid(gridExtent, gridCellCount, gridPoints);
+
         gvk::system::Clock clock;
         while (
             !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
@@ -622,6 +665,9 @@ int main(int, const char*[])
             auto cubeRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3 { 0, 1, 0 });
             auto cubeRotationZ = glm::angleAxis(glm::radians(zRotation * deltaTime), glm::vec3 { 0, 0, 1 });
             cubeTransform.rotation = glm::normalize(cubeRotationY * cubeTransform.rotation * cubeRotationZ);
+
+            // Update the floor transform
+            floorTransform.translation.y = -0.1f;
 
             // Uddate the gvk::math::Camera uniform data...
             CameraUniforms cameraUbo { };
@@ -684,6 +730,7 @@ int main(int, const char*[])
             // Lines
             lineRenderer0.submit((uint32_t)points0.size(), points0.data());
             lineRenderer1.submit((uint32_t)points1.size(), points1.data());
+            gridRenderer.submit((uint32_t)gridPoints.size(), gridPoints.data());
             ///////////////////////////////////////////////////////////////////////////////
 
             wsiManager.update();
@@ -757,27 +804,15 @@ int main(int, const char*[])
                     }
                     ImGui::InputInt("spriteCount", &spriteCount);
                     ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
-                    if (ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f)) {
-                        for (uint32_t i = 0; i < points1.size(); ++i) {
-                            points1[i].width.r = spiralWidth;
-                        }
-                    }
+
                     bool spiralPointCountUpdated = ImGui::InputInt("spiralPointCount", &spiralPointCount);
                     bool spiralHeightUpdate = ImGui::InputInt("spiralHeight", &spiralHeight);
+                    bool spiralWidthUpdated = ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f);
                     bool spiralColor1Updated = ImGui::ColorPicker4("spiralColor1", &spiralColor1[0]);
                     bool spiralColor0Updated = ImGui::ColorPicker4("spiralColor0", &spiralColor0[0]);
-                    if (spiralPointCountUpdated || spiralHeightUpdate || spiralColor0Updated || spiralColor1Updated) {
+                    if (spiralPointCountUpdated || spiralHeightUpdate || spiralWidthUpdated || spiralColor0Updated || spiralColor1Updated) {
                         create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
                     }
-
-                    // for (uint32_t i = 0; i < points0.size(); ++i) {
-                    //     auto positionStr = "position[" + std::to_string(i) + "]";
-                    //     ImGui::DragFloat3(positionStr.c_str(), &points0[i].position[0]);
-                    //     auto colorStr = "color[" + std::to_string(i) + "]";
-                    //     ImGui::ColorPicker4(colorStr.c_str(), &points0[i].color[0]);
-                    //     auto widthStr = "width[" + std::to_string(i) + "]";
-                    //     ImGui::DragFloat(widthStr.c_str(), &points0[i].width[0]);
-                    // }
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
@@ -858,6 +893,7 @@ int main(int, const char*[])
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
                     lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 
