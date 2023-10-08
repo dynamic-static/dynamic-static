@@ -269,34 +269,37 @@ public:
 
     void apply_directed_force(const glm::vec3& force, const glm::vec3& position, float radius)
     {
-        (void)force;
-        (void)position;
-        (void)radius;
+        for (auto& pointMass : mPointMasses) {
+            if (glm::distance2(position, pointMass.position) < radius * radius) {
+                pointMass.apply_force(10.0f * force / (10.0f + glm::distance(position, pointMass.position)));
+            }
+        }
     }
 
     void apply_implosive_force(float force, const glm::vec3& position, float radius)
     {
-        (void)force;
-        (void)position;
-        (void)radius;
+        for (auto& pointMass : mPointMasses) {
+            auto distanceSqrd = glm::distance2(position, pointMass.position);
+            if (distanceSqrd < radius * radius) {
+                pointMass.apply_force(10.0f * force * (position - pointMass.position) / (100.0f + distanceSqrd));
+                pointMass.increase_damping(0.6f);
+            }
+        }
     }
 
     void apply_explosive_force(float force, const glm::vec3& position, float radius)
     {
-        (void)force;
-        (void)position;
-        (void)radius;
+        for (auto& pointMass : mPointMasses) {
+            auto distanceSqrd = glm::distance2(position, pointMass.position);
+            if (distanceSqrd < radius * radius) {
+                pointMass.apply_force(100.0f * force * (position - pointMass.position) / (10000.0f + distanceSqrd));
+                pointMass.increase_damping(0.6f);
+            }
+        }
     }
 
     void update()
     {
-        for (auto& spring : mSprings) {
-            spring.update(mPointMasses);
-        }
-        for (auto& pointMass : mPointMasses) {
-            pointMass.update();
-        }
-        mPoints.clear();
         auto index = [&](uint32_t x, uint32_t y) { return y * (mCreateInfo.cells.x + 1) + x; };
         auto point = [](const PointMass& p, float w)
         {
@@ -306,8 +309,17 @@ public:
                 glm::vec4 { w, 1, 0, 0 },
             };
         };
+        for (auto& spring : mSprings) {
+            spring.update(mPointMasses);
+        }
         for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
-            for (uint32_t x = 0; x < (uint32_t)mCreateInfo.cells.x; ++x) {
+            for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
+                mPointMasses[index(x, y)].update();
+            }
+        }
+        mPoints.clear();
+        for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
+            for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
                 if (!y) {
                     mPoints.push_back(point(mPointMasses[index(x, y)], 3));
                 }
@@ -737,6 +749,7 @@ int main(int, const char*[])
         float guiImageScale = 0.125f;
         (void)guiImageScale;
 
+        int forceType = 0;
         gvk::math::Camera camera;
         camera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
@@ -995,7 +1008,17 @@ int main(int, const char*[])
                 cameraSpaceMouseRay.z = -1;
                 cameraSpaceMouseRay.w = 0;
                 auto worldSpaceMouseRay = glm::normalize(glm::inverse(camera.view()) * cameraSpaceMouseRay);
-                if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
+                if (input.keyboard.pressed(gvk::system::Key::One)) {
+                    forceType = 0;
+                }
+                if (input.keyboard.pressed(gvk::system::Key::Two)) {
+                    forceType = 1;
+                }
+                if (input.keyboard.pressed(gvk::system::Key::Three)) {
+                    forceType = 2;
+                }
+                if (input.mouse.buttons.down(gvk::system::Mouse::Button::Right)) {
+#if 0
                     points0.clear();
                     dst::gfx::Point point{ };
                     point.position.x = camera.transform.translation.x;
@@ -1012,6 +1035,28 @@ int main(int, const char*[])
                     point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z * 100;
                     point.color = gvk::math::Color::Green;
                     points0.push_back(point);
+#endif
+                    glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+                    auto difference = glm::vec3{ } - camera.transform.translation;
+                    auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
+                    auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
+                    auto distance = dot0 / dot1;
+                    auto intersection = camera.transform.translation + direction * distance;
+                    switch (forceType) {
+                    case 0: {
+                        grid.apply_directed_force({ 0, -5000, 0 }, intersection, 50);
+                    } break;
+                    case 1: {
+                        auto sprayAngle = glm::two_pi<float>() / 50.0f;
+                        grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
+                    } break;
+                    case 2: {
+                        grid.apply_explosive_force(4, intersection, 80);
+                    } break;
+                    default: {
+                        assert(false);
+                    } break;
+                    }
                 }
 
                 // Get VkFences from the WsiManager.  The gvk::gui::Renderer will wait on these
