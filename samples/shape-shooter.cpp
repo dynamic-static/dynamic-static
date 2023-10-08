@@ -135,6 +135,9 @@ void create_spiral(int pointCount, int height, float width, const glm::vec4& col
         point.position.z = std::sin(angle) * t;
         point.color = glm::lerp(color0, color1, t);
         point.width.r = t * width;
+        if (i % 3) {
+            point.width.g = 0;
+        }
     }
 }
 
@@ -172,8 +175,216 @@ void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vecto
         if (point.width.r) {
             point.width.r = glm::lerp(point.width.r, 32.0f, point.color.r);
         }
+        point.position.y += 32;
     }
 }
+
+class Grid final
+{
+public:
+    struct CreateInfo
+    {
+        glm::vec2 extent{ };
+        glm::uvec2 cells{ };
+    };
+
+    struct PointMass
+    {
+        void apply_force(const glm::vec3& force)
+        {
+            acceleration += force * inverseMass;
+        }
+
+        void increase_damping(float factor)
+        {
+            damping *= factor;
+        }
+
+        void update()
+        {
+            velocity += acceleration;
+            position += velocity;
+            acceleration = { };
+            if (glm::length2(velocity) < 0.001f * 0.001f) {
+                velocity = { };
+            }
+            velocity *= damping;
+            damping = 0.98f;
+        }
+
+        glm::vec3 position{ };
+        glm::vec3 velocity{ };
+        glm::vec3 acceleration{ };
+        float inverseMass{ };
+        float damping{ 0.98f };
+    };
+
+    class Spring final
+    {
+    public:
+        Spring(const std::vector<PointMass>& pointMasses, uint32_t p0_i, uint32_t p1_i, float stiffness, float damping)
+            : mP0_i{ p0_i }
+            , mP1_i{ p1_i }
+            , mStiffness{ stiffness }
+            , mDamping{ damping }
+            , mTargetLength{ glm::distance(pointMasses[p0_i].position, pointMasses[p1_i].position) * 0.95f }
+        {
+        }
+
+        void update(std::vector<PointMass>& pointMasses)
+        {
+            assert(mP0_i < pointMasses.size());
+            assert(mP1_i < pointMasses.size());
+            auto v = pointMasses[mP0_i].position - pointMasses[mP1_i].position;
+            auto length = glm::length(v);
+            if (mTargetLength < length) {
+                v = (v / length) * (length - mTargetLength);
+                auto dv = pointMasses[mP1_i].velocity - pointMasses[mP0_i].velocity;
+                auto force = mStiffness * v - dv * mDamping;
+                pointMasses[mP0_i].apply_force(-force);
+                pointMasses[mP1_i].apply_force(force);
+            }
+        }
+
+    private:
+        uint32_t mP0_i{ };
+        uint32_t mP1_i{ };
+        float mTargetLength{ };
+        float mStiffness{ };
+        float mDamping{ };
+    };
+
+    static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo* pCreateInfo, Grid* pGrid)
+    {
+        assert(pCreateInfo);
+        assert(pGrid);
+        pGrid->mCreateInfo = *pCreateInfo;
+        gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+            auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
+            gvk_result(dst::gfx::LineRenderer::create(gvkContext, renderPass, lineRendererCreateInfo, &pGrid->mLineRenderer));
+            pGrid->create_grid();
+        } gvk_result_scope_end;
+        return gvkResult;
+    }
+
+    void apply_directed_force(const glm::vec3& force, const glm::vec3& position, float radius)
+    {
+        (void)force;
+        (void)position;
+        (void)radius;
+    }
+
+    void apply_implosive_force(float force, const glm::vec3& position, float radius)
+    {
+        (void)force;
+        (void)position;
+        (void)radius;
+    }
+
+    void apply_explosive_force(float force, const glm::vec3& position, float radius)
+    {
+        (void)force;
+        (void)position;
+        (void)radius;
+    }
+
+    void update()
+    {
+        for (auto& spring : mSprings) {
+            spring.update(mPointMasses);
+        }
+        for (auto& pointMass : mPointMasses) {
+            pointMass.update();
+        }
+        mPoints.clear();
+        auto index = [&](uint32_t x, uint32_t y) { return y * (mCreateInfo.cells.x + 1) + x; };
+        auto point = [](const PointMass& p, float w)
+        {
+            return dst::gfx::Point{
+                glm::vec4 { p.position.x, p.position.y, p.position.z, 1 },
+                glm::vec4 { 0.117647059f, 0.117647059f, 0.545098066f, 1 }, // 0.333333343f
+                glm::vec4 { w, 1, 0, 0 },
+            };
+        };
+        for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
+            for (uint32_t x = 0; x < (uint32_t)mCreateInfo.cells.x; ++x) {
+                if (!y) {
+                    mPoints.push_back(point(mPointMasses[index(x, y)], 3));
+                }
+                mPoints.push_back(point(mPointMasses[index(x + 1, y    )], 3));
+                mPoints.push_back(point(mPointMasses[index(x + 1, y + 1)], 3));
+                mPoints.push_back(point(mPointMasses[index(x,     y + 1)], 3));
+                if (!x) {
+                    mPoints.push_back(point(mPointMasses[index(x, y)], 3));
+                }
+                mPoints.push_back(mPoints.back());
+                mPoints.back().width.g = 0;
+            }
+        }
+        mLineRenderer.submit((uint32_t)mPoints.size(), mPoints.data());
+    }
+
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const
+    {
+        mLineRenderer.record_draw_cmds(commandBuffer, camera, resolution);
+    }
+
+private:
+    void create_grid()
+    {
+        auto w = mCreateInfo.cells.x + 1;
+        auto h = mCreateInfo.cells.y + 1;
+        auto halfExtent = mCreateInfo.extent * 0.5f;
+        auto cellExtent = mCreateInfo.extent / glm::vec2{ (float)mCreateInfo.cells.x, (float)mCreateInfo.cells.y };
+
+        // TODO : Documentation
+        mPointMasses.reserve(w * h /* grid */ + w * 2 + h * 2 /* border */ + w * h / 9 /* anchors */);
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
+                PointMass pointMass{ };
+                pointMass.position = { -halfExtent.x + cellExtent.x * x, 0, -halfExtent.y + cellExtent.y * y };
+                pointMass.inverseMass = 1;
+                mPointMasses.push_back(pointMass);
+            }
+        }
+
+        // TODO : Documentation
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
+                auto i_0 = y * w + x;
+        
+                // TODO : Documentation
+                if (!x || !y || x == w - 1 || y == h - 1) { // Anchor the border of the grid
+                    mPointMasses.push_back(mPointMasses[i_0]);
+                    mPointMasses.back().inverseMass = 0;
+                    mSprings.push_back(Spring(mPointMasses, (uint32_t)mPointMasses.size() - 1, i_0, 0.1f, 0.1f));
+                } else if (!(x % 3) && !(y % 3)) { // Loosely anchor 1/9th of the point masses
+                    mPointMasses.push_back(mPointMasses[i_0]);
+                    mPointMasses.back().inverseMass = 0;
+                    mSprings.push_back(Spring(mPointMasses, (uint32_t)mPointMasses.size() - 1, i_0, 0.002f, 0.02f));
+                }
+        
+                // TODO : Documentation
+                const float Stiffness = 0.28f;
+                const float Damping = 0.06f;
+                if (x) {
+                    auto i_1 = y * w + (x - 1);
+                    mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
+                }
+                if (y) {
+                    auto i_1 = (y - 1) * w + x;
+                    mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
+                }
+            }
+        }
+    }
+
+    CreateInfo mCreateInfo{ };
+    std::vector<Spring> mSprings;
+    std::vector<PointMass> mPointMasses;
+    dst::gfx::LineRenderer mLineRenderer;
+    std::vector<dst::gfx::Point> mPoints;
+};
 
 int main(int, const char*[])
 {
@@ -579,6 +790,7 @@ int main(int, const char*[])
         auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
         dst::gfx::LineRenderer lineRenderer0;
         gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer0));
+#if 0
         std::vector<dst::gfx::Point> points0(4);
         for (int i = 0; i < points0.size(); ++i) {
             points0[i].position.x = (float)i;
@@ -599,6 +811,13 @@ int main(int, const char*[])
             point.width.r = glm::lerp(4.0f, 16.0f, t);
             points0.push_back(point);
         }
+#else
+        std::vector<dst::gfx::Point> points0(4);
+        for (int i = 0; i < points0.size(); ++i) {
+            points0[i].position.x = (float)i;
+            points0[i].position.y = 8;
+        }
+#endif
 
         lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
         lineRendererCreateInfo.capVertexCount = 4;
@@ -620,6 +839,16 @@ int main(int, const char*[])
         glm::vec2 gridExtent{ 64, 32 };
         glm::vec2 gridCellCount{ 128, 64 };
         create_grid(gridExtent, gridCellCount, gridPoints);
+        ///////////////////////////////////////////////////////////////////////////////
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Grid
+        Grid::CreateInfo gridCreateInfo{ };
+        gridCreateInfo.extent = { 64, 32 };
+        gridCreateInfo.cells = { 64, 32 };
+        Grid grid;
+        gvk_result(Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &grid));
+        ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
         while (
@@ -736,6 +965,11 @@ int main(int, const char*[])
             gridRenderer.submit((uint32_t)gridPoints.size(), gridPoints.data());
             ///////////////////////////////////////////////////////////////////////////////
 
+            ///////////////////////////////////////////////////////////////////////////////
+            // Grid
+            grid.update();
+            ///////////////////////////////////////////////////////////////////////////////
+
             wsiManager.update();
             auto swapchain = wsiManager.get_swapchain();
             if (swapchain) {
@@ -745,6 +979,40 @@ int main(int, const char*[])
 
                 auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
                 camera.set_aspect_ratio(extent.width, extent.height);
+
+                // Calculate mouse ray
+                glm::vec2 normalizedDeviceSpaceMouseRay{
+                    input.mouse.position.current[0] / extent.width * 2 - 1,
+                    input.mouse.position.current[1] / extent.height * 2 - 1
+                };
+                glm::vec4 clipSpaceMouseRay{
+                    normalizedDeviceSpaceMouseRay.x,
+                    normalizedDeviceSpaceMouseRay.y,
+                    1.0f,
+                    1.0f
+                };
+                auto cameraSpaceMouseRay = glm::inverse(camera.projection()) * clipSpaceMouseRay;
+                cameraSpaceMouseRay.z = -1;
+                cameraSpaceMouseRay.w = 0;
+                auto worldSpaceMouseRay = glm::normalize(glm::inverse(camera.view()) * cameraSpaceMouseRay);
+                if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
+                    points0.clear();
+                    dst::gfx::Point point{ };
+                    point.position.x = camera.transform.translation.x;
+                    point.position.y = camera.transform.translation.y;
+                    point.position.z = camera.transform.translation.z;
+                    points0.push_back(point);
+                    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x;
+                    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y;
+                    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z;
+                    point.color = gvk::math::Color::Red;
+                    points0.push_back(point);
+                    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x * 100;
+                    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y * 100;
+                    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z * 100;
+                    point.color = gvk::math::Color::Green;
+                    points0.push_back(point);
+                }
 
                 // Get VkFences from the WsiManager.  The gvk::gui::Renderer will wait on these
                 //  VkFences to ensure that it doesn't destroy any resources that are still in
@@ -801,21 +1069,31 @@ int main(int, const char*[])
                     ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
                     ImGui::Image(guiDescriptorSets[0], guiImageExtent);
 #else
-                    float textScale = pTextMeshRenderer->transform.scale.x;
-                    if (ImGui::DragFloat("Text Scale", &textScale)) {
-                        pTextMeshRenderer->transform.scale = glm::vec3(textScale);
+                    int pointCount = (int)points0.size();
+                    if (ImGui::InputInt("pointCount", &pointCount)) {
+                        points0.resize(std::max(0, pointCount));
                     }
-                    ImGui::InputInt("spriteCount", &spriteCount);
-                    ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
+                    for (size_t i = 0; i < points0.size(); ++i) {
+                        ImGui::InputFloat4(("point[" + std::to_string(i) + "].position").c_str(), &points0[i].position[0]);
+                        ImGui::ColorPicker4(("point[" + std::to_string(i) + "].color").c_str(), &points0[i].color[0]);
+                        ImGui::InputFloat4(("point[" + std::to_string(i) + "].width").c_str(), &points0[i].width[0]);
+                    }
 
-                    bool spiralPointCountUpdated = ImGui::InputInt("spiralPointCount", &spiralPointCount);
-                    bool spiralHeightUpdate = ImGui::InputInt("spiralHeight", &spiralHeight);
-                    bool spiralWidthUpdated = ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f);
-                    bool spiralColor1Updated = ImGui::ColorPicker4("spiralColor1", &spiralColor1[0]);
-                    bool spiralColor0Updated = ImGui::ColorPicker4("spiralColor0", &spiralColor0[0]);
-                    if (spiralPointCountUpdated || spiralHeightUpdate || spiralWidthUpdated || spiralColor0Updated || spiralColor1Updated) {
-                        create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
-                    }
+                    // float textScale = pTextMeshRenderer->transform.scale.x;
+                    // if (ImGui::DragFloat("Text Scale", &textScale)) {
+                    //     pTextMeshRenderer->transform.scale = glm::vec3(textScale);
+                    // }
+                    // ImGui::InputInt("spriteCount", &spriteCount);
+                    // ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
+                    // 
+                    // bool spiralPointCountUpdated = ImGui::InputInt("spiralPointCount", &spiralPointCount);
+                    // bool spiralHeightUpdate = ImGui::InputInt("spiralHeight", &spiralHeight);
+                    // bool spiralWidthUpdated = ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f);
+                    // bool spiralColor1Updated = ImGui::ColorPicker4("spiralColor1", &spiralColor1[0]);
+                    // bool spiralColor0Updated = ImGui::ColorPicker4("spiralColor0", &spiralColor0[0]);
+                    // if (spiralPointCountUpdated || spiralHeightUpdate || spiralWidthUpdated || spiralColor0Updated || spiralColor1Updated) {
+                    //     create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
+                    // }
 #endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
@@ -869,7 +1147,7 @@ int main(int, const char*[])
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, floorPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)floorDescriptorSet, 0, nullptr);
-                    floorMesh.record_cmds(commandBuffer);
+                    // floorMesh.record_cmds(commandBuffer);
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
                     cubeMesh.record_cmds(commandBuffer);
@@ -897,6 +1175,11 @@ int main(int, const char*[])
                     lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    ///////////////////////////////////////////////////////////////////////////////
+
+                    ///////////////////////////////////////////////////////////////////////////////
+                    // Grid
+                    grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

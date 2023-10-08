@@ -33,9 +33,9 @@ namespace gfx {
 
 struct Point
 {
-    glm::vec4 position{ 0, 0, 0, 1 };
+    glm::vec4 position{ 0.0f, 0.0f, 0.0f, 1.0f };
     glm::vec4 color{ gvk::math::Color::White };
-    glm::vec4 width{ 4 };
+    glm::vec4 width{ 4.0f, 1.0f, 0.0f, 0.0f };
 };
 
 /*
@@ -48,6 +48,7 @@ public:
     {
     public:
         uint32_t capVertexCount{ 0 };
+        VkPrimitiveTopology primitiveTopology{ VK_PRIMITIVE_TOPOLOGY_LINE_STRIP };
     };
 
     LineRenderer() = default;

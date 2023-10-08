@@ -282,15 +282,15 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
 #if 1
                 ///////////////////////////////////////////////////////////////////////////////
                 Point point0 = pointBuffer.points[gl_InstanceIndex];
-                Point point1 = pointBuffer.points[gl_InstanceIndex + 1];
+                Point point1 = pointBuffer.points[gl_InstanceIndex + int(point0.width.g)];
                 vec4 clip0 = camera.projection * camera.view * point0.position;
                 vec4 clip1 = camera.projection * camera.view * point1.position;
                 vec2 screen0 = camera.resolution * (0.5 * clip0.xy / clip0.w + 0.5);
                 vec2 screen1 = camera.resolution * (0.5 * clip1.xy / clip1.w + 0.5);
                 vec2 xBasis = normalize(screen1 - screen0);
                 vec2 yBasis = vec2(xBasis.y, -xBasis.x);
-                vec2 pt0 = screen0 + point0.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
-                vec2 pt1 = screen1 + point1.width.r * (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                vec2 pt0 = screen0 + point0.width.r *                  (vsPosition.x * xBasis + vsPosition.y * yBasis);
+                vec2 pt1 = screen1 + point1.width.r * point0.width.g * (vsPosition.x * xBasis + vsPosition.y * yBasis);
                 vec2 pt = mix(pt0, pt1, vsPosition.z);
                 vec4 clip = mix(clip0, clip1, vsPosition.z);
                 gl_Position = vec4(clip.w * ((2.0 * pt) / camera.resolution - 1.0), clip.z, clip.w);
