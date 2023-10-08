@@ -135,9 +135,7 @@ void create_spiral(int pointCount, int height, float width, const glm::vec4& col
         point.position.z = std::sin(angle) * t;
         point.color = glm::lerp(color0, color1, t);
         point.width.r = t * width;
-        if (i % 3) {
-            point.width.g = 0;
-        }
+        point.width.g = (float)(i % 2);
     }
 }
 
@@ -367,6 +365,7 @@ private:
         
                 // TODO : Documentation
                 if (!x || !y || x == w - 1 || y == h - 1) { // Anchor the border of the grid
+                    // TODO : Fix missing edge anchors...
                     mPointMasses.push_back(mPointMasses[i_0]);
                     mPointMasses.back().inverseMass = 0;
                     mSprings.push_back(Spring(mPointMasses, (uint32_t)mPointMasses.size() - 1, i_0, 0.1f, 0.1f));
@@ -1044,7 +1043,7 @@ int main(int, const char*[])
                     auto intersection = camera.transform.translation + direction * distance;
                     switch (forceType) {
                     case 0: {
-                        grid.apply_directed_force({ 0, -5000, 0 }, intersection, 50);
+                        grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
                     } break;
                     case 1: {
                         auto sprayAngle = glm::two_pi<float>() / 50.0f;
