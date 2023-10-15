@@ -30,6 +30,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.graphics/text.hpp"
 #include "dynamic-static.graphics/sprite.hpp"
 
+#include "shape-shooter/grid.hpp"
+
 #include "stb/stb_image.h"
 
 #include <array>
@@ -176,226 +178,6 @@ void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vecto
         point.position.y += 32;
     }
 }
-
-class Grid final
-{
-public:
-    struct CreateInfo
-    {
-        glm::vec2 extent{ };
-        glm::uvec2 cells{ };
-    };
-
-    struct PointMass
-    {
-        void apply_force(const glm::vec3& force)
-        {
-            acceleration += force * inverseMass;
-        }
-
-        void increase_damping(float factor)
-        {
-            damping *= factor;
-        }
-
-        void update()
-        {
-            velocity += acceleration;
-            position += velocity;
-            acceleration = { };
-            if (glm::length2(velocity) < 0.001f * 0.001f) {
-                velocity = { };
-            }
-            velocity *= damping;
-            damping = 0.98f;
-        }
-
-        glm::vec3 position{ };
-        glm::vec3 velocity{ };
-        glm::vec3 acceleration{ };
-        float inverseMass{ };
-        float damping{ 0.98f };
-    };
-
-    class Spring final
-    {
-    public:
-        Spring(const std::vector<PointMass>& pointMasses, uint32_t p0_i, uint32_t p1_i, float stiffness, float damping)
-            : mP0_i{ p0_i }
-            , mP1_i{ p1_i }
-            , mStiffness{ stiffness }
-            , mDamping{ damping }
-            , mTargetLength{ glm::distance(pointMasses[p0_i].position, pointMasses[p1_i].position) * 0.95f }
-        {
-        }
-
-        void update(std::vector<PointMass>& pointMasses)
-        {
-            assert(mP0_i < pointMasses.size());
-            assert(mP1_i < pointMasses.size());
-            auto v = pointMasses[mP0_i].position - pointMasses[mP1_i].position;
-            auto length = glm::length(v);
-            if (mTargetLength < length) {
-                v = (v / length) * (length - mTargetLength);
-                auto dv = pointMasses[mP1_i].velocity - pointMasses[mP0_i].velocity;
-                auto force = mStiffness * v - dv * mDamping;
-                pointMasses[mP0_i].apply_force(-force);
-                pointMasses[mP1_i].apply_force(force);
-            }
-        }
-
-    private:
-        uint32_t mP0_i{ };
-        uint32_t mP1_i{ };
-        float mTargetLength{ };
-        float mStiffness{ };
-        float mDamping{ };
-    };
-
-    static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, const CreateInfo* pCreateInfo, Grid* pGrid)
-    {
-        assert(pCreateInfo);
-        assert(pGrid);
-        pGrid->mCreateInfo = *pCreateInfo;
-        gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-            auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
-            gvk_result(dst::gfx::LineRenderer::create(gvkContext, renderPass, lineRendererCreateInfo, &pGrid->mLineRenderer));
-            pGrid->create_grid();
-        } gvk_result_scope_end;
-        return gvkResult;
-    }
-
-    void apply_directed_force(const glm::vec3& force, const glm::vec3& position, float radius)
-    {
-        for (auto& pointMass : mPointMasses) {
-            if (glm::distance2(position, pointMass.position) < radius * radius) {
-                pointMass.apply_force(10.0f * force / (10.0f + glm::distance(position, pointMass.position)));
-            }
-        }
-    }
-
-    void apply_implosive_force(float force, const glm::vec3& position, float radius)
-    {
-        for (auto& pointMass : mPointMasses) {
-            auto distanceSqrd = glm::distance2(position, pointMass.position);
-            if (distanceSqrd < radius * radius) {
-                pointMass.apply_force(10.0f * force * (position - pointMass.position) / (100.0f + distanceSqrd));
-                pointMass.increase_damping(0.6f);
-            }
-        }
-    }
-
-    void apply_explosive_force(float force, const glm::vec3& position, float radius)
-    {
-        for (auto& pointMass : mPointMasses) {
-            auto distanceSqrd = glm::distance2(position, pointMass.position);
-            if (distanceSqrd < radius * radius) {
-                pointMass.apply_force(100.0f * force * (position - pointMass.position) / (10000.0f + distanceSqrd));
-                pointMass.increase_damping(0.6f);
-            }
-        }
-    }
-
-    void update()
-    {
-        auto index = [&](uint32_t x, uint32_t y) { return y * (mCreateInfo.cells.x + 1) + x; };
-        auto point = [](const PointMass& p, float w)
-        {
-            return dst::gfx::Point{
-                glm::vec4 { p.position.x, p.position.y, p.position.z, 1 },
-                glm::vec4 { 0.117647059f, 0.117647059f, 0.545098066f, 1 }, // 0.333333343f
-                glm::vec4 { w, 1, 0, 0 },
-            };
-        };
-        for (auto& spring : mSprings) {
-            spring.update(mPointMasses);
-        }
-        for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
-            for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
-                mPointMasses[index(x, y)].update();
-            }
-        }
-        mPoints.clear();
-        for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
-            for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
-                if (!y) {
-                    mPoints.push_back(point(mPointMasses[index(x, y)], 3));
-                }
-                mPoints.push_back(point(mPointMasses[index(x + 1, y    )], 3));
-                mPoints.push_back(point(mPointMasses[index(x + 1, y + 1)], 3));
-                mPoints.push_back(point(mPointMasses[index(x,     y + 1)], 3));
-                if (!x) {
-                    mPoints.push_back(point(mPointMasses[index(x, y)], 3));
-                }
-                mPoints.push_back(mPoints.back());
-                mPoints.back().width.g = 0;
-            }
-        }
-        mLineRenderer.submit((uint32_t)mPoints.size(), mPoints.data());
-    }
-
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const
-    {
-        mLineRenderer.record_draw_cmds(commandBuffer, camera, resolution);
-    }
-
-private:
-    void create_grid()
-    {
-        auto w = mCreateInfo.cells.x + 1;
-        auto h = mCreateInfo.cells.y + 1;
-        auto halfExtent = mCreateInfo.extent * 0.5f;
-        auto cellExtent = mCreateInfo.extent / glm::vec2{ (float)mCreateInfo.cells.x, (float)mCreateInfo.cells.y };
-
-        // TODO : Documentation
-        mPointMasses.reserve(w * h /* grid */ + w * 2 + h * 2 /* border */ + w * h / 9 /* anchors */);
-        for (uint32_t y = 0; y < h; ++y) {
-            for (uint32_t x = 0; x < w; ++x) {
-                PointMass pointMass{ };
-                pointMass.position = { -halfExtent.x + cellExtent.x * x, 0, -halfExtent.y + cellExtent.y * y };
-                pointMass.inverseMass = 1;
-                mPointMasses.push_back(pointMass);
-            }
-        }
-
-        // TODO : Documentation
-        for (uint32_t y = 0; y < h; ++y) {
-            for (uint32_t x = 0; x < w; ++x) {
-                auto i_0 = y * w + x;
-        
-                // TODO : Documentation
-                if (!x || !y || x == w - 1 || y == h - 1) { // Anchor the border of the grid
-                    // TODO : Fix missing edge anchors...
-                    mPointMasses.push_back(mPointMasses[i_0]);
-                    mPointMasses.back().inverseMass = 0;
-                    mSprings.push_back(Spring(mPointMasses, (uint32_t)mPointMasses.size() - 1, i_0, 0.1f, 0.1f));
-                } else if (!(x % 3) && !(y % 3)) { // Loosely anchor 1/9th of the point masses
-                    mPointMasses.push_back(mPointMasses[i_0]);
-                    mPointMasses.back().inverseMass = 0;
-                    mSprings.push_back(Spring(mPointMasses, (uint32_t)mPointMasses.size() - 1, i_0, 0.002f, 0.02f));
-                }
-        
-                // TODO : Documentation
-                const float Stiffness = 0.28f;
-                const float Damping = 0.06f;
-                if (x) {
-                    auto i_1 = y * w + (x - 1);
-                    mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
-                }
-                if (y) {
-                    auto i_1 = (y - 1) * w + x;
-                    mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
-                }
-            }
-        }
-    }
-
-    CreateInfo mCreateInfo{ };
-    std::vector<Spring> mSprings;
-    std::vector<PointMass> mPointMasses;
-    dst::gfx::LineRenderer mLineRenderer;
-    std::vector<dst::gfx::Point> mPoints;
-};
 
 int main(int, const char*[])
 {
@@ -855,11 +637,11 @@ int main(int, const char*[])
 
         ///////////////////////////////////////////////////////////////////////////////
         // Grid
-        Grid::CreateInfo gridCreateInfo{ };
+        shape_shooter::Grid::CreateInfo gridCreateInfo{ };
         gridCreateInfo.extent = { 64, 32 };
         gridCreateInfo.cells = { 64, 32 };
-        Grid grid;
-        gvk_result(Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &grid));
+        shape_shooter::Grid grid;
+        gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &grid));
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;

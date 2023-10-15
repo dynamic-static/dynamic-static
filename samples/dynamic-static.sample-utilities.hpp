@@ -365,7 +365,7 @@ inline VkResult dst_sample_create_uniform_buffer(const gvk::Device& device, gvk:
     return gvk::Buffer::create(device, &bufferCreateInfo, &vmaAllocationCreateInfo, pUniformBuffer);
 }
 
-VkResult dst_sample_create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
+inline VkResult dst_sample_create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, float radius, uint32_t subdivisions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Icosahedron::Vertices.begin(), dst::gfx::primitive::Icosahedron::Vertices.end());
     for (auto& vertex : vertices) {
@@ -410,7 +410,7 @@ VkResult dst_sample_create_sphere_mesh(const gvk::CommandBuffer& commandBuffer, 
     );
 }
 
-VkResult dst_sample_create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec3& dimensions, gvk::Mesh* pMesh)
+inline VkResult dst_sample_create_box_mesh(const gvk::CommandBuffer& commandBuffer, const glm::vec3& dimensions, gvk::Mesh* pMesh)
 {
     std::vector<glm::vec3> vertices(dst::gfx::primitive::Cube::Vertices.begin(), dst::gfx::primitive::Cube::Vertices.end());
     for (auto& vertex : vertices) {
