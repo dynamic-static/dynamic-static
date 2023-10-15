@@ -20,6 +20,7 @@ dst_add_static_library(
         "${includePath}/defines.hpp"
         "${includePath}/primitives.hpp"
         "${includePath}/renderer.hpp"
+        "${includePath}/sprite-renderer.hpp"
         "${includePath}/sprite.hpp"
         "${includePath}/text.hpp"
     sourceFiles
@@ -28,6 +29,7 @@ dst_add_static_library(
         "${sourcePath}/mesh.cpp"
         "${sourcePath}/placeholder.cpp"
         "${sourcePath}/renderer.cpp"
+        "${sourcePath}/sprite-renderer.cpp"
         "${sourcePath}/sprite.cpp"
         "${sourcePath}/text.cpp"
 )
