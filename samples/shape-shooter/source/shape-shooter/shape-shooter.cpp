@@ -24,7 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#include "dynamic-static.sample-utilities.hpp"
+#include "../../dynamic-static.sample-utilities.hpp"
 
 #include "dynamic-static/text.hpp"
 #include "dynamic-static.graphics/text.hpp"
