@@ -28,7 +28,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static.graphics/buffer.hpp"
 #include "dynamic-static.graphics/defines.hpp"
-#include "dynamic-static.graphics/renderer.hpp"
 #include "dynamic-static/text.hpp"
 
 namespace gvk {
@@ -47,6 +46,11 @@ inline auto get_vertex_description<dst::text::Mesh::Vertex>(uint32_t binding)
 
 namespace dst {
 namespace gfx {
+
+template <typename T>
+class Renderer final
+{
+};
 
 template <>
 class Renderer<dst::text::Font> final

@@ -25,18 +25,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/defines.hpp"
-
+#include "shape-shooter/grid.hpp"
 #include "shape-shooter/entity-manager.hpp"
 #include "shape-shooter/input-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
 
-#include "../../dynamic-static.sample-utilities.hpp"
-
 #include "dynamic-static/text.hpp"
 #include "dynamic-static.graphics/text.hpp"
+#include "dynamic-static.graphics/line-renderer.hpp"
 #include "dynamic-static.graphics/sprite-renderer.hpp"
-
-#include "shape-shooter/grid.hpp"
 
 #include "stb/stb_image.h"
 
