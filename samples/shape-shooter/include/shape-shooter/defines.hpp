@@ -26,26 +26,34 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "shape-shooter/entity.hpp"
-
 #include "../../dynamic-static.sample-utilities.hpp"
+
+#include <array>
 
 namespace shape_shooter {
 
-class PlayerShip
-    : public Entity
+enum class Sprite
 {
-public:
-    static constexpr uint32_t CooldownFrames{ 6 };
+    BlackHole,
+    Bullet,
+    Glow,
+    Laser,
+    Player,
+    Pointer,
+    Seeker,
+    Wanderer,
+    Count,
+};
 
-    PlayerShip(uint32_t imageId);
-
-    void update() override final;
-    bool is_dead() const;
-
-private:
-    uint32_t mCooldown{ };
-
+inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePaths {
+    SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Player.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
+    SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
 };
 
 } // namespace shape_shooter

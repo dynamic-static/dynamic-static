@@ -24,7 +24,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
+#pragma once
+
 #include "../../dynamic-static.sample-utilities.hpp"
+
+#include "dynamic-static.graphics/line-renderer.hpp"
 
 namespace shape_shooter {
 

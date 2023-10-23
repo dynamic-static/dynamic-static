@@ -24,6 +24,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
+#pragma once
+
 #include "../../dynamic-static.sample-utilities.hpp"
 
 namespace shape_shooter {
@@ -31,8 +33,8 @@ namespace shape_shooter {
 class Entity
 {
 public:
+    Entity(uint32_t imageId);
     virtual ~Entity() = 0;
-
     virtual void update() = 0;
     void record_draw_cmds() const;
 
@@ -43,6 +45,7 @@ public:
     bool expired{ };
 
 protected:
+    uint32_t mImageId{ };
     glm::vec4 mColor{ gvk::math::Color::White };
 };
 

@@ -24,11 +24,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
+#include "shape-shooter/defines.hpp"
+
+#include "shape-shooter/entity-manager.hpp"
+#include "shape-shooter/player-ship.hpp"
+
 #include "../../dynamic-static.sample-utilities.hpp"
 
 #include "dynamic-static/text.hpp"
 #include "dynamic-static.graphics/text.hpp"
-#include "dynamic-static.graphics/sprite.hpp"
+#include "dynamic-static.graphics/sprite-renderer.hpp"
 
 #include "shape-shooter/grid.hpp"
 
@@ -560,24 +565,25 @@ int main(int, const char*[])
 
         ///////////////////////////////////////////////////////////////////////////////
         // Sprites
-        static const std::array<const char*, 8> SpriteFilePaths {
-            SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Player.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
-            SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
-        };
-        dst::gfx::Renderer<dst::gfx::Sprite>::CreateInfo spriteRendererCreateInfo { };
-        spriteRendererCreateInfo.filePathCount = (uint32_t)SpriteFilePaths.size();
-        spriteRendererCreateInfo.ppFilePaths = SpriteFilePaths.data();
-        dst::gfx::Renderer<dst::gfx::Sprite> spriteRenderer;
-        gvk_result(dst::gfx::Renderer<dst::gfx::Sprite>::create(gvkContext, wsiManager.get_render_pass(), spriteRendererCreateInfo, &spriteRenderer));
-        int spriteCount = 8;
+        gvk::Buffer spriteStagingBuffer;
+        std::vector<gvk::ImageView> spriteImages((uint32_t)shape_shooter::Sprite::Count);
+        for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
+            gvk_result(dst_sample_load_image(gvkContext, shape_shooter::SpriteFilePaths[i], &spriteStagingBuffer, &spriteImages[i]));
+        }
+        dst::gfx::SpriteRenderer::CreateInfo spriteRendererCreateInfo { };
+        spriteRendererCreateInfo.renderPass = wsiManager.get_render_pass();
+        spriteRendererCreateInfo.imageCount = (uint32_t)spriteImages.size();
+        spriteRendererCreateInfo.pImages = spriteImages.data();
+        dst::gfx::SpriteRenderer spriteRenderer;
+        gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &spriteRenderer));
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
+
+        shape_shooter::EntityManager entityManager;
+#if 0
+        auto pPlayerShip = entityManager.create_entity<shape_shooter::PlayerShip>();
+        (void)pPlayerShip;
+#endif
 
         ///////////////////////////////////////////////////////////////////////////////
         // Lines
@@ -740,7 +746,13 @@ int main(int, const char*[])
             ///////////////////////////////////////////////////////////////////////////////
             // Sprites
             spriteRenderer.begin_sprite_batch();
-            for (int i = 0; i < spriteCount; ++i) {
+            for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
+                gvk::math::Transform transform{ };
+                transform.translation.x = (float)i;
+                transform.translation.y = cubeTransform.translation.y;
+                transform.scale *= 0.1f;
+                spriteRenderer.submit(i % (uint32_t)shape_shooter::Sprite::Count, transform, spriteColor);
+#if 0
                 dst::gfx::Sprite sprite { };
                 sprite.color = spriteColor;
                 sprite.transform.translation.x = (float)i;
@@ -748,6 +760,7 @@ int main(int, const char*[])
                 sprite.transform.scale *= 0.1f;
                 sprite.imageIndex = i % SpriteFilePaths.size();
                 spriteRenderer.submit(sprite);
+#endif
             }
             spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
@@ -990,7 +1003,7 @@ int main(int, const char*[])
                     ///////////////////////////////////////////////////////////////////////////////
                     // Sprites
                     auto spriteCamera = camera;
-                    spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
+                    // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
                     spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
                     ///////////////////////////////////////////////////////////////////////////////

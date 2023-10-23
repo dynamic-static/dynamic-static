@@ -28,6 +28,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
+Entity::Entity(uint32_t imageId)
+    : mImageId{ imageId }
+{
+}
+
 Entity::~Entity()
 {
 }

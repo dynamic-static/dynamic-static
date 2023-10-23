@@ -25,6 +25,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "dynamic-static.graphics/sprite.hpp"
+
+#if 0
+
 #include "dynamic-static/image.hpp"
 
 #include "gvk-handles.hpp"
@@ -590,3 +593,5 @@ VkResult Renderer<Sprite>::allocate_descriptor_set(const gvk::Context& gvkContex
 
 } // namespace gfx
 } // namespace dst
+
+#endif

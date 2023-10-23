@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#if 0
+
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static.graphics/renderer.hpp"
 
@@ -87,3 +89,5 @@ private:
 
 } // namespace gfx
 } // namespace dst
+
+#endif

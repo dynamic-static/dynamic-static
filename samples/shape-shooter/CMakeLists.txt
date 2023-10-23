@@ -35,6 +35,7 @@ dst_add_executable(
         "${includeDirectory}"
     includeFiles
         "${includePath}/bullet.hpp"
+        "${includePath}/defines.hpp"
         "${includePath}/enemy.hpp"
         "${includePath}/enemy-spawner.hpp"
         "${includePath}/entity.hpp"
