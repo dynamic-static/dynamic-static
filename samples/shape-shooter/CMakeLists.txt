@@ -41,7 +41,7 @@ dst_add_executable(
         "${includePath}/entity.hpp"
         "${includePath}/entity-manager.hpp"
         "${includePath}/grid.hpp"
-        "${includePath}/input.hpp"
+        "${includePath}/input-manager.hpp"
         "${includePath}/player-ship.hpp"
         "${includePath}/player-status.hpp"
     sourceFiles
@@ -51,7 +51,7 @@ dst_add_executable(
         "${sourcePath}/entity.cpp"
         "${sourcePath}/entity-manager.cpp"
         "${sourcePath}/grid.cpp"
-        "${sourcePath}/input.cpp"
+        "${sourcePath}/input-manager.cpp"
         "${sourcePath}/player-ship.cpp"
         "${sourcePath}/player-status.cpp"
         "${sourcePath}/shape-shooter.cpp"

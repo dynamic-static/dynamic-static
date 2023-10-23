@@ -26,10 +26,48 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "../../dynamic-static.sample-utilities.hpp"
+#include "shape-shooter/input-manager.hpp"
 
 namespace shape_shooter {
 
+glm::vec3 InputManager::get_movement_direction() const
+{
+    glm::vec3 direction{ };
+    // TODO : Thmubstick
+    if (mInput.keyboard.down(gvk::system::Key::F)) { // Left
+        direction.x += 1;
+    }
+    if (mInput.keyboard.down(gvk::system::Key::H)) { // Right
+        direction.x -= 1;
+    }
+    if (mInput.keyboard.down(gvk::system::Key::T)) { // Forward
+        direction.z -= 1;
+    }
+    if (mInput.keyboard.down(gvk::system::Key::G)) { // Backward
+        direction.z += 1;
+    }
+    return direction.x || direction.y || direction.z ? glm::normalize(direction) : glm::vec3{ };
+}
 
+glm::vec3 InputManager::get_aim_direction() const
+{
+    return { };
+}
+
+void InputManager::update(const gvk::system::Input& input)
+{
+    mInput = input;
+    const auto& mouseDelta = mInput.mouse.position.delta();
+    if (
+        mInput.keyboard.down(gvk::system::Key::UpArrow) ||
+        mInput.keyboard.down(gvk::system::Key::DownArrow) ||
+        mInput.keyboard.down(gvk::system::Key::LeftArrow) ||
+        mInput.keyboard.down(gvk::system::Key::RightArrow) // TODO : Thumbsticks
+    ) {
+        mMouseAimEnabled = false;
+    } else if (mouseDelta[0] || mouseDelta[1]) {
+        mMouseAimEnabled = true;
+    }
+}
 
 } // namespace shape_shooter

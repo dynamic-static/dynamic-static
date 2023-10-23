@@ -26,19 +26,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "shape-shooter/entity-manager.hpp"
 
-#include "../../dynamic-static.sample-utilities.hpp"
-
 #include <vector>
 
 namespace shape_shooter {
 
-void EntityManager::update()
+void EntityManager::update(const InputManager& inputManager, float deltaTime)
 {
     mUpdating = true;
     handle_collisions();
     for (auto& entity : mEntities) {
         assert(entity);
-        entity->update();
+        entity->update(inputManager, deltaTime);
     }
     mUpdating = false;
     for (auto& addedEntity : mAddedEntities) {
@@ -62,10 +60,11 @@ void EntityManager::kill_player()
 
 }
 
-void EntityManager::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const
+void EntityManager::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
 {
-    (void)commandBuffer;
-    (void)camera;
+    for (const auto& entity : mEntities) {
+        entity->draw(spriteRenderer);
+    }
 }
 
 } // namespace shape_shooter

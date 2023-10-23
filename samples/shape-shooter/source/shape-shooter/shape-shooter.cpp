@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/defines.hpp"
 
 #include "shape-shooter/entity-manager.hpp"
+#include "shape-shooter/input-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
 
 #include "../../dynamic-static.sample-utilities.hpp"
@@ -560,6 +561,7 @@ int main(int, const char*[])
                 return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], textMesh, fontRenderer, &renderer);
             }
         );
+        pTextMeshRenderer->transform.translation = glm::vec3{ 0, 16, 0 };
         pTextMeshRenderer->transform.scale = glm::vec3(0.1f);
         ///////////////////////////////////////////////////////////////////////////////
 
@@ -579,11 +581,13 @@ int main(int, const char*[])
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
+        shape_shooter::InputManager inputManager;
         shape_shooter::EntityManager entityManager;
-#if 0
+        const auto& playerShipImageCreateInfo = spriteImages[(uint32_t)shape_shooter::Sprite::Player].get<gvk::Image>().get<VkImageCreateInfo>();
         auto pPlayerShip = entityManager.create_entity<shape_shooter::PlayerShip>();
-        (void)pPlayerShip;
-#endif
+        pPlayerShip->imageIndex = (uint32_t)shape_shooter::Sprite::Player;
+        pPlayerShip->extent = glm::vec2{ playerShipImageCreateInfo.extent.width, playerShipImageCreateInfo.extent.height } * shape_shooter::SpriteScale;
+        pPlayerShip->radius = 10 * shape_shooter::SpriteScale;
 
         ///////////////////////////////////////////////////////////////////////////////
         // Lines
@@ -745,7 +749,10 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // Sprites
+            inputManager.update(input);
+            entityManager.update(inputManager, deltaTime);
             spriteRenderer.begin_sprite_batch();
+#if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
                 gvk::math::Transform transform{ };
                 transform.translation.x = (float)i;
@@ -762,6 +769,9 @@ int main(int, const char*[])
                 spriteRenderer.submit(sprite);
 #endif
             }
+#else
+            entityManager.draw(spriteRenderer);
+#endif
             spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
 
@@ -963,7 +973,7 @@ int main(int, const char*[])
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)reflectionCameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    cubeMesh.record_cmds(commandBuffer);
+                    // cubeMesh.record_cmds(commandBuffer);
                 }
                 vkCmdEndRenderPass(commandBuffer);
 
@@ -989,7 +999,7 @@ int main(int, const char*[])
                     // floorMesh.record_cmds(commandBuffer);
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    cubeMesh.record_cmds(commandBuffer);
+                    // cubeMesh.record_cmds(commandBuffer);
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // TextMesh
@@ -1001,24 +1011,24 @@ int main(int, const char*[])
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////
-                    // Sprites
-                    auto spriteCamera = camera;
-                    // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
-                    //spriteCamera.fieldOfView = viewport.width;
-                    spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
-                    ///////////////////////////////////////////////////////////////////////////////
-
-                    ///////////////////////////////////////////////////////////////////////////////
                     // Lines
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
-                    lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
-                    lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    // lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    // lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid
                     grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    ///////////////////////////////////////////////////////////////////////////////
+
+                    ///////////////////////////////////////////////////////////////////////////////
+                    // Sprites
+                    auto spriteCamera = camera;
+                    // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
+                    //spriteCamera.fieldOfView = viewport.width;
+                    spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

@@ -26,37 +26,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "../../dynamic-static.sample-utilities.hpp"
-
-#include <array>
+#include "shape-shooter/defines.hpp"
 
 namespace shape_shooter {
 
-enum class Sprite
+class InputManager final
 {
-    BlackHole,
-    Bullet,
-    Glow,
-    Laser,
-    Player,
-    Pointer,
-    Seeker,
-    Wanderer,
-    Count,
-};
+public:
+    glm::vec3 get_movement_direction() const;
+    glm::vec3 get_aim_direction() const;
+    void update(const gvk::system::Input& input);
 
-inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePaths {
-    SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Player.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
+private:
+    gvk::system::Input mInput;
+    bool mMouseAimEnabled{ };
 };
-
-inline constexpr float SpriteScale{ 0.1f };
-inline constexpr glm::vec3 SpriteOffset{ 0, 1, 0 };
 
 } // namespace shape_shooter

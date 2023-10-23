@@ -26,9 +26,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "shape-shooter/defines.hpp"
 #include "shape-shooter/entity.hpp"
-
-#include "../../dynamic-static.sample-utilities.hpp"
+#include "shape-shooter/input-manager.hpp"
 
 #include <memory>
 #include <utility>
@@ -39,10 +39,10 @@ namespace shape_shooter {
 class EntityManager final
 {
 public:
-    void update();
+    void update(const InputManager& inputManager, float deltaTime);
     void handle_collisions();
     void kill_player();
-    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
+    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
 
     template <typename EntityType, typename ...Args>
     inline EntityType* create_entity(Args&&... args)

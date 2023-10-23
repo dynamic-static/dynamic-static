@@ -28,13 +28,36 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
-PlayerShip::PlayerShip(uint32_t imageId)
-    : Entity(imageId)
+PlayerShip::PlayerShip()
 {
 }
 
-void PlayerShip::update()
+bool PlayerShip::is_dead() const
 {
+    return false;
+}
+
+void PlayerShip::update(const InputManager& inputManager, float deltaTime)
+{
+    (void)inputManager;
+    (void)deltaTime;
+#if 1
+    velocity += inputManager.get_movement_direction() * mSpeed * deltaTime;
+    position += velocity;
+    // TODO : Clamp position to playfield
+    if (glm::length2(velocity)) {
+        orientation = glm::atan(velocity.z, velocity.x);
+    }
+    // TODO : make_exhaust_fire();
+    velocity = { };
+#endif
+}
+
+void PlayerShip::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+{
+    if (!is_dead()) {
+        Entity::draw(spriteRenderer);
+    }
 }
 
 } // namespace shape_shooter

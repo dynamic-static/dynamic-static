@@ -26,27 +26,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "../../dynamic-static.sample-utilities.hpp"
+#include "shape-shooter/defines.hpp"
+#include "shape-shooter/input-manager.hpp"
 
 namespace shape_shooter {
 
 class Entity
 {
 public:
-    Entity(uint32_t imageId);
+    Entity();
     virtual ~Entity() = 0;
-    virtual void update() = 0;
-    void record_draw_cmds() const;
+    virtual void update(const InputManager& inputManager, float deltaTime) = 0;
+    virtual void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
 
+    uint32_t imageIndex{ };
+    glm::vec2 extent{ };
     glm::vec3 position{ };
     glm::vec3 velocity{ };
+    glm::vec4 color{ gvk::math::Color::White };
     float orientation{ };
     float radius{ 20 };
     bool expired{ };
-
-protected:
-    uint32_t mImageId{ };
-    glm::vec4 mColor{ gvk::math::Color::White };
 };
 
 } // namespace shape_shooter

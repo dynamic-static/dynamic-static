@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static.graphics/primitives.hpp"
 #include "dynamic-static.graphics/sprite.hpp"
+#include "dynamic-static.graphics/sprite-renderer.hpp"
 #include "dynamic-static.physics/defines.hpp"
 #include "dynamic-static.physics/material.hpp"
 #include "dynamic-static.physics/rigid-body.hpp"

@@ -26,9 +26,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "shape-shooter/defines.hpp"
 #include "shape-shooter/entity.hpp"
-
-#include "../../dynamic-static.sample-utilities.hpp"
+#include "shape-shooter/input-manager.hpp"
 
 namespace shape_shooter {
 
@@ -38,14 +38,15 @@ class PlayerShip
 public:
     static constexpr uint32_t CooldownFrames{ 6 };
 
-    PlayerShip(uint32_t imageId);
+    PlayerShip();
 
-    void update() override final;
     bool is_dead() const;
+    void update(const InputManager& inputManager, float deltaTime) override final;
+    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
 
 private:
+    float mSpeed{ 2 };
     uint32_t mCooldown{ };
-
 };
 
 } // namespace shape_shooter

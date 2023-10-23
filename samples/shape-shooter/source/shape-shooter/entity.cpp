@@ -28,8 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
-Entity::Entity(uint32_t imageId)
-    : mImageId{ imageId }
+Entity::Entity()
 {
 }
 
@@ -37,8 +36,13 @@ Entity::~Entity()
 {
 }
 
-void Entity::record_draw_cmds() const
+void Entity::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
 {
+    gvk::math::Transform transform{ };
+    transform.translation = SpriteOffset + position;
+    transform.rotation = glm::angleAxis(orientation, glm::vec3{ 0, 1, 0 }) * glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 });
+    transform.scale *= SpriteScale;
+    spriteRenderer.submit(imageIndex, transform, color);
 }
 
 } // namespace shape_shooter

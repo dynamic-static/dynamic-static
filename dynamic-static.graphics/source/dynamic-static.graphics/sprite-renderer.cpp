@@ -151,7 +151,10 @@ VkResult SpriteRenderer::create(const gvk::Context& gvkContext, const CreateInfo
     pSpriteRenderer->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         pSpriteRenderer->mImages.insert(pSpriteRenderer->mImages.end(), createInfo.pImages, createInfo.pImages + createInfo.imageCount);
-        gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pSpriteRenderer->mSampler));
+        auto samplerCreateInfo = gvk::get_default<VkSamplerCreateInfo>();
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &samplerCreateInfo, nullptr, &pSpriteRenderer->mSampler));
         gvk_result(pSpriteRenderer->create_pipeline(gvkContext, createInfo.renderPass));
         gvk_result(pSpriteRenderer->allocate_descriptor_set(gvkContext));
     } gvk_result_scope_end;
@@ -433,6 +436,9 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         }
 
         auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
+        pipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
+        pipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
+        pipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
         auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
         pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
