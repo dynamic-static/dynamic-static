@@ -29,6 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "stb/stb_truetype.h"
 
 #include <iostream>
+#include <utility>
 
 namespace dst {
 namespace text {
@@ -261,6 +262,29 @@ void Mesh::Renderer::update(float deltaTime, const Mesh& mesh)
 {
     (void)deltaTime;
     (void)mesh;
+}
+
+Mesh::Mesh(Mesh&& other)
+{
+    *this = std::move(other);
+}
+
+Mesh& Mesh::operator=(Mesh&& other)
+{
+    if (this != &other) {
+        mText = std::exchange(other.mText, { });
+        mspFont = std::exchange(other.mspFont, { });
+        mVertices = std::exchange(other.mVertices, { });
+        mIndices = std::exchange(other.mIndices, { });
+        mGlyphSpacing = std::exchange(other.mGlyphSpacing, 0.0f);
+        mLineSpacing = std::exchange(other.mLineSpacing, 0.0f);
+        mKerningEnabled = std::exchange(other.mKerningEnabled, true);
+        mColor = std::exchange(other.mColor, { 1, 1, 1, 1 });
+        mControllers = std::exchange(other.mControllers, { });
+        mRenderers = std::exchange(other.mRenderers, { });
+        mUpdate = std::exchange(other.mUpdate, true);
+    }
+    return *this;
 }
 
 const std::string& Mesh::get_text() const

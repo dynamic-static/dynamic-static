@@ -31,6 +31,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/player-ship.hpp"
 
 #include "dynamic-static/text.hpp"
+#include "dynamic-static.graphics/coordinate-renderer.hpp"
 #include "dynamic-static.graphics/text.hpp"
 #include "dynamic-static.graphics/line-renderer.hpp"
 #include "dynamic-static.graphics/sprite-renderer.hpp"
@@ -540,6 +541,15 @@ int main(int, const char*[])
         cameraController.set_camera(&camera);
 
         ///////////////////////////////////////////////////////////////////////////////
+        // CoordinateRenderer
+        dst::gfx::CoordinateRenderer::CreateInfo coordinateRendererCreateInfo{ };
+        coordinateRendererCreateInfo.renderPass = wsiManager.get_render_pass();
+        coordinateRendererCreateInfo.pTtfFilePath = "C:\\Windows\\Fonts\\georgia.ttf";
+        dst::gfx::CoordinateRenderer coordinateRenderer;
+        gvk_result(dst::gfx::CoordinateRenderer::create(gvkContext, coordinateRendererCreateInfo, &coordinateRenderer));
+        ///////////////////////////////////////////////////////////////////////////////
+
+        ///////////////////////////////////////////////////////////////////////////////
         // TextMesh
         std::shared_ptr<dst::text::Font> spFont;
         // dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 256, &spFont);
@@ -732,6 +742,10 @@ int main(int, const char*[])
             assert(allocationInfo.pMappedData);
             memcpy(allocationInfo.pMappedData, &floorUbo, sizeof(ObjectUniforms));
 
+            ///////////////////////////////////////////////////////////////////////////////
+            // CoordinateRenderer
+            coordinateRenderer.update();
+            ///////////////////////////////////////////////////////////////////////////////
 
             ///////////////////////////////////////////////////////////////////////////////
             // TextMesh
@@ -998,6 +1012,8 @@ int main(int, const char*[])
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
                     // cubeMesh.record_cmds(commandBuffer);
 
+                    const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
+
                     ///////////////////////////////////////////////////////////////////////////////
                     // TextMesh
                     const auto& fontPipeline = fontRenderer.get_pipeline();
@@ -1009,7 +1025,6 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Lines
-                    const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
                     // lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     // lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
@@ -1018,6 +1033,11 @@ int main(int, const char*[])
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid
                     grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    ///////////////////////////////////////////////////////////////////////////////
+
+                    ///////////////////////////////////////////////////////////////////////////////
+                    // CoordinateRenderer
+                    coordinateRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////

@@ -138,6 +138,10 @@ public:
         virtual void update(float deltaTime, const Mesh& mesh);
     };
 
+    Mesh() = default;
+    Mesh(Mesh&& other);
+    Mesh& operator=(Mesh&& other);
+
     const std::string& get_text() const;
     void set_text(const std::string& text);
     const std::shared_ptr<Font>& get_font() const;
@@ -198,8 +202,8 @@ private:
     std::shared_ptr<Font> mspFont;
     std::vector<Vertex> mVertices;
     std::vector<uint16_t> mIndices;
-    float mGlyphSpacing { 0 };
-    float mLineSpacing { 0 };
+    float mGlyphSpacing { };
+    float mLineSpacing { };
     bool mKerningEnabled { true };
     glm::vec4 mColor { 1, 1, 1, 1 };
     std::vector<std::unique_ptr<Controller>> mControllers;
