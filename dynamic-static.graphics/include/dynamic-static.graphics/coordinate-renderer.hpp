@@ -50,7 +50,7 @@ public:
         glm::vec3 majorTick{   4,   4,   4 };
         glm::vec3 minorTick{   1,   1,   1 };
         const char* pTtfFilePath{ };
-        float fontSize{ 4 };
+        float fontSize{ 32 };
     };
 
     CoordinateRenderer() = default;

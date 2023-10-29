@@ -173,7 +173,7 @@ void Grid::create_grid()
     for (uint32_t y = 0; y < h; ++y) {
         for (uint32_t x = 0; x < w; ++x) {
             PointMass pointMass{ };
-            pointMass.position = { -halfExtent.x + cellExtent.x * x, 0, -halfExtent.y + cellExtent.y * y };
+            pointMass.position = { -halfExtent.x + cellExtent.x * x, -0.1f, -halfExtent.y + cellExtent.y * y };
             pointMass.inverseMass = 1;
             mPointMasses.push_back(pointMass);
         }

@@ -228,6 +228,13 @@ static VkResult validate_shader_info(const gvk::spirv::ShaderInfo& shaderInfo)
 
 VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass)
 {
+    // TODO : When the camera is very close to a line, it's possible to get it to
+    //  stop obeying width correctly
+
+    // TODO : Ensure that lines are always "centered"...getting the camera close to
+    //  an intersection will show that as perspective changes, lines shift around
+    //  the "center"
+
     // FROM : https://wwwtyro.net/2019/11/18/instanced-lines.html
 
     assert(gvkContext);

@@ -41,10 +41,10 @@ glm::vec3 InputManager::get_movement_direction() const
         direction.x -= 1;
     }
     if (mInput.keyboard.down(gvk::system::Key::T)) { // Forward
-        direction.z -= 1;
+        direction.z += 1;
     }
     if (mInput.keyboard.down(gvk::system::Key::G)) { // Backward
-        direction.z += 1;
+        direction.z -= 1;
     }
     return direction.x || direction.y || direction.z ? glm::normalize(direction) : glm::vec3{ };
 }

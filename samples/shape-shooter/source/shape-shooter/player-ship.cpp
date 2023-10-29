@@ -46,7 +46,7 @@ void PlayerShip::update(const InputManager& inputManager, float deltaTime)
     position += velocity;
     // TODO : Clamp position to playfield
     if (glm::length2(velocity)) {
-        orientation = glm::atan(velocity.z, velocity.x);
+        orientation = glm::atan(-velocity.z, velocity.x);
     }
     // TODO : make_exhaust_fire();
     velocity = { };

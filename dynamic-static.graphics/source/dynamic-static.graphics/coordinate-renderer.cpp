@@ -67,6 +67,7 @@ void CoordinateRenderer::reset()
 void CoordinateRenderer::update()
 {
     if (mUpdate) {
+        mUpdate = false;
         mPoints.clear();
         std::vector<dst::text::Mesh> textMeshes;
         auto getTextMesh = [&](auto& textMesh)
@@ -88,27 +89,160 @@ void CoordinateRenderer::update()
 
         Point point{ };
         point.position.x = mMin.x;
+        point.color = gvk::math::Color::Red;
+        point.width.r = 2;
         mPoints.push_back(point);
         point.position.x = mMax.x;
+        point.color = gvk::math::Color::Red;
+        point.width.r = 2;
         mPoints.push_back(point);
         mPoints.push_back(mPoints.back());
         mPoints.back().width.g = 0;
 
         point = { };
         point.position.y = mMin.y;
+        point.color = gvk::math::Color::Green;
+        point.width.r = 2;
         mPoints.push_back(point);
         point.position.y = mMax.y;
+        point.color = gvk::math::Color::Green;
+        point.width.r = 2;
         mPoints.push_back(point);
         mPoints.push_back(mPoints.back());
         mPoints.back().width.g = 0;
 
         point = { };
         point.position.z = mMin.z;
+        point.color = gvk::math::Color::Blue;
+        point.width.r = 2;
         mPoints.push_back(point);
         point.position.z = mMax.z;
+        point.color = gvk::math::Color::Blue;
+        point.width.r = 2;
         mPoints.push_back(point);
         mPoints.push_back(mPoints.back());
         mPoints.back().width.g = 0;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        float xMajor = mMin.x;
+        uint32_t xMajorTickCount = (uint32_t)((mMax.x - mMin.x) / mMajorTick.x);
+        for (uint32_t i = 0; i <= xMajorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.x = xMajor;
+            mPoints.back().color = gvk::math::Color::Red;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.y = 1;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+
+            dst::text::Mesh textMesh;
+            getTextMesh(textMesh);
+            textMesh.set_font(mspFont);
+            textMesh.set_text(std::to_string(xMajor));
+            assert(textMesh.get_renderers().size() == 1);
+            auto pTextMeshRenderer = (dst::gfx::Renderer<dst::text::Mesh>*)textMesh.get_renderers()[0].get();
+            pTextMeshRenderer->transform = { };
+            pTextMeshRenderer->transform.translation = { xMajor, 1, 0 };
+            pTextMeshRenderer->transform.scale *= 0.025f;
+            textMeshes.push_back(std::move(textMesh));
+
+            xMajor += mMajorTick.x;
+        }
+        float xMinor = mMin.x;
+        uint32_t xMinorTickCount = (uint32_t)((mMax.x - mMin.x) / mMinorTick.x);
+        for (uint32_t i = 0; i <= xMinorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.x = xMinor;
+            mPoints.back().color = gvk::math::Color::Red;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.y = 0.5f;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+            xMinor += mMinorTick.x;
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////
+        float yMajor = mMin.y;
+        uint32_t yMajorTickCount = (uint32_t)((mMax.y - mMin.y) / mMajorTick.y);
+        for (uint32_t i = 0; i <= yMajorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.y = yMajor;
+            mPoints.back().color = gvk::math::Color::Green;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.z = 1;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+
+            dst::text::Mesh textMesh;
+            getTextMesh(textMesh);
+            textMesh.set_font(mspFont);
+            textMesh.set_text(std::to_string(yMajor));
+            assert(textMesh.get_renderers().size() == 1);
+            auto pTextMeshRenderer = (dst::gfx::Renderer<dst::text::Mesh>*)textMesh.get_renderers()[0].get();
+            pTextMeshRenderer->transform = { };
+            pTextMeshRenderer->transform.translation = { 0, yMajor, 1 };
+            pTextMeshRenderer->transform.scale *= 0.025f;
+            textMeshes.push_back(std::move(textMesh));
+
+            yMajor += mMajorTick.y;
+        }
+        float yMinor = mMin.y;
+        uint32_t yMinorTickCount = (uint32_t)((mMax.y - mMin.y) / mMinorTick.y);
+        for (uint32_t i = 0; i <= yMinorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.y = yMinor;
+            mPoints.back().color = gvk::math::Color::Green;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.z = 0.5f;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+            yMinor += mMinorTick.y;
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////
+        float zMajor = mMin.z;
+        uint32_t zMajorTickCount = (uint32_t)((mMax.z - mMin.z) / mMajorTick.z);
+        for (uint32_t i = 0; i <= zMajorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.z = zMajor;
+            mPoints.back().color = gvk::math::Color::Blue;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.x = 1;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+
+            dst::text::Mesh textMesh;
+            getTextMesh(textMesh);
+            textMesh.set_font(mspFont);
+            textMesh.set_text(std::to_string(zMajor));
+            assert(textMesh.get_renderers().size() == 1);
+            auto pTextMeshRenderer = (dst::gfx::Renderer<dst::text::Mesh>*)textMesh.get_renderers()[0].get();
+            pTextMeshRenderer->transform = { };
+            pTextMeshRenderer->transform.translation = { 1, 0, zMajor };
+            pTextMeshRenderer->transform.scale *= 0.025f;
+            textMeshes.push_back(std::move(textMesh));
+
+            zMajor += mMajorTick.z;
+        }
+        float zMinor = mMin.z;
+        uint32_t zMinorTickCount = (uint32_t)((mMax.z - mMin.z) / mMinorTick.z);
+        for (uint32_t i = 0; i <= zMinorTickCount; ++i) {
+            mPoints.emplace_back();
+            mPoints.back().position.z = zMinor;
+            mPoints.back().color = gvk::math::Color::Blue;
+            mPoints.back().width.r = 2;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().position.x = 0.5f;
+            mPoints.push_back(mPoints.back());
+            mPoints.back().width.g = 0;
+            zMinor += mMinorTick.z;
+        }
+        ///////////////////////////////////////////////////////////////////////////////
 
         ///////////////////////////////////////////////////////////////////////////////
         mLineRenderer.submit((uint32_t)mPoints.size(), mPoints.data());
@@ -121,13 +255,17 @@ void CoordinateRenderer::update()
 
 void CoordinateRenderer::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const
 {
-    mLineRenderer.record_draw_cmds(commandBuffer, camera, resolution);
     for (const auto& textMesh : mTextMeshes) {
+        const auto& fontPipeline = mFontRenderer.get_pipeline();
+        const auto& fontDescriptorSet = mFontRenderer.get_descriptor_set();
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)fontDescriptorSet, 0, nullptr);
         // TODO : This is kludgy...
         assert(textMesh.get_renderers().size() == 1);
-        auto pTextMeshRenderer = reinterpret_cast<dst::gfx::Renderer<dst::text::Mesh>*>(textMesh.get_renderers()[0].get());
+        auto pTextMeshRenderer = (dst::gfx::Renderer<dst::text::Mesh>*)textMesh.get_renderers()[0].get();
         pTextMeshRenderer->record_draw_cmds(commandBuffer, mFontRenderer);
     }
+    mLineRenderer.record_draw_cmds(commandBuffer, camera, resolution);
 }
 
 const glm::vec3& CoordinateRenderer::get_min() const

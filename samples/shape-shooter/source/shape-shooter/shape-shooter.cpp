@@ -1037,6 +1037,7 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // CoordinateRenderer
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     coordinateRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
