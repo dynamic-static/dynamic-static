@@ -47,13 +47,24 @@ public:
     template <typename EntityType, typename ...Args>
     inline EntityType* create_entity(Args&&... args)
     {
-        auto upEntity = std::make_unique<EntityType>(std::forward(args)...);
+        auto upEntity = std::make_unique<EntityType>(std::forward<Args>(args)...);
         auto pEntity = upEntity.get();
-        mEntities.emplace_back(std::move(upEntity));
+        if (!mUpdating) {
+            add_entity(std::move(upEntity));
+        } else {
+            mAddedEntities.emplace_back(std::move(upEntity));
+        }
         return pEntity;
     }
 
 private:
+    template <typename EntityType>
+    inline void add_entity(std::unique_ptr<EntityType>&& upEntity)
+    {
+        assert(upEntity);
+        mEntities.emplace_back(std::move(upEntity));
+    }
+
     std::vector<std::unique_ptr<Entity>> mEntities;
     std::vector<std::unique_ptr<Entity>> mAddedEntities;
     bool mUpdating{ };

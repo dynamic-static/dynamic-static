@@ -35,6 +35,7 @@ dst_add_executable(
         "${includeDirectory}"
     includeFiles
         "${includePath}/bullet.hpp"
+        "${includePath}/context.hpp"
         "${includePath}/defines.hpp"
         "${includePath}/enemy.hpp"
         "${includePath}/enemy-spawner.hpp"
@@ -44,8 +45,10 @@ dst_add_executable(
         "${includePath}/input-manager.hpp"
         "${includePath}/player-ship.hpp"
         "${includePath}/player-status.hpp"
+        "${includePath}/utilities.hpp"
     sourceFiles
         "${sourcePath}/bullet.cpp"
+        "${sourcePath}/context.cpp"
         "${sourcePath}/enemy.cpp"
         "${sourcePath}/enemy-spawner.cpp"
         "${sourcePath}/entity.cpp"
@@ -55,6 +58,7 @@ dst_add_executable(
         "${sourcePath}/player-ship.cpp"
         "${sourcePath}/player-status.cpp"
         "${sourcePath}/shape-shooter.cpp"
+        "${sourcePath}/utilities.cpp"
     compileDefinitions
         SHAPE_SHOOTER_CONTENT="${MonoGameSamples_SOURCE_DIR}/NeonShooter/NeonShooter.Core/Content/"
 )

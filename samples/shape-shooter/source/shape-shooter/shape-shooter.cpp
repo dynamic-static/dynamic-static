@@ -24,9 +24,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
+#include "shape-shooter/context.hpp"
 #include "shape-shooter/defines.hpp"
-#include "shape-shooter/grid.hpp"
 #include "shape-shooter/entity-manager.hpp"
+#include "shape-shooter/grid.hpp"
 #include "shape-shooter/input-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
 
@@ -583,15 +584,12 @@ int main(int, const char*[])
         spriteRendererCreateInfo.renderPass = wsiManager.get_render_pass();
         spriteRendererCreateInfo.imageCount = (uint32_t)spriteImages.size();
         spriteRendererCreateInfo.pImages = spriteImages.data();
-        dst::gfx::SpriteRenderer spriteRenderer;
-        gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &spriteRenderer));
+        gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &shape_shooter::Context::instance().spriteRenderer));
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
-        shape_shooter::InputManager inputManager;
-        shape_shooter::EntityManager entityManager;
         const auto& playerShipImageCreateInfo = spriteImages[(uint32_t)shape_shooter::Sprite::Player].get<gvk::Image>().get<VkImageCreateInfo>();
-        auto pPlayerShip = entityManager.create_entity<shape_shooter::PlayerShip>();
+        auto pPlayerShip = shape_shooter::Context::instance().entityManager.create_entity<shape_shooter::PlayerShip>();
         pPlayerShip->imageIndex = (uint32_t)shape_shooter::Sprite::Player;
         pPlayerShip->extent = glm::vec2{ playerShipImageCreateInfo.extent.width, playerShipImageCreateInfo.extent.height } * shape_shooter::SpriteScale;
         pPlayerShip->radius = 10 * shape_shooter::SpriteScale;
@@ -657,8 +655,7 @@ int main(int, const char*[])
         shape_shooter::Grid::CreateInfo gridCreateInfo{ };
         gridCreateInfo.extent = { 64, 32 };
         gridCreateInfo.cells = { 64, 32 };
-        shape_shooter::Grid grid;
-        gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &grid));
+        gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
         ///////////////////////////////////////////////////////////////////////////////
 
         gvk::system::Clock clock;
@@ -760,9 +757,9 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // Sprites
-            inputManager.update(input);
-            entityManager.update(inputManager, deltaTime);
-            spriteRenderer.begin_sprite_batch();
+            shape_shooter::Context::instance().inputManager.update(input);
+            shape_shooter::Context::instance().entityManager.update(shape_shooter::Context::instance().inputManager, deltaTime);
+            shape_shooter::Context::instance().spriteRenderer.begin_sprite_batch();
 #if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
                 gvk::math::Transform transform{ };
@@ -781,9 +778,9 @@ int main(int, const char*[])
 #endif
             }
 #else
-            entityManager.draw(spriteRenderer);
+            shape_shooter::Context::instance().entityManager.draw(shape_shooter::Context::instance().spriteRenderer);
 #endif
-            spriteRenderer.end_sprite_batch();
+            shape_shooter::Context::instance().spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
 
             ///////////////////////////////////////////////////////////////////////////////
@@ -795,7 +792,7 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // Grid
-            grid.update();
+            shape_shooter::Context::instance().grid.update();
             ///////////////////////////////////////////////////////////////////////////////
 
             wsiManager.update();
@@ -859,14 +856,14 @@ int main(int, const char*[])
                     auto intersection = camera.transform.translation + direction * distance;
                     switch (forceType) {
                     case 0: {
-                        grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
+                        shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
                     } break;
                     case 1: {
                         auto sprayAngle = glm::two_pi<float>() / 50.0f;
-                        grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
+                        shape_shooter::Context::instance().grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
                     } break;
                     case 2: {
-                        grid.apply_explosive_force(4, intersection, 80);
+                        shape_shooter::Context::instance().grid.apply_explosive_force(4, intersection, 80);
                     } break;
                     default: {
                         assert(false);
@@ -1032,7 +1029,7 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid
-                    grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////
@@ -1046,7 +1043,7 @@ int main(int, const char*[])
                     auto spriteCamera = camera;
                     // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
-                    spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
+                    shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
                     ///////////////////////////////////////////////////////////////////////////////
                 }
 

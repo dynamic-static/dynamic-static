@@ -24,41 +24,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#pragma once
-
-#include "../../dynamic-static.sample-utilities.hpp"
-
-#include <array>
+#include "shape-shooter/context.hpp"
 
 namespace shape_shooter {
 
-class Context;
-
-enum class Sprite
+Context::Context()
 {
-    BlackHole,
-    Bullet,
-    Glow,
-    Laser,
-    Player,
-    Pointer,
-    Seeker,
-    Wanderer,
-    Count,
-};
+}
 
-inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePaths {
-    SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Player.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
-};
-
-inline constexpr float SpriteScale{ 0.1f };
-inline constexpr glm::vec3 SpriteOffset{ 0, 1, 0 };
+Context& Context::instance()
+{
+    static Context sContext;
+    return sContext;
+}
 
 } // namespace shape_shooter

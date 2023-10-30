@@ -41,7 +41,7 @@ void EntityManager::update(const InputManager& inputManager, float deltaTime)
     mUpdating = false;
     for (auto& addedEntity : mAddedEntities) {
         assert(addedEntity);
-        mEntities.push_back(std::move(addedEntity));
+        add_entity(std::move(addedEntity));
     }
     mAddedEntities.clear();
     std::erase_if(mEntities, [](const std::unique_ptr<Entity>& entity) { return entity->expired; });

@@ -24,41 +24,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#pragma once
-
-#include "../../dynamic-static.sample-utilities.hpp"
-
-#include <array>
+#include "shape-shooter/utilities.hpp"
 
 namespace shape_shooter {
 
-class Context;
-
-enum class Sprite
+float get_orientation(const glm::vec3& v)
 {
-    BlackHole,
-    Bullet,
-    Glow,
-    Laser,
-    Player,
-    Pointer,
-    Seeker,
-    Wanderer,
-    Count,
-};
+    return glm::atan(-v.z, v.x);
+}
 
-inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePaths {
-    SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Player.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
-};
-
-inline constexpr float SpriteScale{ 0.1f };
-inline constexpr glm::vec3 SpriteOffset{ 0, 1, 0 };
+glm::vec3 from_polar(float angle, float magnitude)
+{
+    return glm::vec3{ glm::cos(angle), 0, glm::sin(angle) } * magnitude;
+}
 
 } // namespace shape_shooter

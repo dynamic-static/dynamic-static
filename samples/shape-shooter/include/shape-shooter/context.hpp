@@ -26,39 +26,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "../../dynamic-static.sample-utilities.hpp"
-
-#include <array>
+#include "shape-shooter/defines.hpp"
+#include "shape-shooter/entity-manager.hpp"
+#include "shape-shooter/grid.hpp"
+#include "shape-shooter/input-manager.hpp"
 
 namespace shape_shooter {
 
-class Context;
-
-enum class Sprite
+class Context final
 {
-    BlackHole,
-    Bullet,
-    Glow,
-    Laser,
-    Player,
-    Pointer,
-    Seeker,
-    Wanderer,
-    Count,
-};
+public:
+    static Context& instance();
+    dst::gfx::SpriteRenderer spriteRenderer;
+    EntityManager entityManager;
+    InputManager inputManager;
+    Grid grid;
 
-inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePaths {
-    SHAPE_SHOOTER_CONTENT "/Art/Black Hole.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Bullet.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Glow.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Laser.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Player.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Pointer.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Seeker.png",
-    SHAPE_SHOOTER_CONTENT "/Art/Wanderer.png",
+private:
+    Context();
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
 };
-
-inline constexpr float SpriteScale{ 0.1f };
-inline constexpr glm::vec3 SpriteOffset{ 0, 1, 0 };
 
 } // namespace shape_shooter

@@ -25,6 +25,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/player-ship.hpp"
+#include "shape-shooter/bullet.hpp"
+#include "shape-shooter/context.hpp"
+#include "shape-shooter/utilities.hpp"
 
 namespace shape_shooter {
 
@@ -41,12 +44,25 @@ void PlayerShip::update(const InputManager& inputManager, float deltaTime)
 {
     (void)inputManager;
     (void)deltaTime;
+
+    auto aim = glm::vec3(1, 0, 0);
+    if (glm::length2(aim) && mCooldownTimer <= 0) {
+        mCooldownTimer = mCooldownTime;
+        auto bulletOrientation = get_orientation(aim);
+        float randomSpread = 0; // TODO :
+        // auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
+        auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 0.18f);
+        auto offset = glm::vec3(0); // TODO :
+        Context::instance().entityManager.create_entity<Bullet>(position + offset, bulletVelocity);
+    }
+    mCooldownTimer -= deltaTime;
+
 #if 1
     velocity += inputManager.get_movement_direction() * mSpeed * deltaTime;
     position += velocity;
     // TODO : Clamp position to playfield
     if (glm::length2(velocity)) {
-        orientation = glm::atan(-velocity.z, velocity.x);
+        orientation = get_orientation(velocity);
     }
     // TODO : make_exhaust_fire();
     velocity = { };
