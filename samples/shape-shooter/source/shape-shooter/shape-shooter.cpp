@@ -536,7 +536,9 @@ int main(int, const char*[])
         (void)guiImageScale;
 
         int forceType = 0;
+        int lookType = 0;
         gvk::math::Camera camera;
+        camera.farPlane = 10000000.0f;
         camera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
         cameraController.set_camera(&camera);
@@ -594,6 +596,7 @@ int main(int, const char*[])
         pPlayerShip->extent = glm::vec2{ playerShipImageCreateInfo.extent.width, playerShipImageCreateInfo.extent.height } * shape_shooter::SpriteScale;
         pPlayerShip->radius = 10 * shape_shooter::SpriteScale;
 
+#if 0
         ///////////////////////////////////////////////////////////////////////////////
         // Lines
         auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
@@ -649,11 +652,12 @@ int main(int, const char*[])
         glm::vec2 gridCellCount{ 128, 64 };
         create_grid(gridExtent, gridCellCount, gridPoints);
         ///////////////////////////////////////////////////////////////////////////////
+#endif
 
         ///////////////////////////////////////////////////////////////////////////////
         // Grid
         shape_shooter::Grid::CreateInfo gridCreateInfo{ };
-        gridCreateInfo.extent = { 64, 32 };
+        gridCreateInfo.extent = { 1920, 1080 };
         gridCreateInfo.cells = { 64, 32 };
         gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
         ///////////////////////////////////////////////////////////////////////////////
@@ -684,7 +688,7 @@ int main(int, const char*[])
                     /* .moveRight           = */ input.keyboard.down(gvk::system::Key::D),
                     /* .moveForward         = */ input.keyboard.down(gvk::system::Key::W),
                     /* .moveBackward        = */ input.keyboard.down(gvk::system::Key::S),
-                    /* .moveSpeedMultiplier = */ input.keyboard.down(gvk::system::Key::LeftShift) ? 2.0f : 1.0f,
+                    /* .moveSpeedMultiplier = */ input.keyboard.down(gvk::system::Key::LeftShift) ? 24.0f : 1.0f,
                     /* .lookDelta           = */ { input.mouse.position.delta()[0], input.mouse.position.delta()[1] },
                     /* .fieldOfViewDelta    = */ input.mouse.scroll.delta()[1],
                 };
@@ -698,6 +702,14 @@ int main(int, const char*[])
                     camera.fieldOfView = 60.0f;
                 }
                 cameraController.update(cameraControllerUpdateInfo);
+            }
+
+            if (input.keyboard.pressed(gvk::system::Key::Backspace)) {
+                lookType = lookType ? 0 : 1;
+                if (lookType) {
+                    camera.transform.translation = { 0, 965, 0 };
+                    camera.transform.rotation = glm::normalize(glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 }));
+                }
             }
 
             // Update the floating cube object's gvk::math::Transform...
@@ -783,16 +795,18 @@ int main(int, const char*[])
             shape_shooter::Context::instance().spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
 
+#if 0
             ///////////////////////////////////////////////////////////////////////////////
             // Lines
             lineRenderer0.submit((uint32_t)points0.size(), points0.data());
             lineRenderer1.submit((uint32_t)points1.size(), points1.data());
             gridRenderer.submit((uint32_t)gridPoints.size(), gridPoints.data());
             ///////////////////////////////////////////////////////////////////////////////
+#endif
 
             ///////////////////////////////////////////////////////////////////////////////
             // Grid
-            shape_shooter::Context::instance().grid.update();
+            shape_shooter::Context::instance().grid.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
             wsiManager.update();
@@ -856,7 +870,8 @@ int main(int, const char*[])
                     auto intersection = camera.transform.translation + direction * distance;
                     switch (forceType) {
                     case 0: {
-                        shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
+                        // shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
+                        shape_shooter::Context::instance().grid.apply_directed_force({ 0, -5000.0f, 0 }, intersection, 50);
                     } break;
                     case 1: {
                         auto sprayAngle = glm::two_pi<float>() / 50.0f;
@@ -926,6 +941,7 @@ int main(int, const char*[])
                     ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
                     ImGui::Image(guiDescriptorSets[0], guiImageExtent);
 #else
+#if 0
                     int pointCount = (int)points0.size();
                     if (ImGui::InputInt("pointCount", &pointCount)) {
                         points0.resize(std::max(0, pointCount));
@@ -935,6 +951,7 @@ int main(int, const char*[])
                         ImGui::ColorPicker4(("point[" + std::to_string(i) + "].color").c_str(), &points0[i].color[0]);
                         ImGui::InputFloat4(("point[" + std::to_string(i) + "].width").c_str(), &points0[i].width[0]);
                     }
+#endif
 
                     // float textScale = pTextMeshRenderer->transform.scale.x;
                     // if (ImGui::DragFloat("Text Scale", &textScale)) {
@@ -1020,12 +1037,14 @@ int main(int, const char*[])
                     pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
                     ///////////////////////////////////////////////////////////////////////////////
 
+#if 0
                     ///////////////////////////////////////////////////////////////////////////////
                     // Lines
                     // lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     // lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
+#endif
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid

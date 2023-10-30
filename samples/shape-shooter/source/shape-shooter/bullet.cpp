@@ -47,9 +47,10 @@ void Bullet::update(const InputManager& inputManager, float deltaTime)
     (void)inputManager;
     (void)deltaTime;
     position += velocity;
-    // grid.apply_explosive_force();
-    if (position.x < -32 || 32 < position.x ||
-        position.y < -32 || 32 < position.y) {
+    // Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, /* from_1920x1080(64, 80) */ 2.666666666666669f);
+    Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, 80.0f);
+    if (position.x < -1920 || 1920 < position.x ||
+        position.z < -1080 || 1080 < position.z) {
         expired = true;
         for (uint32_t i = 0; i < 30; ++i) {
             (void)i;

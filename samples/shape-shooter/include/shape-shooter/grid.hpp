@@ -45,7 +45,7 @@ public:
     {
         void apply_force(const glm::vec3& force);
         void increase_damping(float factor);
-        void update();
+        void update(float deltaTime);
 
         glm::vec3 position{ };
         glm::vec3 velocity{ };
@@ -72,7 +72,7 @@ public:
     void apply_directed_force(const glm::vec3& force, const glm::vec3& position, float radius);
     void apply_implosive_force(float force, const glm::vec3& position, float radius);
     void apply_explosive_force(float force, const glm::vec3& position, float radius);
-    void update();
+    void update(float deltaTime);
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const;
 
 private:

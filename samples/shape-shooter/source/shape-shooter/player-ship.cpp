@@ -51,7 +51,7 @@ void PlayerShip::update(const InputManager& inputManager, float deltaTime)
         auto bulletOrientation = get_orientation(aim);
         float randomSpread = 0; // TODO :
         // auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
-        auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 0.18f);
+        auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
         auto offset = glm::vec3(0); // TODO :
         Context::instance().entityManager.create_entity<Bullet>(position + offset, bulletVelocity);
     }

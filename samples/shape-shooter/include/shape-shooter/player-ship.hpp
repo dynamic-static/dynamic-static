@@ -45,8 +45,8 @@ public:
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
 
 private:
-    float mSpeed{ 4 };
-    float mCooldownTime{ 0.5f };
+    float mSpeed{ 8.0f / (1.0f / 60.0f) };
+    float mCooldownTime{ 0.1f };
     float mCooldownTimer{ };
 };
 

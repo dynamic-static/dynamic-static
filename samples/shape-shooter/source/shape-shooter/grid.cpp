@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "shape-shooter/grid.hpp"
 
+#include "shape-shooter/utilities.hpp"
+
 namespace shape_shooter {
 
 void Grid::PointMass::apply_force(const glm::vec3& force)
@@ -38,10 +40,11 @@ void Grid::PointMass::increase_damping(float factor)
     damping *= factor;
 }
 
-void Grid::PointMass::update()
+void Grid::PointMass::update(float deltaTime)
 {
+    (void)deltaTime;
     velocity += acceleration;
-    position += velocity;
+    position += velocity; // *deltaTime;
     acceleration = { };
     if (glm::length2(velocity) < 0.001f * 0.001f) {
         velocity = { };
@@ -112,13 +115,14 @@ void Grid::apply_explosive_force(float force, const glm::vec3& position, float r
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {
-            pointMass.apply_force(100.0f * force * (position - pointMass.position) / (10000.0f + distanceSqrd));
+            // pointMass.apply_force(100.0f * force * (pointMass.position - position) / (10000.0f + distanceSqrd));
+            pointMass.apply_force(100.0f * force * (pointMass.position - position) / (10000.0f + distanceSqrd));
             pointMass.increase_damping(0.6f);
         }
     }
 }
 
-void Grid::update()
+void Grid::update(float deltaTime)
 {
     auto index = [&](uint32_t x, uint32_t y) { return y * (mCreateInfo.cells.x + 1) + x; };
     auto point = [](const PointMass& p, float w)
@@ -134,7 +138,7 @@ void Grid::update()
     }
     for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
         for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
-            mPointMasses[index(x, y)].update();
+            mPointMasses[index(x, y)].update(deltaTime);
         }
     }
     mPoints.clear();

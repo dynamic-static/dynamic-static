@@ -32,5 +32,6 @@ namespace shape_shooter {
 
 float get_orientation(const glm::vec3& v);
 glm::vec3 from_polar(float angle, float magnitude);
+float from_1920x1080(float base, float value);
 
 } // namespace shape_shooter
