@@ -34,19 +34,26 @@ namespace shape_shooter {
 class Entity
 {
 public:
-    Entity();
+    Entity(Sprite sprite);
     virtual ~Entity() = 0;
-    virtual void update(const InputManager& inputManager, float deltaTime) = 0;
+
+    glm::vec2 get_sprite_extent() const;
+    virtual void update(float deltaTime) = 0;
     virtual void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
 
-    uint32_t imageIndex{ };
-    glm::vec2 extent{ };
     glm::vec3 position{ };
     glm::vec3 velocity{ };
     glm::vec4 color{ gvk::math::Color::White };
     float orientation{ };
     float radius{ 20 };
     bool expired{ };
+
+protected:
+    Sprite mSprite{ };
+
+private:
+    Entity(const Entity&) = delete;
+    Entity& operator=(const Entity&) = delete;
 };
 
 } // namespace shape_shooter

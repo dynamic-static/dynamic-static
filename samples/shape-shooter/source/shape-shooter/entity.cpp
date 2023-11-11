@@ -25,15 +25,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/entity.hpp"
+#include "shape-shooter/context.hpp"
 
 namespace shape_shooter {
 
-Entity::Entity()
+Entity::Entity(Sprite sprite)
+    : mSprite { sprite }
 {
 }
 
 Entity::~Entity()
 {
+}
+
+glm::vec2 Entity::get_sprite_extent() const
+{
+    const auto& imageViews = Context::instance().spriteRenderer.get_images();
+    assert((uint32_t)mSprite < imageViews.size());
+    const auto& imageExtent = imageViews[(uint32_t)mSprite].get<gvk::Image>().get<VkImageCreateInfo>().extent;
+    return { imageExtent.width, imageExtent.height };
 }
 
 void Entity::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
@@ -42,7 +52,7 @@ void Entity::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
     transform.translation = SpriteOffset + position;
     transform.rotation = glm::angleAxis(orientation, glm::vec3{ 0, 1, 0 }) * glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 });
     transform.scale *= SpriteScale;
-    spriteRenderer.submit(imageIndex, transform, color);
+    spriteRenderer.submit((uint32_t)mSprite, transform, color);
 }
 
 } // namespace shape_shooter

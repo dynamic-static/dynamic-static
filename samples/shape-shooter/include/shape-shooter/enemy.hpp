@@ -35,11 +35,46 @@ class Enemy final
     : public Entity
 {
 public:
-    void update(const InputManager& inputManager, float deltaTime) override final;
+    Enemy(Sprite sprite);
+
+    uint32_t get_point_value() const;
+    bool is_active() const;
+    void update(float deltaTime) override final;
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
 
 private:
+    class Behavior
+    {
+    public:
+        Behavior() = default;
+        virtual void update(Enemy& enemy) = 0;
+    private:
+        Behavior(const Behavior&) = delete;
+        Behavior& operator=(const Behavior&) = delete;
+    };
 
+    class FollowPlayer final
+        : public Behavior
+    {
+    public:
+        FollowPlayer() = default;
+        void update(Enemy& enemy) override final;
+    };
+
+    class MoveRandomly final
+        : public Behavior
+    {
+    public:
+        MoveRandomly();
+        void update(Enemy& enemy) override final;
+    private:
+        float mDirection{ };
+        uint32_t mUpdateCounter{ };
+    };
+
+    std::vector<std::unique_ptr<Behavior>> mBehaviors;
+    float mTimeUntilStart{ 1.0f };
+    uint32_t mPointValue{ 1 };
 };
 
 } // namespace shape_shooter

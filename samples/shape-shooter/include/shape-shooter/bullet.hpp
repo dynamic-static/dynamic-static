@@ -36,7 +36,7 @@ class Bullet final
 {
 public:
     Bullet(const glm::vec3& position, const glm::vec3& velocity);
-    void update(const InputManager& inputManager, float deltaTime);
+    void update(float deltaTime);
 };
 
 } // namespace shape_shooter

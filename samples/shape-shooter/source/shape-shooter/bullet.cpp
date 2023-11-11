@@ -31,20 +31,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace shape_shooter {
 
 Bullet::Bullet(const glm::vec3& pos, const glm::vec3& vel)
+    : Entity(Sprite::Bullet)
 {
-    imageIndex = (uint32_t)shape_shooter::Sprite::Bullet;
-    const auto& images = Context::instance().spriteRenderer.get_images();
-    const auto& imageCreateInfo = images[imageIndex].get<gvk::Image>().get<VkImageCreateInfo>();
-    extent = glm::vec2{ imageCreateInfo.extent.width, imageCreateInfo.extent.height };
     position = pos;
     velocity = vel;
     orientation = get_orientation(vel);
-    radius = 8 * SpriteScale;
+    radius = 8;
 }
 
-void Bullet::update(const InputManager& inputManager, float deltaTime)
+void Bullet::update(float deltaTime)
 {
-    (void)inputManager;
     (void)deltaTime;
     position += velocity;
     // Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, /* from_1920x1080(64, 80) */ 2.666666666666669f);

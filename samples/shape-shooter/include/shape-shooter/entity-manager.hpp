@@ -39,7 +39,10 @@ namespace shape_shooter {
 class EntityManager final
 {
 public:
-    void update(const InputManager& inputManager, float deltaTime);
+    EntityManager() = default;
+
+    uint32_t get_entity_count() const;
+    void update(float deltaTime);
     void handle_collisions();
     void kill_player();
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
@@ -68,6 +71,9 @@ private:
     std::vector<std::unique_ptr<Entity>> mEntities;
     std::vector<std::unique_ptr<Entity>> mAddedEntities;
     bool mUpdating{ };
+
+    EntityManager(const EntityManager&) = delete;
+    EntityManager& operator=(const EntityManager&) = delete;
 };
 
 } // namespace shape_shooter

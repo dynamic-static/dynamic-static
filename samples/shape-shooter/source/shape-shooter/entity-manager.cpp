@@ -30,13 +30,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
-void EntityManager::update(const InputManager& inputManager, float deltaTime)
+uint32_t EntityManager::get_entity_count() const
+{
+    return (uint32_t)mEntities.size();
+}
+
+void EntityManager::update(float deltaTime)
 {
     mUpdating = true;
     handle_collisions();
     for (auto& entity : mEntities) {
         assert(entity);
-        entity->update(inputManager, deltaTime);
+        entity->update(deltaTime);
     }
     mUpdating = false;
     for (auto& addedEntity : mAddedEntities) {

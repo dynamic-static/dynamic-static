@@ -40,7 +40,7 @@ enum class Sprite
     Bullet,
     Glow,
     Laser,
-    Player,
+    PlayerShip,
     Pointer,
     Seeker,
     Wanderer,
@@ -61,5 +61,6 @@ inline constexpr std::array<const char*, (uint32_t)Sprite::Count> SpriteFilePath
 // inline constexpr float SpriteScale{ 0.1f };
 inline constexpr float SpriteScale{ 1.0f };
 inline constexpr glm::vec3 SpriteOffset{ 0, 1, 0 };
+inline constexpr float OneOverSixty{ 0.0166666666666667f };
 
 } // namespace shape_shooter

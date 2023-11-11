@@ -27,9 +27,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/defines.hpp"
+#include "shape-shooter/enemy-spawner.hpp"
 #include "shape-shooter/entity-manager.hpp"
 #include "shape-shooter/grid.hpp"
 #include "shape-shooter/input-manager.hpp"
+#include "shape-shooter/player-ship.hpp"
 
 namespace shape_shooter {
 
@@ -37,13 +39,17 @@ class Context final
 {
 public:
     static Context& instance();
+    dst::RandomNumberGenerator rng;
     dst::gfx::SpriteRenderer spriteRenderer;
+    PlayerShip* pPlayerShip{ };
+    EnemySpawner enemySpawner;
     EntityManager entityManager;
     InputManager inputManager;
     Grid grid;
 
 private:
     Context();
+
     Context(const Context&) = delete;
     Context& operator=(const Context&) = delete;
 };

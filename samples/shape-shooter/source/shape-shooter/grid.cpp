@@ -92,15 +92,24 @@ VkResult Grid::create(const gvk::Context& gvkContext, const gvk::RenderPass& ren
 
 void Grid::apply_directed_force(const glm::vec3& force, const glm::vec3& position, float radius)
 {
+    (void)force;
+    (void)position;
+    (void)radius;
+#if 0
     for (auto& pointMass : mPointMasses) {
         if (glm::distance2(position, pointMass.position) < radius * radius) {
             pointMass.apply_force(10.0f * force / (10.0f + glm::distance(position, pointMass.position)));
         }
     }
+#endif
 }
 
 void Grid::apply_implosive_force(float force, const glm::vec3& position, float radius)
 {
+    (void)force;
+    (void)position;
+    (void)radius;
+#if 0
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {
@@ -108,10 +117,15 @@ void Grid::apply_implosive_force(float force, const glm::vec3& position, float r
             pointMass.increase_damping(0.6f);
         }
     }
+#endif
 }
 
 void Grid::apply_explosive_force(float force, const glm::vec3& position, float radius)
 {
+    (void)force;
+    (void)position;
+    (void)radius;
+#if 0
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {
@@ -120,6 +134,7 @@ void Grid::apply_explosive_force(float force, const glm::vec3& position, float r
             pointMass.increase_damping(0.6f);
         }
     }
+#endif
 }
 
 void Grid::update(float deltaTime)

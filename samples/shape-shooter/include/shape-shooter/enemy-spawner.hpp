@@ -27,36 +27,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/defines.hpp"
-#include "shape-shooter/entity.hpp"
-#include "shape-shooter/input-manager.hpp"
-
-#include <memory>
-#include <utility>
-#include <vector>
 
 namespace shape_shooter {
 
-class EntityManager final
+class EnemySpawner final
 {
 public:
-    void update(const InputManager& inputManager, float deltaTime);
-    void handle_collisions();
-    void kill_player();
-    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
+    EnemySpawner() = default;
 
-    template <typename EntityType, typename ...Args>
-    inline EntityType* create_entity(Args&&... args)
-    {
-        auto upEntity = std::make_unique<EntityType>(std::forward(args)...);
-        auto pEntity = upEntity.get();
-        mEntities.emplace_back(std::move(upEntity));
-        return pEntity;
-    }
+    void update(float deltaTime);
+    void reset();
 
 private:
-    std::vector<std::unique_ptr<Entity>> mEntities;
-    std::vector<std::unique_ptr<Entity>> mAddedEntities;
-    bool mUpdating{ };
+    glm::vec3 get_spawn_position();
+
+    dst::RandomNumberGenerator mRng;
+    float mInverseSpawnChance{ 90 };
+    float mInverseBlackHoleChance{ 600 };
+
+    EnemySpawner(const EnemySpawner&) = delete;
+    EnemySpawner& operator=(const EnemySpawner&) = delete;
 };
 
 } // namespace shape_shooter

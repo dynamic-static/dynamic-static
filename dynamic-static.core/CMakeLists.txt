@@ -19,6 +19,7 @@ dst_add_static_library(
         "${includePath}/filesystem.hpp"
         "${includePath}/hash-combine.hpp"
         "${includePath}/image.hpp"
+        "${includePath}/random.hpp"
         "${includePath}/state-machine.hpp"
         "${includePath}/text.hpp"
         "${includePath}/type-id.hpp"
@@ -38,5 +39,6 @@ dst_add_target_test(
         dynamic-static.core
     sourceFiles
         "${testsPath}/placeholder.tests.cpp"
+        "${testsPath}/random.tests.cpp"
         "${testsPath}/state-machine.tests.cpp"
 )

@@ -538,7 +538,7 @@ int main(int, const char*[])
         int forceType = 0;
         int lookType = 0;
         gvk::math::Camera camera;
-        camera.farPlane = 10000000.0f;
+        camera.farPlane = 1000.0f;
         camera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
         cameraController.set_camera(&camera);
@@ -590,11 +590,9 @@ int main(int, const char*[])
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
-        const auto& playerShipImageCreateInfo = spriteImages[(uint32_t)shape_shooter::Sprite::Player].get<gvk::Image>().get<VkImageCreateInfo>();
-        auto pPlayerShip = shape_shooter::Context::instance().entityManager.create_entity<shape_shooter::PlayerShip>();
-        pPlayerShip->imageIndex = (uint32_t)shape_shooter::Sprite::Player;
-        pPlayerShip->extent = glm::vec2{ playerShipImageCreateInfo.extent.width, playerShipImageCreateInfo.extent.height } * shape_shooter::SpriteScale;
-        pPlayerShip->radius = 10 * shape_shooter::SpriteScale;
+        auto& shapeShooterContext = shape_shooter::Context::instance();
+        shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
+
 
 #if 0
         ///////////////////////////////////////////////////////////////////////////////
@@ -769,9 +767,10 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // Sprites
-            shape_shooter::Context::instance().inputManager.update(input);
-            shape_shooter::Context::instance().entityManager.update(shape_shooter::Context::instance().inputManager, deltaTime);
-            shape_shooter::Context::instance().spriteRenderer.begin_sprite_batch();
+            shapeShooterContext.inputManager.update(input);
+            shapeShooterContext.entityManager.update(deltaTime);
+            shapeShooterContext.enemySpawner.update(deltaTime);
+            shapeShooterContext.spriteRenderer.begin_sprite_batch();
 #if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
                 gvk::math::Transform transform{ };

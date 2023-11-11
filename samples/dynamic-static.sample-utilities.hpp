@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "dynamic-static/defines.hpp"
 #include "dynamic-static/image.hpp"
+#include "dynamic-static/random.hpp"
 #include "dynamic-static/state-machine.hpp"
 // #include "dynamic-static.audio/defines.hpp"
 #include "dynamic-static.graphics/defines.hpp"

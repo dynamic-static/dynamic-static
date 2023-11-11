@@ -41,13 +41,14 @@ public:
     PlayerShip();
 
     bool is_dead() const;
-    void update(const InputManager& inputManager, float deltaTime) override final;
+    void update(float deltaTime) override final;
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
 
 private:
     float mSpeed{ 8.0f / (1.0f / 60.0f) };
     float mCooldownTime{ 0.1f };
     float mCooldownTimer{ };
+
 };
 
 } // namespace shape_shooter

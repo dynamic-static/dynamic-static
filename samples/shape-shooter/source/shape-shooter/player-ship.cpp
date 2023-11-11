@@ -32,6 +32,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 namespace shape_shooter {
 
 PlayerShip::PlayerShip()
+    : Entity(Sprite::PlayerShip)
 {
 }
 
@@ -40,11 +41,8 @@ bool PlayerShip::is_dead() const
     return false;
 }
 
-void PlayerShip::update(const InputManager& inputManager, float deltaTime)
+void PlayerShip::update(float deltaTime)
 {
-    (void)inputManager;
-    (void)deltaTime;
-
     auto aim = glm::vec3(1, 0, 0);
     if (glm::length2(aim) && mCooldownTimer <= 0) {
         mCooldownTimer = mCooldownTime;
@@ -58,7 +56,7 @@ void PlayerShip::update(const InputManager& inputManager, float deltaTime)
     mCooldownTimer -= deltaTime;
 
 #if 1
-    velocity += inputManager.get_movement_direction() * mSpeed * deltaTime;
+    velocity += Context::instance().inputManager.get_movement_direction() * mSpeed * deltaTime;
     position += velocity;
     // TODO : Clamp position to playfield
     if (glm::length2(velocity)) {
