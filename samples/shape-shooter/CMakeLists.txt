@@ -12,12 +12,16 @@ FetchContent_GetProperties(MonoGameSamples SOURCE_DIR MonoGameSamples_SOURCE_DIR
 
 ################################################################################
 # TODO : Documentation
-# add_custom_command(
-#     TARGET shape-shooter POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#     ${fmodSharedLibraries}
-#     $<TARGET_FILE_DIR:shape-shooter>
-# )
+set(SHAPE_SHOOTER_AUDIO_ENABLED 0)
+if(${DST_FMOD_ENABLED})
+    set(SHAPE_SHOOTER_AUDIO_ENABLED 1)
+    add_custom_command(
+        TARGET shape-shooter POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${fmodSharedLibraries}
+        $<TARGET_FILE_DIR:shape-shooter>
+    )
+endif()
 
 ################################################################################
 # shape-shooter
@@ -61,4 +65,5 @@ dst_add_executable(
         "${sourcePath}/utilities.cpp"
     compileDefinitions
         SHAPE_SHOOTER_CONTENT="${MonoGameSamples_SOURCE_DIR}/NeonShooter/NeonShooter.Core/Content/"
+        SHAPE_SHOOTER_AUDIO_ENABLED="${SHAPE_SHOOTER_AUDIO_ENABLED}"
 )
