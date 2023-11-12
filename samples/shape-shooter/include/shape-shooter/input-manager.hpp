@@ -38,6 +38,9 @@ public:
     void update(const gvk::system::Input& input);
 
 private:
+    glm::vec3 get_mouse_aim_direction() const;
+    glm::vec3 get_gamepad_aim_direction() const;
+
     gvk::system::Input mInput;
     bool mMouseAimEnabled{ };
 };

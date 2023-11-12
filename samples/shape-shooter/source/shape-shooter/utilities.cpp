@@ -43,4 +43,14 @@ float from_1920x1080(float base, float value)
     return value / 1920 * base;
 }
 
+glm::vec3 ray_plane_intersection(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, const glm::vec3& planePoint, const glm::vec3& planeNormal)
+{
+    // FROM : https://stackoverflow.com/questions/69257700/finding-the-intersection-of-a-ray-and-a-plane-programmatically
+    auto difference = planePoint - rayOrigin;
+    auto dot0 = glm::dot(difference, planeNormal);
+    auto dot1 = glm::dot(rayDirection, planeNormal);
+    auto distance = dot0 / dot1;
+    return rayOrigin + rayDirection * distance;
+}
+
 } // namespace shape_shooter

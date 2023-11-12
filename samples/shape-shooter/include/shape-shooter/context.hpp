@@ -39,8 +39,12 @@ class Context final
 {
 public:
     static Context& instance();
+    glm::vec2 renderExtent{ };
     dst::RandomNumberGenerator rng;
     dst::gfx::SpriteRenderer spriteRenderer;
+    glm::vec2 playField{ 1920, 1080 };
+    gvk::math::Camera gameCamera;
+    gvk::math::Camera uiCamera;
     PlayerShip* pPlayerShip{ };
     EnemySpawner enemySpawner;
     EntityManager entityManager;

@@ -43,7 +43,9 @@ bool PlayerShip::is_dead() const
 
 void PlayerShip::update(float deltaTime)
 {
-    auto aim = glm::vec3(1, 0, 0);
+    auto& context = Context::instance();
+    const auto& inputManager = context.inputManager;
+    auto aim = inputManager.get_aim_direction();
     if (glm::length2(aim) && mCooldownTimer <= 0) {
         mCooldownTimer = mCooldownTime;
         auto bulletOrientation = get_orientation(aim);

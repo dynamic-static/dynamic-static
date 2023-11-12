@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/grid.hpp"
 #include "shape-shooter/input-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
+#include "shape-shooter/utilities.hpp"
 
 #include "dynamic-static/text.hpp"
 #include "dynamic-static.graphics/coordinate-renderer.hpp"
@@ -534,14 +535,8 @@ int main(int, const char*[])
         float zRotation = 45.0f;
         float guiImageScale = 0.125f;
         (void)guiImageScale;
-
         int forceType = 0;
         int lookType = 0;
-        gvk::math::Camera camera;
-        camera.farPlane = 1000.0f;
-        camera.transform.translation = { 0, 2, -7 };
-        gvk::math::FreeCameraController cameraController;
-        cameraController.set_camera(&camera);
 
         ///////////////////////////////////////////////////////////////////////////////
         // CoordinateRenderer
@@ -592,7 +587,10 @@ int main(int, const char*[])
 
         auto& shapeShooterContext = shape_shooter::Context::instance();
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
-
+        shapeShooterContext.gameCamera.farPlane = 1000.0f;
+        shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
+        gvk::math::FreeCameraController cameraController;
+        cameraController.set_camera(&shapeShooterContext.gameCamera);
 
 #if 0
         ///////////////////////////////////////////////////////////////////////////////
@@ -697,7 +695,7 @@ int main(int, const char*[])
                     systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Visible);
                 }
                 if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
-                    camera.fieldOfView = 60.0f;
+                    shapeShooterContext.gameCamera.fieldOfView = 60.0f;
                 }
                 cameraController.update(cameraControllerUpdateInfo);
             }
@@ -705,8 +703,8 @@ int main(int, const char*[])
             if (input.keyboard.pressed(gvk::system::Key::Backspace)) {
                 lookType = lookType ? 0 : 1;
                 if (lookType) {
-                    camera.transform.translation = { 0, 965, 0 };
-                    camera.transform.rotation = glm::normalize(glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 }));
+                    shapeShooterContext.gameCamera.transform.translation = { 0, 965, 0 };
+                    shapeShooterContext.gameCamera.transform.rotation = glm::normalize(glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 }));
                 }
             }
 
@@ -721,8 +719,8 @@ int main(int, const char*[])
 
             // Uddate the gvk::math::Camera uniform data...
             CameraUniforms cameraUbo { };
-            cameraUbo.view = camera.view();
-            cameraUbo.projection = camera.projection();
+            cameraUbo.view = shapeShooterContext.gameCamera.view();
+            cameraUbo.projection = shapeShooterContext.gameCamera.projection();
             VmaAllocationInfo allocationInfo{ };
             vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
             assert(allocationInfo.pMappedData);
@@ -816,7 +814,8 @@ int main(int, const char*[])
                 gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
 
                 auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
-                camera.set_aspect_ratio(extent.width, extent.height);
+                shapeShooterContext.gameCamera.set_aspect_ratio(extent.width, extent.height);
+                shapeShooterContext.renderExtent = { extent.width, extent.height };
 
                 // Calculate mouse ray
                 glm::vec2 normalizedDeviceSpaceMouseRay{
@@ -829,10 +828,27 @@ int main(int, const char*[])
                     1.0f,
                     1.0f
                 };
-                auto cameraSpaceMouseRay = glm::inverse(camera.projection()) * clipSpaceMouseRay;
+                auto cameraSpaceMouseRay = glm::inverse(shapeShooterContext.gameCamera.projection()) * clipSpaceMouseRay;
                 cameraSpaceMouseRay.z = -1;
                 cameraSpaceMouseRay.w = 0;
-                auto worldSpaceMouseRay = glm::normalize(glm::inverse(camera.view()) * cameraSpaceMouseRay);
+                auto worldSpaceMouseRay = glm::normalize(glm::inverse(shapeShooterContext.gameCamera.view()) * cameraSpaceMouseRay);
+
+#if 0
+                glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+                auto difference = glm::vec3{ } - camera.transform.translation;
+                auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
+                auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
+                auto distance = dot0 / dot1;
+                auto intersection = camera.transform.translation + direction * distance;
+#endif
+#if 0
+                auto rayOrigin = camera.transform.translation;
+                glm::vec3 rayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+                glm::vec3 planePoint{ };
+                glm::vec3 planeNormal{ 0, 1, 0 };
+                shapeShooterContext.pPlayerShip->position = shape_shooter::ray_plane_intersection(rayOrigin, rayDirection, planePoint, planeNormal);
+#endif
+
                 if (input.keyboard.pressed(gvk::system::Key::One)) {
                     forceType = 0;
                 }
@@ -861,28 +877,31 @@ int main(int, const char*[])
                     point.color = gvk::math::Color::Green;
                     points0.push_back(point);
 #endif
-                    glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
-                    auto difference = glm::vec3{ } - camera.transform.translation;
-                    auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
-                    auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
-                    auto distance = dot0 / dot1;
-                    auto intersection = camera.transform.translation + direction * distance;
-                    switch (forceType) {
-                    case 0: {
-                        // shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
-                        shape_shooter::Context::instance().grid.apply_directed_force({ 0, -5000.0f, 0 }, intersection, 50);
-                    } break;
-                    case 1: {
-                        auto sprayAngle = glm::two_pi<float>() / 50.0f;
-                        shape_shooter::Context::instance().grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
-                    } break;
-                    case 2: {
-                        shape_shooter::Context::instance().grid.apply_explosive_force(4, intersection, 80);
-                    } break;
-                    default: {
-                        assert(false);
-                    } break;
-                    }
+                    // glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+                    // auto difference = glm::vec3{ } - camera.transform.translation;
+                    // auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
+                    // auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
+                    // auto distance = dot0 / dot1;
+                    // auto intersection = camera.transform.translation + direction * distance;
+
+
+
+                    // switch (forceType) {
+                    // case 0: {
+                    //     // shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
+                    //     shape_shooter::Context::instance().grid.apply_directed_force({ 0, -5000.0f, 0 }, intersection, 50);
+                    // } break;
+                    // case 1: {
+                    //     auto sprayAngle = glm::two_pi<float>() / 50.0f;
+                    //     shape_shooter::Context::instance().grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
+                    // } break;
+                    // case 2: {
+                    //     shape_shooter::Context::instance().grid.apply_explosive_force(4, intersection, 80);
+                    // } break;
+                    // default: {
+                    //     assert(false);
+                    // } break;
+                    // }
                 }
 
                 // Get VkFences from the WsiManager.  The gvk::gui::Renderer will wait on these
@@ -1047,18 +1066,18 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid
-                    shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // CoordinateRenderer
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
-                    coordinateRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
+                    coordinateRenderer.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Sprites
-                    auto spriteCamera = camera;
+                    auto spriteCamera = shapeShooterContext.gameCamera;
                     // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
                     shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);

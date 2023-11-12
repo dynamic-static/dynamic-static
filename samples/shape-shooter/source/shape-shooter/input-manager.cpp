@@ -27,6 +27,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/input-manager.hpp"
+#include "shape-shooter/context.hpp"
+#include "shape-shooter/utilities.hpp"
 
 namespace shape_shooter {
 
@@ -51,7 +53,7 @@ glm::vec3 InputManager::get_movement_direction() const
 
 glm::vec3 InputManager::get_aim_direction() const
 {
-    return { };
+    return mMouseAimEnabled ? get_mouse_aim_direction() : get_gamepad_aim_direction();
 }
 
 void InputManager::update(const gvk::system::Input& input)
@@ -68,6 +70,37 @@ void InputManager::update(const gvk::system::Input& input)
     } else if (mouseDelta[0] || mouseDelta[1]) {
         mMouseAimEnabled = true;
     }
+}
+
+glm::vec3 InputManager::get_mouse_aim_direction() const
+{
+    const auto& context = Context::instance();
+    const auto& renderExtent = context.renderExtent;
+    glm::vec2 normalizedDeviceSpaceMouseRay{
+        mInput.mouse.position.current[0] / renderExtent.x * 2 - 1,
+        mInput.mouse.position.current[1] / renderExtent.y * 2 - 1,
+    };
+    glm::vec4 clipSpaceMouseRay{
+        normalizedDeviceSpaceMouseRay.x,
+        normalizedDeviceSpaceMouseRay.y,
+        1.0f,
+        1.0f
+    };
+    const auto& gameCamera = context.gameCamera;
+    auto cameraSpaceMouseRay = glm::inverse(gameCamera.projection()) * clipSpaceMouseRay;
+    cameraSpaceMouseRay.z = -1;
+    cameraSpaceMouseRay.w = 0;
+    auto worldSpaceMouseRay = glm::normalize(glm::inverse(gameCamera.view()) * cameraSpaceMouseRay);
+    auto worldSpaceMouseRayOrigin = gameCamera.transform.translation;
+    glm::vec3 worldSpaceMouseRayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+    auto aimPoint = ray_plane_intersection(worldSpaceMouseRayOrigin, worldSpaceMouseRayDirection, { }, { 0, 1, 0 });
+    auto aimDirection = aimPoint - context.pPlayerShip->position;
+    return aimDirection.x || aimDirection.y || aimDirection.z ? glm::normalize(aimDirection) : aimDirection;
+}
+
+glm::vec3 InputManager::get_gamepad_aim_direction() const
+{
+    return { };
 }
 
 } // namespace shape_shooter
