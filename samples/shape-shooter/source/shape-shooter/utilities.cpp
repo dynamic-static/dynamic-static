@@ -30,7 +30,7 @@ namespace shape_shooter {
 
 float get_orientation(const glm::vec3& v)
 {
-    return glm::atan(-v.z, v.x);
+    return std::atan2(-v.z, v.x);
 }
 
 glm::vec3 from_polar(float angle, float magnitude)

@@ -842,7 +842,7 @@ int main(int, const char*[])
                 auto intersection = camera.transform.translation + direction * distance;
 #endif
 #if 0
-                auto rayOrigin = camera.transform.translation;
+                auto rayOrigin = shapeShooterContext.gameCamera.transform.translation;
                 glm::vec3 rayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
                 glm::vec3 planePoint{ };
                 glm::vec3 planeNormal{ 0, 1, 0 };

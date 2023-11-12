@@ -45,12 +45,13 @@ void PlayerShip::update(float deltaTime)
 {
     auto& context = Context::instance();
     const auto& inputManager = context.inputManager;
-    auto aim = inputManager.get_aim_direction();
-    if (glm::length2(aim) && mCooldownTimer <= 0) {
+    auto aimDirection = inputManager.get_aim_direction();
+    if (glm::length2(aimDirection) && mCooldownTimer <= 0) {
         mCooldownTimer = mCooldownTime;
-        auto bulletOrientation = get_orientation(aim);
+        // TODO : Sort out inconsistent rotations from get_orientation()
+        // auto bulletOrientation = get_orientation(aimDirection);
+        auto bulletOrientation = std::atan2(aimDirection.z, aimDirection.x);
         float randomSpread = 0; // TODO :
-        // auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
         auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
         auto offset = glm::vec3(0); // TODO :
         Context::instance().entityManager.create_entity<Bullet>(position + offset, bulletVelocity);
