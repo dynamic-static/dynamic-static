@@ -33,6 +33,8 @@ namespace shape_shooter {
 class InputManager final
 {
 public:
+    InputManager() = default;
+
     glm::vec3 get_movement_direction() const;
     glm::vec3 get_aim_direction() const;
     void update(const gvk::system::Input& input);
@@ -43,6 +45,9 @@ private:
 
     gvk::system::Input mInput;
     bool mMouseAimEnabled{ };
+
+    InputManager(const InputManager&) = delete;
+    InputManager& operator=(const InputManager&) = delete;
 };
 
 } // namespace shape_shooter

@@ -55,4 +55,10 @@ void Entity::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
     spriteRenderer.submit((uint32_t)mSprite, transform, color);
 }
 
+bool Entity::collision(const Entity& lhs, const Entity& rhs)
+{
+    auto radius = lhs.radius + rhs.radius;
+    return !lhs.expired && !rhs.expired && glm::distance2(lhs.position, rhs.position) < radius * radius;
+}
+
 } // namespace shape_shooter

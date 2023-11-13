@@ -47,8 +47,11 @@ dst_add_executable(
         "${includePath}/entity-manager.hpp"
         "${includePath}/grid.hpp"
         "${includePath}/input-manager.hpp"
+        "${includePath}/particle.hpp"
+        "${includePath}/particle-manager.hpp"
         "${includePath}/player-ship.hpp"
         "${includePath}/player-status.hpp"
+        "${includePath}/score-board.hpp"
         "${includePath}/utilities.hpp"
     sourceFiles
         "${sourcePath}/bullet.cpp"
@@ -59,8 +62,11 @@ dst_add_executable(
         "${sourcePath}/entity-manager.cpp"
         "${sourcePath}/grid.cpp"
         "${sourcePath}/input-manager.cpp"
+        "${sourcePath}/particle.cpp"
+        "${sourcePath}/particle-manager.cpp"
         "${sourcePath}/player-ship.cpp"
         "${sourcePath}/player-status.cpp"
+        "${sourcePath}/score-board.cpp"
         "${sourcePath}/shape-shooter.cpp"
         "${sourcePath}/utilities.cpp"
     compileDefinitions

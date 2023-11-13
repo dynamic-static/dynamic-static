@@ -26,9 +26,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "shape-shooter/bullet.hpp"
 #include "shape-shooter/defines.hpp"
+#include "shape-shooter/enemy.hpp"
 #include "shape-shooter/entity.hpp"
 #include "shape-shooter/input-manager.hpp"
+#include "shape-shooter/utilities.hpp"
 
 #include <memory>
 #include <utility>
@@ -66,10 +69,17 @@ private:
     {
         assert(upEntity);
         mEntities.emplace_back(std::move(upEntity));
+        if (mEntities.back()->get_type_id() == get_type_id<Bullet>()) {
+            mBullets.push_back((Bullet*)mEntities.back().get());
+        } else if (mEntities.back()->get_type_id() == get_type_id<Enemy>()) {
+            mEnemies.push_back((Enemy*)mEntities.back().get());
+        }
     }
 
     std::vector<std::unique_ptr<Entity>> mEntities;
     std::vector<std::unique_ptr<Entity>> mAddedEntities;
+    std::vector<Bullet*> mBullets;
+    std::vector<Enemy*> mEnemies;
     bool mUpdating{ };
 
     EntityManager(const EntityManager&) = delete;

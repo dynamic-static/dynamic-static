@@ -28,6 +28,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
+bool PlayField::contains(const glm::vec3& point) const
+{
+    auto halfExtent = extent * 0.5f;
+    return
+        -halfExtent.x < point.x && point.x < halfExtent.x &&
+        -halfExtent.y < point.y && point.y < halfExtent.y &&
+        -halfExtent.z < point.z && point.z < halfExtent.z;
+}
+
 float get_orientation(const glm::vec3& v)
 {
     return std::atan2(-v.z, v.x);

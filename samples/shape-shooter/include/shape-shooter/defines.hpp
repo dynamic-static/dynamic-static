@@ -28,6 +28,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "../../dynamic-static.sample-utilities.hpp"
 
+#include "dynamic-static/text.hpp"
+#include "dynamic-static.graphics/coordinate-renderer.hpp"
+#include "dynamic-static.graphics/text.hpp"
+#include "dynamic-static.graphics/line-renderer.hpp"
+#include "dynamic-static.graphics/sprite-renderer.hpp"
+
 #include <array>
 
 namespace shape_shooter {

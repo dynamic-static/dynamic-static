@@ -24,8 +24,47 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#include "shape-shooter/player-status.hpp"
+#pragma once
+
+#include "shape-shooter/defines.hpp"
+
+#include <vector>
 
 namespace shape_shooter {
+
+class ScoreBoard final
+{
+public:
+    ScoreBoard() = default;
+    ScoreBoard(ScoreBoard&& other) = default;
+    ScoreBoard& operator=(ScoreBoard&& other) = default;
+    static VkResult create(const gvk::Context& gvkContext, const gvk::RenderPass& renderPass, ScoreBoard* pScoreBoard);
+    ~ScoreBoard();
+    void reset();
+
+    int get_score();
+    void add_points(int points);
+    void increase_multiplier();
+    void reset_score();
+    void reset_multiplier();
+    void update(float deltaTime);
+    void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
+
+private:
+    static int load_high_score();
+    static void save_high_score(int highScore);
+
+    int mHighScore{ };
+    int mScore{ };
+    int mMultiplier{ };
+    float mMultiplierTimer{ };
+    std::shared_ptr<dst::text::Font> mspFont;
+    dst::text::Mesh mScoreTextMesh;
+    dst::text::Mesh mHighScoreTextMesh;
+    dst::gfx::Renderer<dst::text::Font> mFontRenderer;
+
+    ScoreBoard(const ScoreBoard&) = delete;
+    ScoreBoard& operator=(const ScoreBoard&) = delete;
+};
 
 } // namespace shape_shooter

@@ -32,6 +32,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/grid.hpp"
 #include "shape-shooter/input-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
+#include "shape-shooter/player-status.hpp"
+#include "shape-shooter/score-board.hpp"
 
 namespace shape_shooter {
 
@@ -42,9 +44,10 @@ public:
     glm::vec2 renderExtent{ };
     dst::RandomNumberGenerator rng;
     dst::gfx::SpriteRenderer spriteRenderer;
-    glm::vec2 playField{ 1920, 1080 };
+    PlayField playField{ { 1920, 1, 1080 } };
+    PlayerStatus playerStatus;
+    ScoreBoard scoreBoard;
     gvk::math::Camera gameCamera;
-    gvk::math::Camera uiCamera;
     PlayerShip* pPlayerShip{ };
     EnemySpawner enemySpawner;
     EntityManager entityManager;

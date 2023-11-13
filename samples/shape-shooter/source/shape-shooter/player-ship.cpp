@@ -36,6 +36,11 @@ PlayerShip::PlayerShip()
 {
 }
 
+uint64_t PlayerShip::get_type_id() const
+{
+    return shape_shooter::get_type_id<PlayerShip>();
+}
+
 bool PlayerShip::is_dead() const
 {
     return false;
@@ -44,24 +49,32 @@ bool PlayerShip::is_dead() const
 void PlayerShip::update(float deltaTime)
 {
     auto& context = Context::instance();
+    auto& rng = context.rng;
+    const auto& playField = context.playField;
+    auto& entityManager = context.entityManager;
     const auto& inputManager = context.inputManager;
+
     auto aimDirection = inputManager.get_aim_direction();
     if (glm::length2(aimDirection) && mCooldownTimer <= 0) {
         mCooldownTimer = mCooldownTime;
         // TODO : Sort out inconsistent rotations from get_orientation()
         // auto bulletOrientation = get_orientation(aimDirection);
-        auto bulletOrientation = std::atan2(aimDirection.z, aimDirection.x);
-        float randomSpread = 0; // TODO :
-        auto bulletVelocity = from_polar(bulletOrientation + randomSpread, 11.0f);
-        auto offset = glm::vec3(0); // TODO :
-        Context::instance().entityManager.create_entity<Bullet>(position + offset, bulletVelocity);
+        auto aimAngle = std::atan2(aimDirection.z, aimDirection.x);
+        auto aimRotation = glm::angleAxis(aimAngle, glm::vec3{ 0, 1, 0 });
+
+        float bulletSpread = rng.range(-0.04f, 0.04f) + rng.range(-0.04f, 0.04f);
+        auto bulletVelocity = from_polar(aimAngle + bulletSpread, 11.0f);
+
+        entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0, -8 } * aimRotation, bulletVelocity);
+        entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0,  8 } * aimRotation, bulletVelocity);
     }
     mCooldownTimer -= deltaTime;
 
 #if 1
-    velocity += Context::instance().inputManager.get_movement_direction() * mSpeed * deltaTime;
+    velocity += inputManager.get_movement_direction() * mSpeed * deltaTime;
     position += velocity;
-    // TODO : Clamp position to playfield
+    const auto& halfPlayFieldExtent = playField.extent * 0.5f;
+    position = glm::clamp(position, -halfPlayFieldExtent, halfPlayFieldExtent);
     if (glm::length2(velocity)) {
         orientation = get_orientation(velocity);
     }

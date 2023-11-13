@@ -40,6 +40,7 @@ public:
 
     PlayerShip();
 
+    uint64_t get_type_id() const override final;
     bool is_dead() const;
     void update(float deltaTime) override final;
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;

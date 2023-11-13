@@ -37,8 +37,10 @@ class Enemy final
 public:
     Enemy(Sprite sprite);
 
+    uint64_t get_type_id() const override final;
     uint32_t get_point_value() const;
     bool is_active() const;
+    void handle_collision(const Enemy& other);
     void update(float deltaTime) override final;
     void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
 
@@ -59,6 +61,8 @@ private:
     public:
         FollowPlayer() = default;
         void update(Enemy& enemy) override final;
+    private:
+        float mAcceleration{ 0.9f };
     };
 
     class MoveRandomly final

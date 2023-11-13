@@ -39,20 +39,38 @@ Bullet::Bullet(const glm::vec3& pos, const glm::vec3& vel)
     radius = 8;
 }
 
+uint64_t Bullet::get_type_id() const
+{
+    return shape_shooter::get_type_id<Bullet>();
+}
+
 void Bullet::update(float deltaTime)
 {
+    auto& context = Context::instance();
+    const auto& playField = context.playField;
+
     (void)deltaTime;
     position += velocity;
     // Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, /* from_1920x1080(64, 80) */ 2.666666666666669f);
     Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, 80.0f);
-    if (position.x < -1920 || 1920 < position.x ||
-        position.z < -1080 || 1080 < position.z) {
+    if (!playField.contains(position)) {
         expired = true;
         for (uint32_t i = 0; i < 30; ++i) {
             (void)i;
             // TODO : Create particles
         }
     }
+#if 0
+    if (position.x < -playField.x * 0.5f || playField.x * 0.5f < position.x ||
+        position.y < -playField.x * 0.5f || playField.y * 0.5f < position.x ||
+        position.z < -playField.y * 0.5f || playField.z * 0.5f < position.z) {
+        expired = true;
+        for (uint32_t i = 0; i < 30; ++i) {
+            (void)i;
+            // TODO : Create particles
+        }
+    }
+#endif
 }
 
 } // namespace shape_shooter

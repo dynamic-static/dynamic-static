@@ -50,6 +50,11 @@ Enemy::Enemy(Sprite sprite)
     color = gvk::math::Color::Transparent;
 }
 
+uint64_t Enemy::get_type_id() const
+{
+    return shape_shooter::get_type_id<Enemy>();
+}
+
 uint32_t Enemy::get_point_value() const
 {
     return mPointValue;
@@ -58,6 +63,12 @@ uint32_t Enemy::get_point_value() const
 bool Enemy::is_active() const
 {
     return mTimeUntilStart <= 0;
+}
+
+void Enemy::handle_collision(const Enemy& other)
+{
+    auto direction = position - other.position;
+    velocity += 10.0f * direction / (glm::length2(direction) + 1);
 }
 
 void Enemy::update(float deltaTime)
@@ -73,8 +84,8 @@ void Enemy::update(float deltaTime)
     }
     // TODO : Hardcoded values...
     position += velocity;
-    position.x = glm::clamp(position.x, -1920 * 0.5f, 1920 * 0.5f);
-    position.z = glm::clamp(position.z, -1080 * 0.5f, 1080 * 0.5f);
+    const auto& halfPlayFieldExtent = Context::instance().playField.extent * 0.5f;
+    position = glm::clamp(position, -halfPlayFieldExtent, halfPlayFieldExtent);
     velocity *= 0.8f;
 }
 
@@ -85,7 +96,19 @@ void Enemy::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
 
 void Enemy::FollowPlayer::update(Enemy& enemy)
 {
-    (void)enemy;
+    const auto& context = Context::instance();
+    assert(context.pPlayerShip);
+    const auto& playerShip = *context.pPlayerShip;
+    if (!playerShip.is_dead()) {
+        auto direction = playerShip.position - enemy.position;
+        if (direction.x || direction.y || direction.z) {
+            direction = glm::normalize(direction);
+        }
+        enemy.velocity += direction * mAcceleration;
+    }
+    if (enemy.velocity.x || enemy.velocity.y) {
+        enemy.orientation = std::atan2(-enemy.velocity.z, enemy.velocity.x);
+    }
 }
 
 Enemy::MoveRandomly::MoveRandomly()
@@ -97,13 +120,22 @@ void Enemy::MoveRandomly::update(Enemy& enemy)
 {
     // TODO : Hardcoded values...
     auto& context = Context::instance();
+    auto& rng = context.rng;
     if (!mUpdateCounter) {
-        mDirection += context.rng.range(-0.1f, 0.1f);
+        mDirection += rng.range(-0.1f, 0.1f);
         mDirection = glm::wrapAngle(mDirection);
     }
     enemy.velocity += from_polar(mDirection, 0.4f);
     enemy.orientation -= 0.05f;
-    // TODO : Make enemy move away from edge...
+    if (!context.playField.contains(enemy.position)) {
+        mDirection = std::atan2(-enemy.position.z, -enemy.position.x) + rng.range(-glm::half_pi<float>(), glm::half_pi<float>());
+    }
+#if 0
+    if (enemy.position.x <= -context.playField.x * 0.5f || context.playField.x * 0.5f <= enemy.position.x ||
+        enemy.position.z <= -context.playField.y * 0.5f || context.playField.y * 0.5f <= enemy.position.z) {
+        mDirection = std::atan2(-enemy.position.z, -enemy.position.x) + rng.range(-glm::half_pi<float>(), glm::half_pi<float>());
+    }
+#endif
     if (6 <= mUpdateCounter++) {
         mUpdateCounter = 0;
     }

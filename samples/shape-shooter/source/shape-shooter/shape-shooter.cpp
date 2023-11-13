@@ -586,6 +586,7 @@ int main(int, const char*[])
         ///////////////////////////////////////////////////////////////////////////////
 
         auto& shapeShooterContext = shape_shooter::Context::instance();
+        shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
         shapeShooterContext.gameCamera.farPlane = 1000.0f;
         shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
@@ -764,10 +765,11 @@ int main(int, const char*[])
             ///////////////////////////////////////////////////////////////////////////////
 
             ///////////////////////////////////////////////////////////////////////////////
-            // Sprites
+            // shape_shooter::Context
             shapeShooterContext.inputManager.update(input);
             shapeShooterContext.entityManager.update(deltaTime);
             shapeShooterContext.enemySpawner.update(deltaTime);
+            shapeShooterContext.scoreBoard.update(deltaTime);
             shapeShooterContext.spriteRenderer.begin_sprite_batch();
 #if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
@@ -787,9 +789,9 @@ int main(int, const char*[])
 #endif
             }
 #else
-            shape_shooter::Context::instance().entityManager.draw(shape_shooter::Context::instance().spriteRenderer);
+            shapeShooterContext.entityManager.draw(shapeShooterContext.spriteRenderer);
 #endif
-            shape_shooter::Context::instance().spriteRenderer.end_sprite_batch();
+            shapeShooterContext.spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
 
 #if 0
@@ -1053,6 +1055,8 @@ int main(int, const char*[])
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, fontPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)fontDescriptorSet, 0, nullptr);
                     pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
+
+                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera);
                     ///////////////////////////////////////////////////////////////////////////////
 
 #if 0

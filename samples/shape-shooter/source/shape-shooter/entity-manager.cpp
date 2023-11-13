@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/entity-manager.hpp"
+#include "shape-shooter/context.hpp"
 
 #include <vector>
 
@@ -39,25 +40,54 @@ void EntityManager::update(float deltaTime)
 {
     mUpdating = true;
     handle_collisions();
-    for (auto& entity : mEntities) {
-        assert(entity);
-        entity->update(deltaTime);
+    for (auto& upEntity : mEntities) {
+        assert(upEntity);
+        upEntity->update(deltaTime);
     }
     mUpdating = false;
-    for (auto& addedEntity : mAddedEntities) {
-        assert(addedEntity);
-        add_entity(std::move(addedEntity));
+    for (auto& upAddedEntity : mAddedEntities) {
+        assert(upAddedEntity);
+        add_entity(std::move(upAddedEntity));
     }
     mAddedEntities.clear();
-    std::erase_if(mEntities, [](const std::unique_ptr<Entity>& entity) { return entity->expired; });
-    // bullets
-    // enemies
-    // blackholes
+    std::erase_if(mBullets, [](const Bullet* pBullet) { assert(pBullet); return pBullet->expired; });
+    std::erase_if(mEnemies, [](const Enemy* pEnemy) { assert(pEnemy); return pEnemy->expired; });
+    // Blackholes
+    std::erase_if(mEntities, [](const std::unique_ptr<Entity>& upEntity) { assert(upEntity); return upEntity->expired; });
 }
 
 void EntityManager::handle_collisions()
 {
-    
+    for (uint32_t i = 0; i < mEnemies.size(); ++i) {
+        assert(mEnemies[i]);
+        for (uint32_t j = i + 1; j < mEnemies.size(); ++j) {
+            assert(mEnemies[j]);
+            if (Entity::collision(*mEnemies[i], *mEnemies[j])) {
+                mEnemies[i]->handle_collision(*mEnemies[j]);
+                mEnemies[j]->handle_collision(*mEnemies[i]);
+            }
+        }
+    }
+    for (auto pEnemy : mEnemies) {
+        assert(pEnemy);
+        for (auto pBullet : mBullets) {
+            assert(pBullet);
+            if (Entity::collision(*pEnemy, *pBullet)) {
+                Context::instance().scoreBoard.add_points(pEnemy->get_point_value());
+                Context::instance().scoreBoard.increase_multiplier();
+                pEnemy->expired = true;
+                pBullet->expired = true;
+            }
+        }
+    }
+    const auto& pPlayerShip = Context::instance().pPlayerShip;
+    for (auto pEnemy : mEnemies) {
+        assert(pEnemy);
+        if (pEnemy->is_active() && Entity::collision(*pEnemy, *pPlayerShip)) {
+            kill_player();
+            break;
+        }
+    }
 }
 
 void EntityManager::kill_player()

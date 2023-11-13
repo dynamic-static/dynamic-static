@@ -30,9 +30,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
+struct PlayField
+{
+    bool contains(const glm::vec3& point) const;
+    glm::vec3 extent{ };
+};
+
 float get_orientation(const glm::vec3& v);
 glm::vec3 from_polar(float angle, float magnitude);
 float from_1920x1080(float base, float value);
 glm::vec3 ray_plane_intersection(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, const glm::vec3& planePoint, const glm::vec3& planeNormal);
+
+template <typename T>
+inline uint64_t get_type_id()
+{
+    static const T* sPtr;
+    return (uint64_t)&sPtr;
+}
 
 } // namespace shape_shooter

@@ -24,8 +24,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#include "shape-shooter/player-status.hpp"
+#pragma once
+
+#include "shape-shooter/defines.hpp"
 
 namespace shape_shooter {
+
+class ParticleManager final
+{
+public:
+    ParticleManager() = default;
+
+
+
+private:
+    ParticleManager(const ParticleManager&) = delete;
+    ParticleManager& operator=(const ParticleManager&) = delete;
+};
 
 } // namespace shape_shooter
