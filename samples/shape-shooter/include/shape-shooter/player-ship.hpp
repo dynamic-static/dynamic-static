@@ -47,7 +47,8 @@ public:
 
 private:
     float mSpeed{ 8.0f / (1.0f / 60.0f) };
-    float mCooldownTime{ 0.1f };
+    // float mCooldownTime{ 0.1f };
+    float mCooldownTime{ 0.25f };
     float mCooldownTimer{ };
 
 };

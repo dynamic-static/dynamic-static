@@ -40,6 +40,7 @@ float get_orientation(const glm::vec3& v);
 glm::vec3 from_polar(float angle, float magnitude);
 float from_1920x1080(float base, float value);
 glm::vec3 ray_plane_intersection(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, const glm::vec3& planePoint, const glm::vec3& planeNormal);
+glm::vec3 get_random_vector(float minLength, float maxLength);
 
 template <typename T>
 inline uint64_t get_type_id()

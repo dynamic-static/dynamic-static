@@ -27,6 +27,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/defines.hpp"
+#include "shape-shooter/particle.hpp"
+#include "shape-shooter/ring-buffer.hpp"
 
 namespace shape_shooter {
 
@@ -35,9 +37,14 @@ class ParticleManager final
 public:
     ParticleManager() = default;
 
-
+    void resize(size_t capacity);
+    void add(const Particle& particle);
+    void update(float deltaTime);
+    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
 
 private:
+    RingBuffer<Particle> mParticles;
+
     ParticleManager(const ParticleManager&) = delete;
     ParticleManager& operator=(const ParticleManager&) = delete;
 };

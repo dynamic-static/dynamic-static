@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/utilities.hpp"
+#include "shape-shooter/context.hpp"
 
 namespace shape_shooter {
 
@@ -60,6 +61,14 @@ glm::vec3 ray_plane_intersection(const glm::vec3& rayOrigin, const glm::vec3& ra
     auto dot1 = glm::dot(rayDirection, planeNormal);
     auto distance = dot0 / dot1;
     return rayOrigin + rayDirection * distance;
+}
+
+glm::vec3 get_random_vector(float minLength, float maxLength)
+{
+    auto& rng = Context::instance().rng;
+    double theta = rng.range<double>(0, 1) * 2 * M_PI;
+    auto length = rng.range(minLength, maxLength);
+    return { length * (float)std::cos(theta), 0, length * (float)std::sin(theta) };
 }
 
 } // namespace shape_shooter

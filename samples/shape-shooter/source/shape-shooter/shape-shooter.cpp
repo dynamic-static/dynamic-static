@@ -588,6 +588,7 @@ int main(int, const char*[])
         auto& shapeShooterContext = shape_shooter::Context::instance();
         shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
+        shapeShooterContext.particleManager.resize(2048);
         shapeShooterContext.gameCamera.farPlane = 1000.0f;
         shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
@@ -770,6 +771,7 @@ int main(int, const char*[])
             shapeShooterContext.entityManager.update(deltaTime);
             shapeShooterContext.enemySpawner.update(deltaTime);
             shapeShooterContext.scoreBoard.update(deltaTime);
+            shapeShooterContext.particleManager.update(deltaTime);
             shapeShooterContext.spriteRenderer.begin_sprite_batch();
 #if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
@@ -789,7 +791,10 @@ int main(int, const char*[])
 #endif
             }
 #else
+            // SpriteSortMode.Texture
             shapeShooterContext.entityManager.draw(shapeShooterContext.spriteRenderer);
+            // SpriteSortMode.Deferred
+            shapeShooterContext.particleManager.draw(shapeShooterContext.spriteRenderer);
 #endif
             shapeShooterContext.spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////

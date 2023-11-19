@@ -112,7 +112,7 @@ public:
     template <typename T>
     inline bool probability(T value, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr)
     {
-        return value >= range<T>(T { 1 }, T { 100 });
+        return range<T>(T { 1 }, T { 100 }) <= value;
     }
 
     /**
@@ -124,7 +124,7 @@ public:
     template <typename T>
     inline bool probability(T value, typename std::enable_if<std::is_floating_point<T>::value>::type* = nullptr)
     {
-        return value >= range<T>(std::numeric_limits<T>::epsilon(), T { 1.0 });
+        return range<T>(std::numeric_limits<T>::epsilon(), T { 1.0 }) <= value;
     }
 
     /**
@@ -138,7 +138,7 @@ public:
     inline T index(T count)
     {
         static_assert(std::is_integral<T>::value, "dst::RandomNumberGenerator::index<>() can only be used with integer types");
-        return count > T { 0 } ? range<T>(T { 0 }, count - T { 1 }) : T { 0 };
+        return T { 0 } < count ? range<T>(T { 0 }, count - T { 1 }) : T { 0 };
     }
 
     /**
@@ -152,7 +152,7 @@ public:
     inline T die_roll(T D)
     {
         static_assert(std::is_integral<T>::value, "dst::RandomNumberGenerator::die_roll<>() can only be used with integer types");
-        return D > T { 0 } ? range<T>(T { 1 }, D) : T { 0 };
+        return T { 0 } < D ? range<T>(T { 1 }, D) : T { 0 };
     }
 
 private:

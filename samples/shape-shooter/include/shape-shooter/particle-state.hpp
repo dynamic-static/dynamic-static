@@ -27,29 +27,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/defines.hpp"
+#include "shape-shooter/particle-manager.hpp"
 
 namespace shape_shooter {
 
-class Particle final
+class ParticleState final
 {
 public:
-    enum class Type
-    {
-        None,
-        Enemy,
-        Bullet,
-        IgnoreGravity,
-    };
 
-    Type type{ };
-    glm::vec3 position{ };
-    glm::vec3 velocity{ };
-    float orientation{ };
-    glm::vec3 scale{ 1, 1, 1 };
-    glm::vec4 color{ gvk::math::Color::White };
-    float duration{ };
-    float percentLife{ 1 };
-    float lengthMultiplier{ 1 };
+    ParticleState() = default;
+
+private:
+    ParticleState(const ParticleState&) = delete;
+    ParticleState& operator=(const ParticleState&) = delete;
 };
 
 } // namespace shape_shooter

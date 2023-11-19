@@ -49,8 +49,10 @@ dst_add_executable(
         "${includePath}/input-manager.hpp"
         "${includePath}/particle.hpp"
         "${includePath}/particle-manager.hpp"
+        "${includePath}/particle-state.hpp"
         "${includePath}/player-ship.hpp"
         "${includePath}/player-status.hpp"
+        "${includePath}/ring-buffer.hpp"
         "${includePath}/score-board.hpp"
         "${includePath}/utilities.hpp"
     sourceFiles
@@ -64,6 +66,7 @@ dst_add_executable(
         "${sourcePath}/input-manager.cpp"
         "${sourcePath}/particle.cpp"
         "${sourcePath}/particle-manager.cpp"
+        "${sourcePath}/particle-state.cpp"
         "${sourcePath}/player-ship.cpp"
         "${sourcePath}/player-status.cpp"
         "${sourcePath}/score-board.cpp"

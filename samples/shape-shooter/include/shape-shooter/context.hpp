@@ -31,6 +31,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/entity-manager.hpp"
 #include "shape-shooter/grid.hpp"
 #include "shape-shooter/input-manager.hpp"
+#include "shape-shooter/particle-manager.hpp"
 #include "shape-shooter/player-ship.hpp"
 #include "shape-shooter/player-status.hpp"
 #include "shape-shooter/score-board.hpp"
@@ -52,6 +53,7 @@ public:
     EnemySpawner enemySpawner;
     EntityManager entityManager;
     InputManager inputManager;
+    ParticleManager particleManager;
     Grid grid;
 
 private:

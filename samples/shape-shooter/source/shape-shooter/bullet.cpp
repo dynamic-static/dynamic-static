@@ -48,6 +48,7 @@ void Bullet::update(float deltaTime)
 {
     auto& context = Context::instance();
     const auto& playField = context.playField;
+    auto& particleManager = context.particleManager;
 
     (void)deltaTime;
     position += velocity;
@@ -56,21 +57,16 @@ void Bullet::update(float deltaTime)
     if (!playField.contains(position)) {
         expired = true;
         for (uint32_t i = 0; i < 30; ++i) {
-            (void)i;
-            // TODO : Create particles
+            Particle particle{ };
+            particle.position = position;
+            particle.velocity = get_random_vector(0, 9);
+            particle.color = gvk::math::Color::LightBlue;
+            particle.duration = 50;
+            particle.scale = { 1, 1, 1 };
+            particle.type = Particle::Type::Bullet;
+            particleManager.add(particle);
         }
     }
-#if 0
-    if (position.x < -playField.x * 0.5f || playField.x * 0.5f < position.x ||
-        position.y < -playField.x * 0.5f || playField.y * 0.5f < position.x ||
-        position.z < -playField.y * 0.5f || playField.z * 0.5f < position.z) {
-        expired = true;
-        for (uint32_t i = 0; i < 30; ++i) {
-            (void)i;
-            // TODO : Create particles
-        }
-    }
-#endif
 }
 
 } // namespace shape_shooter
