@@ -46,8 +46,9 @@ glm::vec2 Entity::get_sprite_extent() const
     return { imageExtent.width, imageExtent.height };
 }
 
-void Entity::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+void Entity::draw() const
 {
+    auto& spriteRenderer = Context::instance().spriteRenderer;
     gvk::math::Transform transform{ };
     transform.translation = SpriteOffset + position;
     transform.rotation = glm::angleAxis(orientation, glm::vec3{ 0, 1, 0 }) * glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 });

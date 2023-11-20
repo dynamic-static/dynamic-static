@@ -35,13 +35,12 @@ class EnemySpawner final
 public:
     EnemySpawner() = default;
 
-    void update(float deltaTime);
+    void update();
     void reset();
 
 private:
     glm::vec3 get_spawn_position();
 
-    dst::RandomNumberGenerator mRng;
     float mInverseSpawnChance{ 90 };
     float mInverseBlackHoleChance{ 600 };
 

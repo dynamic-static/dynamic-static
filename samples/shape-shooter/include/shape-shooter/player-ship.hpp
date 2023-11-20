@@ -42,15 +42,16 @@ public:
 
     uint64_t get_type_id() const override final;
     bool is_dead() const;
-    void update(float deltaTime) override final;
-    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
+    void update() override final;
+    void draw() const override final;
 
 private:
+    void make_exhaust_fire();
+
     float mSpeed{ 8.0f / (1.0f / 60.0f) };
     // float mCooldownTime{ 0.1f };
     float mCooldownTime{ 0.25f };
     float mCooldownTimer{ };
-
 };
 
 } // namespace shape_shooter

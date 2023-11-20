@@ -41,8 +41,8 @@ public:
     uint32_t get_point_value() const;
     bool is_active() const;
     void handle_collision(const Enemy& other);
-    void update(float deltaTime) override final;
-    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const override final;
+    void update() override final;
+    void draw() const override final;
 
 private:
     class Behavior

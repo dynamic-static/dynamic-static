@@ -71,8 +71,9 @@ void Enemy::handle_collision(const Enemy& other)
     velocity += 10.0f * direction / (glm::length2(direction) + 1);
 }
 
-void Enemy::update(float deltaTime)
+void Enemy::update()
 {
+    auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
     if (is_active()) {
         for (const auto& upBehavior : mBehaviors) {
             assert(upBehavior);
@@ -89,13 +90,15 @@ void Enemy::update(float deltaTime)
     velocity *= 0.8f;
 }
 
-void Enemy::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+void Enemy::draw() const
 {
-    Entity::draw(spriteRenderer);
+    Entity::draw();
 }
 
 void Enemy::FollowPlayer::update(Enemy& enemy)
 {
+    (void)enemy;
+#if 1
     const auto& context = Context::instance();
     assert(context.pPlayerShip);
     const auto& playerShip = *context.pPlayerShip;
@@ -109,6 +112,7 @@ void Enemy::FollowPlayer::update(Enemy& enemy)
     if (enemy.velocity.x || enemy.velocity.y) {
         enemy.orientation = std::atan2(-enemy.velocity.z, enemy.velocity.x);
     }
+#endif
 }
 
 Enemy::MoveRandomly::MoveRandomly()
@@ -118,6 +122,8 @@ Enemy::MoveRandomly::MoveRandomly()
 
 void Enemy::MoveRandomly::update(Enemy& enemy)
 {
+    (void)enemy;
+#if 1
     // TODO : Hardcoded values...
     auto& context = Context::instance();
     auto& rng = context.rng;
@@ -139,6 +145,7 @@ void Enemy::MoveRandomly::update(Enemy& enemy)
     if (6 <= mUpdateCounter++) {
         mUpdateCounter = 0;
     }
+#endif
 }
 
 } // namespace shape_shooter

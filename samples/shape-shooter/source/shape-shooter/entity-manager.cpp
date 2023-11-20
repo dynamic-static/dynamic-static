@@ -36,13 +36,13 @@ uint32_t EntityManager::get_entity_count() const
     return (uint32_t)mEntities.size();
 }
 
-void EntityManager::update(float deltaTime)
+void EntityManager::update()
 {
     mUpdating = true;
     handle_collisions();
     for (auto& upEntity : mEntities) {
         assert(upEntity);
-        upEntity->update(deltaTime);
+        upEntity->update();
     }
     mUpdating = false;
     for (auto& upAddedEntity : mAddedEntities) {
@@ -50,18 +50,16 @@ void EntityManager::update(float deltaTime)
         add_entity(std::move(upAddedEntity));
     }
     mAddedEntities.clear();
-    std::erase_if(mBullets, [](const Bullet* pBullet) { assert(pBullet); return pBullet->expired; });
-    std::erase_if(mEnemies, [](const Enemy* pEnemy) { assert(pEnemy); return pEnemy->expired; });
+    std::erase_if(mBullets, [](const Bullet* pBullet) { return pBullet->expired; });
+    std::erase_if(mEnemies, [](const Enemy* pEnemy) { return pEnemy->expired; });
     // Blackholes
-    std::erase_if(mEntities, [](const std::unique_ptr<Entity>& upEntity) { assert(upEntity); return upEntity->expired; });
+    std::erase_if(mEntities, [](const std::unique_ptr<Entity>& upEntity) { return upEntity->expired; });
 }
 
 void EntityManager::handle_collisions()
 {
     for (uint32_t i = 0; i < mEnemies.size(); ++i) {
-        assert(mEnemies[i]);
         for (uint32_t j = i + 1; j < mEnemies.size(); ++j) {
-            assert(mEnemies[j]);
             if (Entity::collision(*mEnemies[i], *mEnemies[j])) {
                 mEnemies[i]->handle_collision(*mEnemies[j]);
                 mEnemies[j]->handle_collision(*mEnemies[i]);
@@ -69,20 +67,32 @@ void EntityManager::handle_collisions()
         }
     }
     for (auto pEnemy : mEnemies) {
-        assert(pEnemy);
         for (auto pBullet : mBullets) {
-            assert(pBullet);
             if (Entity::collision(*pEnemy, *pBullet)) {
                 Context::instance().scoreBoard.add_points(pEnemy->get_point_value());
                 Context::instance().scoreBoard.increase_multiplier();
                 pEnemy->expired = true;
                 pBullet->expired = true;
+                auto hue0 = Context::instance().rng.range(0.0f, 6.0f);
+                auto hue1 = glm::mod(hue0 + Context::instance().rng.range(0.0f, 2.0f), 6.0f);
+                auto color0 = hsv_to_color(hue0, 0.5f, 1.0f);
+                auto color1 = hsv_to_color(hue1, 0.5f, 1.0f);
+                for (uint32_t i = 0; i < 120; ++i) {
+                    float speed = 18.0f * (1.0f - 1.0f / Context::instance().rng.range(1, 10));
+                    Particle particle{ };
+                    particle.position = pEnemy->position;
+                    particle.velocity = get_random_vector(speed, speed);
+                    particle.duration = 190;
+                    particle.scale *= 1.5f;
+                    particle.type = Particle::Type::Enemy;
+                    particle.color = glm::lerp(color0, color1, Context::instance().rng.range(0.0f, 1.0f));
+                    Context::instance().particleManager.add(particle);
+                }
             }
         }
     }
     const auto& pPlayerShip = Context::instance().pPlayerShip;
     for (auto pEnemy : mEnemies) {
-        assert(pEnemy);
         if (pEnemy->is_active() && Entity::collision(*pEnemy, *pPlayerShip)) {
             kill_player();
             break;
@@ -95,10 +105,10 @@ void EntityManager::kill_player()
 
 }
 
-void EntityManager::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+void EntityManager::draw() const
 {
     for (const auto& entity : mEntities) {
-        entity->draw(spriteRenderer);
+        entity->draw();
     }
 }
 

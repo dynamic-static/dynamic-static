@@ -40,9 +40,8 @@ void ParticleManager::add(const Particle& particle)
     mParticles.push_back(particle);
 }
 
-void ParticleManager::update(float deltaTime)
+void ParticleManager::update()
 {
-    (void)deltaTime;
     const auto& context = Context::instance();
     auto playFieldHalfExtent = context.playField.extent * 0.5f;
     for (size_t i = 0; i < mParticles.count();) {
@@ -66,7 +65,7 @@ void ParticleManager::update(float deltaTime)
         if (particle.type == Particle::Type::Bullet) {
             particle.scale.x = particle.lengthMultiplier * std::min(std::min(1.0f, 0.1f * speed + 0.1f), alpha);
         } else {
-        
+            particle.scale.x = particle.lengthMultiplier * std::min(std::min(1.0f, 0.2f * speed + 0.1f), alpha);
         }
 
         // TODO : Documentation
@@ -95,7 +94,7 @@ void ParticleManager::update(float deltaTime)
         } else if (particle.type == Particle::Type::Enemy) {
             particle.velocity *= 0.94f;
         } else {
-            particle.velocity *= 0.96f; // TODO : Double check against tutorial...float mod
+            particle.velocity *= 0.96f + glm::mod(std::abs(particle.position.x), 0.04f);
         }
 
         // TODO : Documentation
@@ -109,15 +108,16 @@ void ParticleManager::update(float deltaTime)
     }
 }
 
-void ParticleManager::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+void ParticleManager::draw() const
 {
+    auto& spriteRenderer = Context::instance().spriteRenderer;
     for (size_t i = 0; i < mParticles.count(); ++i) {
         auto& particle = mParticles[i];
         gvk::math::Transform transform{ };
         transform.translation = SpriteOffset + particle.position;
         transform.rotation = glm::angleAxis(particle.orientation, glm::vec3{ 0, 1, 0 }) * glm::angleAxis(glm::radians(90.0f), glm::vec3{ 1, 0, 0 });
         transform.scale *= SpriteScale * particle.scale;
-        spriteRenderer.submit((uint32_t)Sprite::Laser, transform, particle.color);
+        spriteRenderer.submit((uint32_t)particle.sprite, transform, particle.color);
     }
 }
 

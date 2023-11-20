@@ -71,4 +71,22 @@ glm::vec3 get_random_vector(float minLength, float maxLength)
     return { length * (float)std::cos(theta), 0, length * (float)std::sin(theta) };
 }
 
+glm::vec4 hsv_to_color(float hue, float saturation, float value, float alpha)
+{
+    if (!hue && !saturation) {
+        return { value, value, value, alpha };
+    } else {
+        float c = saturation * value;
+        float x = c * (1.0f - std::abs(glm::mod(hue, 2.0f) - 1));
+        float m = value - c;
+        if        (hue < 1.0f) { return { c + m, x + m, m, alpha };
+        } else if (hue < 2.0f) { return { x + m, c + m, m, alpha };
+        } else if (hue < 3.0f) { return { m, c + m, x + m, alpha };
+        } else if (hue < 4.0f) { return { m, x + m, c + m, alpha };
+        } else if (hue < 5.0f) { return { x + m, m, c + m, alpha };
+        } else                 { return { c + m, m, x + m, alpha };
+        }
+    }
+}
+
 } // namespace shape_shooter

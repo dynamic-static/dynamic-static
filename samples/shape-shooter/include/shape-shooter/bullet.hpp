@@ -38,7 +38,7 @@ public:
     Bullet(const glm::vec3& position, const glm::vec3& velocity);
 
     uint64_t get_type_id() const override final;
-    void update(float deltaTime) override final;
+    void update() override final;
 };
 
 } // namespace shape_shooter

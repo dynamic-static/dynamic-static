@@ -32,19 +32,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
-void EnemySpawner::update(float deltaTime)
+void EnemySpawner::update()
 {
-    (void)deltaTime;
     auto& context = Context::instance();
+    auto& rng = context.rng;
     const auto& pPlayerShip = context.pPlayerShip;
     assert(pPlayerShip);
     auto& entityManager = context.entityManager;
     if (!pPlayerShip->is_dead() && entityManager.get_entity_count() < 200) {
-        if (mRng.die_roll((int)mInverseSpawnChance) == 1) {
+        if (rng.die_roll((int)mInverseSpawnChance) == 1) {
             auto pEnemy = entityManager.create_entity<Enemy>(Sprite::Seeker);
             pEnemy->position = get_spawn_position();
         }
-        if (mRng.die_roll((int)mInverseSpawnChance) == 1) {
+        if (rng.die_roll((int)mInverseSpawnChance) == 1) {
             auto pEnemy = entityManager.create_entity<Enemy>(Sprite::Wanderer);
             pEnemy->position = get_spawn_position();
         }
@@ -68,7 +68,8 @@ glm::vec3 EnemySpawner::get_spawn_position()
     assert(pPlayerShip);
     do {
         // TODO : Hardcoded values...
-        position = glm::vec3{ mRng.range(-1920.0f, 1920.0f), 0, mRng.range(-1080.0f, 1080.0f) };
+        auto& rng = Context::instance().rng;
+        position = glm::vec3{ rng.range(-1920.0f, 1920.0f), 0, rng.range(-1080.0f, 1080.0f) };
     } while (glm::distance2(position, pPlayerShip->position) < 250.0f * 250.0f);
     return position;
 }

@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "shape-shooter/score-board.hpp"
+#include "shape-shooter/context.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -112,8 +113,10 @@ void ScoreBoard::reset_multiplier()
     mMultiplier = 1;
 }
 
-void ScoreBoard::update(float deltaTime)
+void ScoreBoard::update()
 {
+    auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
+
     mScoreTextMesh.set_text(std::to_string(mScore));
     auto pScoreTextMeshRenderer = get_text_mesh_renderer(mScoreTextMesh);
     pScoreTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });

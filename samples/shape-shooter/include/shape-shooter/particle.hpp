@@ -42,6 +42,7 @@ public:
     };
 
     Type type{ };
+    Sprite sprite{ Sprite::Laser };
     glm::vec3 position{ };
     glm::vec3 velocity{ };
     float orientation{ };

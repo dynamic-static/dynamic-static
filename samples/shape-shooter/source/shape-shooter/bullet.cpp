@@ -44,14 +44,13 @@ uint64_t Bullet::get_type_id() const
     return shape_shooter::get_type_id<Bullet>();
 }
 
-void Bullet::update(float deltaTime)
+void Bullet::update()
 {
     auto& context = Context::instance();
     const auto& playField = context.playField;
     auto& particleManager = context.particleManager;
 
-    (void)deltaTime;
-    position += velocity;
+    position += velocity; // deltaTime
     // Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, /* from_1920x1080(64, 80) */ 2.666666666666669f);
     Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, 80.0f);
     if (!playField.contains(position)) {

@@ -46,13 +46,14 @@ bool PlayerShip::is_dead() const
     return false;
 }
 
-void PlayerShip::update(float deltaTime)
+void PlayerShip::update()
 {
     auto& context = Context::instance();
     auto& rng = context.rng;
     const auto& playField = context.playField;
     auto& entityManager = context.entityManager;
     const auto& inputManager = context.inputManager;
+    auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
 
     auto aimDirection = inputManager.get_aim_direction();
     if (glm::length2(aimDirection) && mCooldownTimer <= 0) {
@@ -75,18 +76,73 @@ void PlayerShip::update(float deltaTime)
     position += velocity;
     const auto& halfPlayFieldExtent = playField.extent * 0.5f;
     position = glm::clamp(position, -halfPlayFieldExtent, halfPlayFieldExtent);
-    if (glm::length2(velocity)) {
+    if (0.0f < glm::length2(velocity)) {
         orientation = get_orientation(velocity);
     }
-    // TODO : make_exhaust_fire();
+    make_exhaust_fire();
     velocity = { };
 #endif
 }
 
-void PlayerShip::draw(dst::gfx::SpriteRenderer& spriteRenderer) const
+void PlayerShip::draw() const
 {
     if (!is_dead()) {
-        Entity::draw(spriteRenderer);
+        Entity::draw();
+    }
+}
+
+void PlayerShip::make_exhaust_fire()
+{
+    auto totalTime = Context::instance().clock.total<gvk::system::Seconds<float>>();
+    if (0.1f < glm::length2(velocity)) {
+        // TODO : Documentation
+        orientation = get_orientation(velocity);
+        auto particleRotation = glm::angleAxis(orientation, glm::vec3{ 0, 1, 0 });
+
+        // TODO : Update this comment to be world units/second
+        // The primary velocity of the paritcles is 3 pixels/frame in the direction
+        //  opposite to which the ship is travelling.
+        auto baseVelocity = velocity * (-3.0f / glm::length(velocity)); // scale_to()
+        // Calculate the sideways velocity for the two side streams.  The direction is
+        //  perpendicular to the ship's velocity and the magnitude varies sinusoidally.
+        auto perpendicularVelocity = glm::vec3(baseVelocity.z, baseVelocity.y, -baseVelocity.x) * (0.6f * std::sin(totalTime * 10.0f));
+
+        // TODO : Documentation
+        Particle particle{ };
+        particle.type = Particle::Type::Enemy;
+        particle.position = position; // +glm::vec3{ -25, 0, 0 } *particleRotation; // Position of the ship's exhaust pipe
+        particle.duration = 60.0f;
+        particle.scale = { 0.5f, 1.0f, 1.0f };
+        auto& particleManager = Context::instance().particleManager;
+        float alpha = 0.7f;
+
+        // Middle particle stream
+        auto middleColor = glm::vec4(1.0f, 187.0f / 255.0f, 30.0f / 255.0f, 1.0f); // Orange yellow
+        particle.velocity = baseVelocity + get_random_vector(0, 1);
+        particle.sprite = Sprite::Laser;
+        particle.color = gvk::math::Color::White * alpha;
+        particleManager.add(particle);
+        particle.sprite = Sprite::Glow;
+        particle.color = middleColor * alpha;
+        particleManager.add(particle);
+
+        // Side particle streams
+        auto perpendicularVelocity0 = baseVelocity + perpendicularVelocity + get_random_vector(0.0f, 0.3f);
+        auto perpendicularVelocity1 = baseVelocity - perpendicularVelocity + get_random_vector(0.0f, 0.3f);
+        particle.sprite = Sprite::Laser;
+        particle.color = gvk::math::Color::White * alpha;
+        particle.velocity = perpendicularVelocity0;
+        particleManager.add(particle);
+        particle.velocity = perpendicularVelocity1;
+        particleManager.add(particle);
+
+        auto sideColor = glm::vec4(200.0f / 255.0f, 38.0f / 255.0f, 9.0f / 255.0f, 1.0f); // Deep red
+        particle.sprite = Sprite::Glow;
+        particle.color = sideColor * alpha;
+        particle.velocity = perpendicularVelocity0;
+        particleManager.add(particle);
+        particle.velocity = perpendicularVelocity1;
+        particleManager.add(particle);
     }
 }
 

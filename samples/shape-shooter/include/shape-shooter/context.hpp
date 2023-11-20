@@ -42,6 +42,7 @@ class Context final
 {
 public:
     static Context& instance();
+    gvk::system::Clock clock;
     glm::vec2 renderExtent{ };
     dst::RandomNumberGenerator rng;
     dst::gfx::SpriteRenderer spriteRenderer;

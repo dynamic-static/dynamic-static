@@ -47,7 +47,7 @@ public:
     void increase_multiplier();
     void reset_score();
     void reset_multiplier();
-    void update(float deltaTime);
+    void update();
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const;
 
 private:

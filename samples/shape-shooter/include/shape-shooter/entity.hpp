@@ -39,8 +39,8 @@ public:
 
     glm::vec2 get_sprite_extent() const;
     virtual uint64_t get_type_id() const = 0;
-    virtual void update(float deltaTime) = 0;
-    virtual void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
+    virtual void update() = 0;
+    virtual void draw() const;
     static bool collision(const Entity& lhs, const Entity& rhs);
 
     glm::vec3 position{ };

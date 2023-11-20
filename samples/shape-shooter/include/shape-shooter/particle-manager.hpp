@@ -39,8 +39,8 @@ public:
 
     void resize(size_t capacity);
     void add(const Particle& particle);
-    void update(float deltaTime);
-    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
+    void update();
+    void draw() const;
 
 private:
     RingBuffer<Particle> mParticles;

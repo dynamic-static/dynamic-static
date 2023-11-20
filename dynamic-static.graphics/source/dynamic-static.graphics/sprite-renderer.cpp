@@ -152,8 +152,8 @@ VkResult SpriteRenderer::create(const gvk::Context& gvkContext, const CreateInfo
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         pSpriteRenderer->mImages.insert(pSpriteRenderer->mImages.end(), createInfo.pImages, createInfo.pImages + createInfo.imageCount);
         auto samplerCreateInfo = gvk::get_default<VkSamplerCreateInfo>();
-        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &samplerCreateInfo, nullptr, &pSpriteRenderer->mSampler));
         gvk_result(pSpriteRenderer->create_pipeline(gvkContext, createInfo.renderPass));
         gvk_result(pSpriteRenderer->allocate_descriptor_set(gvkContext));
@@ -326,10 +326,10 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
             } spriteBuffer;
 
             vec4 Vertices[4] = vec4[](
-                vec4(-0.45,  0.5, 0, 1),
-                vec4( 0.45,  0.5, 0, 1),
-                vec4(-0.45, -0.5, 0, 1),
-                vec4( 0.45, -0.5, 0, 1)
+                vec4(-0.5,  0.5, 0, 1),
+                vec4( 0.5,  0.5, 0, 1),
+                vec4(-0.5, -0.5, 0, 1),
+                vec4( 0.5, -0.5, 0, 1)
             );
 
             layout(location = 0) out float fsTexindex;
@@ -416,8 +416,35 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         auto pipelineInputAssemblyStateCreateInfo = gvk::get_default<VkPipelineInputAssemblyStateCreateInfo>();
         pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
+        // TODO : Blend needs to be configurable
         auto pipelineColorBlendAttachmentState = gvk::get_default<VkPipelineColorBlendAttachmentState>();
         pipelineColorBlendAttachmentState.blendEnable = VK_TRUE;
+#if 1
+        pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        pipelineColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+        pipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        pipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+        pipelineColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+#endif
+#if 0
+        pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        pipelineColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+        pipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        pipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+        pipelineColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+#endif
+#if 0
+        /* .blendEnable         = */ VK_FALSE,
+        /* .srcColorBlendFactor = */ VK_BLEND_FACTOR_SRC_ALPHA,
+        /* .dstColorBlendFactor = */ VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        /* .colorBlendOp        = */ VK_BLEND_OP_ADD,
+        /* .srcAlphaBlendFactor = */ VK_BLEND_FACTOR_ONE,
+        /* .dstAlphaBlendFactor = */ VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        /* .alphaBlendOp        = */ VK_BLEND_OP_ADD,
+        /* .colorWriteMask      = */ VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+#endif
         auto pipelineColorBlendStateCreateInfo = gvk::get_default<VkPipelineColorBlendStateCreateInfo>();
         pipelineColorBlendStateCreateInfo.pAttachments = &pipelineColorBlendAttachmentState;
 
@@ -435,10 +462,13 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
             }
         }
 
+        // TODO : Depth needs to be configurable
         auto pipelineDepthStencilStateCreateInfo = gvk::get_default<VkPipelineDepthStencilStateCreateInfo>();
+#if 0
         pipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
         pipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
         pipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+#endif
 
         auto pipelineRasterizationStateCreateInfo = gvk::get_default<VkPipelineRasterizationStateCreateInfo>();
         pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;

@@ -45,10 +45,10 @@ public:
     EntityManager() = default;
 
     uint32_t get_entity_count() const;
-    void update(float deltaTime);
+    void update();
     void handle_collisions();
     void kill_player();
-    void draw(dst::gfx::SpriteRenderer& spriteRenderer) const;
+    void draw() const;
 
     template <typename EntityType, typename ...Args>
     inline EntityType* create_entity(Args&&... args)

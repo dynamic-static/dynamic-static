@@ -527,7 +527,7 @@ int main(int, const char*[])
         vkUpdateDescriptorSets(gvkContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
 
         // These variables will be controlled via gui widgets
-        bool showGui = true;
+        bool showGui = false;
         float anchor = 1.5f;
         float amplitude = 0.5f;
         float frequency = 3;
@@ -660,7 +660,8 @@ int main(int, const char*[])
         gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
         ///////////////////////////////////////////////////////////////////////////////
 
-        gvk::system::Clock clock;
+        // gvk::system::Clock clock;
+        auto& clock = shapeShooterContext.clock;
         while (
             !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
             !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
@@ -768,10 +769,10 @@ int main(int, const char*[])
             ///////////////////////////////////////////////////////////////////////////////
             // shape_shooter::Context
             shapeShooterContext.inputManager.update(input);
-            shapeShooterContext.entityManager.update(deltaTime);
-            shapeShooterContext.enemySpawner.update(deltaTime);
-            shapeShooterContext.scoreBoard.update(deltaTime);
-            shapeShooterContext.particleManager.update(deltaTime);
+            shapeShooterContext.entityManager.update();
+            shapeShooterContext.enemySpawner.update();
+            shapeShooterContext.scoreBoard.update();
+            shapeShooterContext.particleManager.update();
             shapeShooterContext.spriteRenderer.begin_sprite_batch();
 #if 0
             for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
@@ -792,9 +793,9 @@ int main(int, const char*[])
             }
 #else
             // SpriteSortMode.Texture
-            shapeShooterContext.entityManager.draw(shapeShooterContext.spriteRenderer);
+            shapeShooterContext.entityManager.draw();
             // SpriteSortMode.Deferred
-            shapeShooterContext.particleManager.draw(shapeShooterContext.spriteRenderer);
+            shapeShooterContext.particleManager.draw();
 #endif
             shapeShooterContext.spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
@@ -955,6 +956,7 @@ int main(int, const char*[])
                     // Call guiRenderer.begin_gui().  Note that all ImGui widgets must be handled
                     //  between calls to begin_gui()/end_gui()
                     guiRenderer.begin_gui(guiRendererBeginInfo);
+                    ImGui::ShowDemoWindow();
 #if 0
                     ImGui::ShowDemoWindow();
                     ImGui::DragFloat("anchor", &anchor, 0.01f);
