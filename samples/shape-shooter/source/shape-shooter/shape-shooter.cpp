@@ -185,6 +185,44 @@ void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vecto
     }
 }
 
+VkResult create_camera_resources(const gvk::DescriptorPool& descriptorPool, const gvk::DescriptorSetLayout& descriptorSetLayout, std::pair<gvk::Buffer, gvk::DescriptorSet>& cameraResources)
+{
+    cameraResources.first.reset();
+    cameraResources.second.reset();
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        const auto& device = descriptorSetLayout.get<gvk::Device>();
+
+        // TODO : Documentation
+        gvk_result(dst_sample_create_uniform_buffer<Uniforms>(device, &cameraResources.first));
+
+        // TODO : Documentation
+        auto descriptorSetAllocateInfo = gvk::get_default<VkDescriptorSetAllocateInfo>();
+        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = 1;
+        descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout.get<VkDescriptorSetLayout>();
+        gvk_result(gvk::DescriptorSet::allocate(device, &descriptorSetAllocateInfo, &cameraResources.second));
+
+        // TODO : Documentation
+        auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
+        descriptorBufferInfo.buffer = cameraResources.first;
+
+        // TODO : Documentation
+        auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+        writeDescriptorSet.dstSet = cameraResources.second;
+        writeDescriptorSet.descriptorCount = 1;
+        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+        device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+void update_camera_uniform_buffer(const gvk::math::Camera& camera, gvk::Buffer uniformBuffer)
+{
+    (void)camera;
+    (void)uniformBuffer;
+}
+
 int main(int, const char*[])
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
@@ -245,6 +283,7 @@ int main(int, const char*[])
         gvk::Sampler sampler;
         gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &sampler));
 
+#if 0
         // Create resources for our cube object...this includes a gvk::Mesh, a uniform
         //  gvk::Buffer, a gvk::math::Transform, and a gvk::Pipeline...
         gvk::Mesh cubeMesh;
@@ -403,13 +442,17 @@ int main(int, const char*[])
             fragmentShaderInfo,
             &floorPipeline
         ));
+#endif
 
+#if 0
         // Create camera uniform gvk::Buffer objects...
         gvk::Buffer cameraUniformBuffer;
         gvk::Buffer reflectionCameraUniformBuffer;
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gvkContext.get_devices()[0], &cameraUniformBuffer));
         gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gvkContext.get_devices()[0], &reflectionCameraUniformBuffer));
+#endif
 
+#if 0
         // Allocate gvk::DescriptorSet objects...because both gvk::Pipeline objects
         //  have individual camera and object uniforms we expect 2 gvk::DescriptorSet
         //  objects for each, with the camera gvk::DescriptorSet at index 0 and the
@@ -437,7 +480,9 @@ int main(int, const char*[])
         cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
         auto reflectionCameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
         reflectionCameraUniformBufferDescriptorInfo.buffer = reflectionCameraUniformBuffer;
+#endif
 
+#if 0
         // For the VkDescriptorImageInfo we'll use the gvk::RenderTarget object's
         //  color attachment.  If the gvk::RenderTarget has multisample anti aliasing
         //  enabled, the MSAA attachment will be at index 0 and the resolve attachment
@@ -525,14 +570,15 @@ int main(int, const char*[])
         writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writeDescriptorSet.pImageInfo = &renderTargetColorAttachmentDescriptorInfo;
         vkUpdateDescriptorSets(gvkContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
+#endif
 
         // These variables will be controlled via gui widgets
         bool showGui = false;
-        float anchor = 1.5f;
-        float amplitude = 0.5f;
-        float frequency = 3;
-        float yRotation = 90.0f;
-        float zRotation = 45.0f;
+        // float anchor = 1.5f;
+        // float amplitude = 0.5f;
+        // float frequency = 3;
+        // float yRotation = 90.0f;
+        // float zRotation = 45.0f;
         float guiImageScale = 0.125f;
         (void)guiImageScale;
         int forceType = 0;
@@ -589,10 +635,35 @@ int main(int, const char*[])
         shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
         shapeShooterContext.particleManager.resize(2048);
+
         shapeShooterContext.gameCamera.farPlane = 1000.0f;
         shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
         cameraController.set_camera(&shapeShooterContext.gameCamera);
+
+        auto cameraDescriptorPoolSize = gvk::get_default<VkDescriptorPoolSize>();
+        cameraDescriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        cameraDescriptorPoolSize.descriptorCount = 2;
+        auto cameraDescriptorPoolCreateInfo = gvk::get_default<VkDescriptorPoolCreateInfo>();
+        cameraDescriptorPoolCreateInfo.maxSets = 2;
+        cameraDescriptorPoolCreateInfo.poolSizeCount = 1;
+        cameraDescriptorPoolCreateInfo.pPoolSizes = &cameraDescriptorPoolSize;
+        gvk::DescriptorPool cameraDescriptorPool;
+        gvk_result(gvk::DescriptorPool::create(gvkContext.get_devices()[0], &cameraDescriptorPoolCreateInfo, nullptr, &cameraDescriptorPool));
+
+#if 0
+        const auto& spriteRendererPipeline = shapeShooterContext.spriteRenderer.get_pipeline();
+        const auto& spriteRendererPipelineLayout = spriteRendererPipeline.get<gvk::PipelineLayout>();
+        const auto& spriteRendererDescriptorSetLayouts = spriteRendererPipelineLayout.get<gvk::DescriptorSetLayouts>();
+        gvk_result(spriteRendererDescriptorSetLayouts.empty() ? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS);
+        gvk_result(create_camera_resources(cameraDescriptorPool, spriteRendererDescriptorSetLayouts[0], shapeShooterContext.gameCameraResources));
+#else
+        const auto& fontRendererPipeline = fontRenderer.get_pipeline();
+        const auto& fontRendererPipelineLayout = fontRendererPipeline.get<gvk::PipelineLayout>();
+        const auto& fontRendererDescriptorSetLayouts = fontRendererPipelineLayout.get<gvk::DescriptorSetLayouts>();
+        gvk_result(fontRendererDescriptorSetLayouts.empty() ? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS);
+        gvk_result(create_camera_resources(cameraDescriptorPool, fontRendererDescriptorSetLayouts[0], shapeShooterContext.gameCameraResources));
+#endif
 
 #if 0
         ///////////////////////////////////////////////////////////////////////////////
@@ -711,6 +782,7 @@ int main(int, const char*[])
                 }
             }
 
+#if 0
             // Update the floating cube object's gvk::math::Transform...
             cubeTransform.translation.y = anchor + amplitude * glm::sin(frequency * clock.total<gvk::system::Seconds<float>>());
             auto cubeRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3 { 0, 1, 0 });
@@ -719,16 +791,23 @@ int main(int, const char*[])
 
             // Update the floor transform
             floorTransform.translation.y = -0.1f;
+#endif
 
             // Uddate the gvk::math::Camera uniform data...
             CameraUniforms cameraUbo { };
             cameraUbo.view = shapeShooterContext.gameCamera.view();
             cameraUbo.projection = shapeShooterContext.gameCamera.projection();
             VmaAllocationInfo allocationInfo{ };
+#if 0
             vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+#else
+            const auto& gameCameraUniformBuffer = shapeShooterContext.gameCameraResources.first;
+            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), gameCameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+#endif
             assert(allocationInfo.pMappedData);
             memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
+#if 0
             // Setup the reflection vk::math::Camera uniforms by scaling the view by -1 on
             //  the y axis then update the reflection gvk::math::Camera uniform data...
             cameraUbo.view = cameraUbo.view * glm::scale(glm::vec3 { 1, -1, 1 });
@@ -749,6 +828,7 @@ int main(int, const char*[])
             vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), floorUniformBuffer.get<VmaAllocation>(), &allocationInfo);
             assert(allocationInfo.pMappedData);
             memcpy(allocationInfo.pMappedData, &floorUbo, sizeof(ObjectUniforms));
+#endif
 
             ///////////////////////////////////////////////////////////////////////////////
             // CoordinateRenderer
@@ -1006,6 +1086,7 @@ int main(int, const char*[])
                 const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
                 gvk_result(vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
 
+#if 0
                 // Begin a gvk::RenderPass with our gvk::RenderTarget...
                 auto renderPassBeginInfo = renderTarget.get_render_pass_begin_info();
                 vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1028,9 +1109,10 @@ int main(int, const char*[])
                     // cubeMesh.record_cmds(commandBuffer);
                 }
                 vkCmdEndRenderPass(commandBuffer);
+#endif
 
                 // Begin the gvk::RenderPass that renders into the gvk::WsiManager...
-                renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
+                auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
                 vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
                 {
                     VkRect2D scissor{ { }, renderPassBeginInfo.renderArea.extent };
@@ -1045,6 +1127,8 @@ int main(int, const char*[])
                     //  gvk::DescriptorSet at index 0...then issue a draw call for the floating
                     //  cube...
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+#if 0
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, floorPipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)floorDescriptorSet, 0, nullptr);
@@ -1052,6 +1136,7 @@ int main(int, const char*[])
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
                     // cubeMesh.record_cmds(commandBuffer);
+#endif
 
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
@@ -1060,7 +1145,13 @@ int main(int, const char*[])
                     const auto& fontPipeline = fontRenderer.get_pipeline();
                     const auto& fontDescriptorSet = fontRenderer.get_descriptor_set();
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, fontPipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)fontDescriptorSet, 0, nullptr);
+                    const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
+#if 0
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+#else
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+#endif
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &fontDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
                     pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
 
                     shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera);
@@ -1082,7 +1173,7 @@ int main(int, const char*[])
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // CoordinateRenderer
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
                     coordinateRenderer.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
                     ///////////////////////////////////////////////////////////////////////////////
 

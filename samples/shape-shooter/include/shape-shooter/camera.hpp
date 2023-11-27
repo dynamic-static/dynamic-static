@@ -27,44 +27,32 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "shape-shooter/defines.hpp"
-#include "shape-shooter/enemy-spawner.hpp"
-#include "shape-shooter/entity-manager.hpp"
-#include "shape-shooter/grid.hpp"
-#include "shape-shooter/input-manager.hpp"
-#include "shape-shooter/particle-manager.hpp"
-#include "shape-shooter/player-ship.hpp"
-#include "shape-shooter/player-status.hpp"
-#include "shape-shooter/score-board.hpp"
 
 namespace shape_shooter {
 
-class Context final
+class Camera final
 {
 public:
-    static Context& instance();
-    gvk::system::Clock clock;
-    glm::vec2 renderExtent{ };
-    dst::RandomNumberGenerator rng;
-    dst::gfx::SpriteRenderer spriteRenderer;
-    PlayField playField{ { 1920, 1, 1080 } };
-    PlayerShip* pPlayerShip{ };
-    PlayerStatus playerStatus;
-    ScoreBoard scoreBoard;
-    EnemySpawner enemySpawner;
-    EntityManager entityManager;
-    InputManager inputManager;
-    ParticleManager particleManager;
-    gvk::math::Camera gameCamera;
-    std::pair<gvk::Buffer, gvk::DescriptorSet> gameCameraResources;
-    gvk::math::Camera scoreBoardCamera;
-    std::pair<gvk::Buffer, gvk::DescriptorSet> scoreBoardCameraResources;
-    Grid grid;
+    struct Uniforms
+    {
+        glm::mat4 view{ };
+        glm::mat4 projection{ };
+    };
+
+    Camera() = default;
+    static VkResult create(const gvk::DescriptorSetLayout& descriptorSetLayout, Camera* pCamera);
+    ~Camera();
+    void reset();
+
+    const gvk::DescriptorSet& get_descriptor_set() const;
+    void update();
 
 private:
-    Context();
+    gvk::Buffer mUniformBuffer;
+    gvk::DescriptorSet mDescriptorSet;
 
-    Context(const Context&) = delete;
-    Context& operator=(const Context&) = delete;
+    Camera(const Camera&) = delete;
+    Camera& operator=(const Camera&) = delete;
 };
 
 } // namespace shape_shooter

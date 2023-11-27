@@ -39,6 +39,7 @@ dst_add_executable(
         "${includeDirectory}"
     includeFiles
         "${includePath}/bullet.hpp"
+        "${includePath}/camera.hpp"
         "${includePath}/context.hpp"
         "${includePath}/defines.hpp"
         "${includePath}/enemy.hpp"
@@ -57,6 +58,7 @@ dst_add_executable(
         "${includePath}/utilities.hpp"
     sourceFiles
         "${sourcePath}/bullet.cpp"
+        "${sourcePath}/camera.cpp"
         "${sourcePath}/context.cpp"
         "${sourcePath}/enemy.cpp"
         "${sourcePath}/enemy-spawner.cpp"

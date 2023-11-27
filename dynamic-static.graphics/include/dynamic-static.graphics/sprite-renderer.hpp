@@ -52,6 +52,7 @@ public:
     void reset();
 
     const std::vector<gvk::ImageView>& get_images() const;
+    const gvk::Pipeline& get_pipeline() const;
     void begin_sprite_batch();
     void submit(uint32_t imageIndex, const gvk::math::Transform& transform = { }, const glm::vec4& color = gvk::math::Color::White, const glm::vec4& uv = { 0, 0, 1, 1 });
     void submit(uint32_t imageIndex, const glm::vec3& translation, const glm::quat& rotation = { 1, 0, 0, 0 }, const glm::vec3& scale = { 1, 1, 1 }, const glm::vec4 & color = gvk::math::Color::White, const glm::vec4 & uv = { 0, 0, 1, 1 });

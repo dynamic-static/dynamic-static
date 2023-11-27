@@ -181,6 +181,11 @@ const std::vector<gvk::ImageView>& SpriteRenderer::get_images() const
     return mImages;
 }
 
+const gvk::Pipeline& SpriteRenderer::get_pipeline() const
+{
+    return mPipeline;
+}
+
 void SpriteRenderer::begin_sprite_batch()
 {
     mSprites.clear();
