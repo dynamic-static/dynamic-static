@@ -42,6 +42,7 @@ public:
     ~ScoreBoard();
     void reset();
 
+    const dst::gfx::Renderer<dst::text::Font>& get_font_renderer() const;
     int get_score();
     void add_points(int points);
     void increase_multiplier();

@@ -81,6 +81,11 @@ void ScoreBoard::reset()
     mFontRenderer = { };
 }
 
+const dst::gfx::Renderer<dst::text::Font>& ScoreBoard::get_font_renderer() const
+{
+    return mFontRenderer;
+}
+
 int ScoreBoard::get_score()
 {
     return mScore;

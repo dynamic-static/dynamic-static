@@ -96,8 +96,13 @@ VkResult create_camera_resources(const gvk::DescriptorPool& descriptorPool, cons
 
 void update_camera_uniform_buffer(const gvk::math::Camera& camera, gvk::Buffer uniformBuffer)
 {
-    (void)camera;
-    (void)uniformBuffer;
+    CameraUniforms cameraUniforms{ };
+    cameraUniforms.view = camera.view();
+    cameraUniforms.projection = camera.projection();
+    VmaAllocationInfo allocationInfo{ };
+    vmaGetAllocationInfo(uniformBuffer.get<gvk::Device>().get<VmaAllocator>(), uniformBuffer.get<VmaAllocation>(), &allocationInfo);
+    assert(allocationInfo.pMappedData);
+    memcpy(allocationInfo.pMappedData, &cameraUniforms, sizeof(CameraUniforms));
 }
 
 int main(int, const char*[])
@@ -174,29 +179,6 @@ int main(int, const char*[])
         ///////////////////////////////////////////////////////////////////////////////
 
         ///////////////////////////////////////////////////////////////////////////////
-        // TextMesh
-        std::shared_ptr<dst::text::Font> spFont;
-        // dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 256, &spFont);
-        dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 64, &spFont);
-        dst::gfx::Renderer<dst::text::Font> fontRenderer;
-        dst::gfx::Renderer<dst::text::Font>::create(gvkContext, wsiManager.get_render_pass(), *spFont, &fontRenderer);
-
-        dst::text::Mesh textMesh;
-        textMesh.set_font(spFont);
-        textMesh.set_text("The quick brown fox jumps over the lazy dog!");
-        dst::gfx::Renderer<dst::text::Mesh>* pTextMeshRenderer = nullptr;
-        textMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(
-            [&](const auto& /*textMesh*/, auto& renderer)
-            {
-                pTextMeshRenderer = &renderer;
-                return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], textMesh, fontRenderer, &renderer);
-            }
-        );
-        pTextMeshRenderer->transform.translation = glm::vec3{ 0, 16, 0 };
-        pTextMeshRenderer->transform.scale = glm::vec3(0.1f);
-        ///////////////////////////////////////////////////////////////////////////////
-
-        ///////////////////////////////////////////////////////////////////////////////
         // Sprites
         gvk::Buffer spriteStagingBuffer;
         std::vector<gvk::ImageView> spriteImages((uint32_t)shape_shooter::Sprite::Count);
@@ -231,11 +213,12 @@ int main(int, const char*[])
         gvk::DescriptorPool cameraDescriptorPool;
         gvk_result(gvk::DescriptorPool::create(gvkContext.get_devices()[0], &cameraDescriptorPoolCreateInfo, nullptr, &cameraDescriptorPool));
 
-        const auto& fontRendererPipeline = fontRenderer.get_pipeline();
+        const auto& fontRendererPipeline = shapeShooterContext.scoreBoard.get_font_renderer().get_pipeline();
         const auto& fontRendererPipelineLayout = fontRendererPipeline.get<gvk::PipelineLayout>();
         const auto& fontRendererDescriptorSetLayouts = fontRendererPipelineLayout.get<gvk::DescriptorSetLayouts>();
         gvk_result(fontRendererDescriptorSetLayouts.empty() ? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS);
         gvk_result(create_camera_resources(cameraDescriptorPool, fontRendererDescriptorSetLayouts[0], shapeShooterContext.gameCameraResources));
+        gvk_result(create_camera_resources(cameraDescriptorPool, fontRendererDescriptorSetLayouts[0], shapeShooterContext.scoreBoardCameraResources));
 
         ///////////////////////////////////////////////////////////////////////////////
         // Grid
@@ -296,25 +279,19 @@ int main(int, const char*[])
                 }
             }
 
-            // Uddate the gvk::math::Camera uniform data...
-            CameraUniforms cameraUbo { };
-            cameraUbo.view = shapeShooterContext.gameCamera.view();
-            cameraUbo.projection = shapeShooterContext.gameCamera.projection();
-            VmaAllocationInfo allocationInfo{ };
-            const auto& gameCameraUniformBuffer = shapeShooterContext.gameCameraResources.first;
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), gameCameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-            assert(allocationInfo.pMappedData);
-            memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
+            static bool lockScoreBoardCamera = false;
+            if (input.keyboard.pressed(gvk::system::Key::L)) {
+                lockScoreBoardCamera = !lockScoreBoardCamera;
+            }
+            if (!lockScoreBoardCamera) {
+                shapeShooterContext.scoreBoardCamera = shapeShooterContext.gameCamera;
+            }
+            update_camera_uniform_buffer(shapeShooterContext.gameCamera, shapeShooterContext.gameCameraResources.first);
+            update_camera_uniform_buffer(shapeShooterContext.scoreBoardCamera, shapeShooterContext.scoreBoardCameraResources.first);
 
             ///////////////////////////////////////////////////////////////////////////////
             // CoordinateRenderer
             coordinateRenderer.update();
-            ///////////////////////////////////////////////////////////////////////////////
-
-            ///////////////////////////////////////////////////////////////////////////////
-            // TextMesh
-            pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3 { 0, 1, 0 });
-            textMesh.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
             ///////////////////////////////////////////////////////////////////////////////
@@ -422,37 +399,27 @@ int main(int, const char*[])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
-                    ///////////////////////////////////////////////////////////////////////////////
-                    // TextMesh
-                    const auto& fontPipeline = fontRenderer.get_pipeline();
-                    const auto& fontDescriptorSet = fontRenderer.get_descriptor_set();
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, fontPipeline);
                     const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &fontDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-                    pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
+                    (void)gameCameraDescriptorSet;
+                    const auto& scoreBoardCameraDescriptorSet = shapeShooterContext.scoreBoardCameraResources.second;
+                    (void)scoreBoardCameraDescriptorSet;
 
-                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera);
-                    ///////////////////////////////////////////////////////////////////////////////
+                    // ScoreBoard
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &scoreBoardCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.scoreBoardCamera);
 
-                    ///////////////////////////////////////////////////////////////////////////////
                     // Grid
                     shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
-                    ///////////////////////////////////////////////////////////////////////////////
 
-                    ///////////////////////////////////////////////////////////////////////////////
                     // CoordinateRenderer
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
                     coordinateRenderer.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
-                    ///////////////////////////////////////////////////////////////////////////////
 
-                    ///////////////////////////////////////////////////////////////////////////////
                     // Sprites
                     auto spriteCamera = shapeShooterContext.gameCamera;
                     // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
                     shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
-                    ///////////////////////////////////////////////////////////////////////////////
                 }
 
                 // If the gvk::gui::Renderer is enabled, record cmds to render it
