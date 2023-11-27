@@ -62,129 +62,6 @@ struct Uniforms
     CameraUniforms camera{ };
 };
 
-VkResult create_mesh(
-    const gvk::Context& context,
-    const glm::vec3& dimensions,
-    const glm::vec4& topColor,
-    const glm::vec4& bottomColor,
-    gvk::Mesh* pMesh
-)
-{
-    float w = dimensions[0] * 0.5f;
-    float h = dimensions[1] * 0.5f;
-    float d = dimensions[2] * 0.5f;
-    std::array<dst::gfx::VertexPositionTexcoordColor, 24> vertices {
-        // Top
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 1, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 1, 1 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 1 }, { topColor }},
-        // Left
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-        // Front
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  w }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  w }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  w }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  w }, { 0, 0 }, { bottomColor }},
-        // Right
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor}},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor}},
-        // Back
-        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
-        // Bottom
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
-        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
-    };
-    size_t index_i = 0;
-    size_t vertex_i = 0;
-    constexpr size_t FaceCount = 6;
-    constexpr size_t IndicesPerFace = 6;
-    std::array<uint16_t, IndicesPerFace * FaceCount> indices;
-    for (size_t face_i = 0; face_i < FaceCount; ++face_i) {
-        indices[index_i++] = (uint16_t)(vertex_i + 0);
-        indices[index_i++] = (uint16_t)(vertex_i + 1);
-        indices[index_i++] = (uint16_t)(vertex_i + 2);
-        indices[index_i++] = (uint16_t)(vertex_i + 2);
-        indices[index_i++] = (uint16_t)(vertex_i + 3);
-        indices[index_i++] = (uint16_t)(vertex_i + 0);
-        vertex_i += 4;
-    }
-    return pMesh->write(
-        context.get_devices()[0],
-        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
-        context.get_command_buffers()[0],
-        VK_NULL_HANDLE,
-        (uint32_t)vertices.size(),
-        vertices.data(),
-        (uint32_t)indices.size(),
-        indices.data()
-    );
-}
-
-void create_spiral(int pointCount, int height, float width, const glm::vec4& color0, const glm::vec4& color1, std::vector<dst::gfx::Point>& points)
-{
-    points.resize(pointCount);
-    for (int i = 0; i < pointCount; ++i) {
-        auto& point = points[i];
-        auto t = i / (float)pointCount;
-        auto angle = t * 2.0f * glm::pi<float>() * height;
-        point.position.x = std::cos(angle) * t;
-        point.position.y = t * height;
-        point.position.z = std::sin(angle) * t;
-        point.color = glm::lerp(color0, color1, t);
-        point.width.r = t * width;
-        point.width.g = (float)(i % 2);
-    }
-}
-
-void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vector<dst::gfx::Point>& points)
-{
-    points.clear();
-    auto halfExtent = extent * 0.5f;
-    auto cellExtent = extent / cellCount;
-    auto makePoint = [](auto v) { return dst::gfx::Point{ glm::vec4 { v.x, 0, v.y, 1 } }; };
-    for (uint32_t y = 0; y < cellCount.y; ++y) {
-        for (uint32_t x = 0; x < cellCount.x; ++x) {
-            auto i = points.size();
-            points.push_back({ });
-            points.back().width.r = 0;
-            auto corner = -extent * 0.5f + cellExtent * glm::vec2{ x, y };
-            if (!x) {
-                points.push_back(makePoint(corner));
-            }
-            points.push_back(makePoint(corner + glm::vec2{ 0, cellExtent.y }));
-            points.push_back(makePoint(corner + cellExtent));
-            points.push_back(makePoint(corner + glm::vec2{ cellExtent.x, 0 }));
-            if (!y) {
-                points.push_back(makePoint(corner));
-            }
-            points[i].position = points[i + 1].position;
-            points.push_back(points.back());
-            points.back().width.r = 0;
-        }
-    }
-    for (auto& point : points) {
-        point.color.r = (point.position.x + extent.x * 0.5f) / extent.x;
-        point.color.g = 0;
-        point.color.b = (point.position.z + extent.y * 0.5f) / extent.y;
-        point.position.y = (std::sin(point.position.x) + std::sin(point.position.z)) * 0.5f;
-        if (point.width.r) {
-            point.width.r = glm::lerp(point.width.r, 32.0f, point.color.r);
-        }
-        point.position.y += 32;
-    }
-}
-
 VkResult create_camera_resources(const gvk::DescriptorPool& descriptorPool, const gvk::DescriptorSetLayout& descriptorSetLayout, std::pair<gvk::Buffer, gvk::DescriptorSet>& cameraResources)
 {
     cameraResources.first.reset();
@@ -283,305 +160,8 @@ int main(int, const char*[])
         gvk::Sampler sampler;
         gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &sampler));
 
-#if 0
-        // Create resources for our cube object...this includes a gvk::Mesh, a uniform
-        //  gvk::Buffer, a gvk::math::Transform, and a gvk::Pipeline...
-        gvk::Mesh cubeMesh;
-        gvk_result(create_mesh(gvkContext, { 1, 1, 1 }, gvk::math::Color::Black, gvk::math::Color::White, &cubeMesh));
-        gvk::Buffer cubeUniformBuffer;
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gvkContext.get_devices()[0], &cubeUniformBuffer));
-        gvk::math::Transform cubeTransform;
-        gvk::spirv::ShaderInfo vertexShaderInfo{ };
-        vertexShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
-        vertexShaderInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        vertexShaderInfo.lineOffset = __LINE__;
-        vertexShaderInfo.source = R"(
-            #version 450
-
-            layout(set = 0, binding = 0)
-            uniform CameraUniformBuffer
-            {
-                mat4 view;
-                mat4 projection;
-            } camera;
-
-            layout(set = 1, binding = 0)
-            uniform ObjectUniformBuffer
-            {
-                mat4 world;
-            } object;
-
-            layout(location = 0) in vec3 vsPosition;
-            layout(location = 1) in vec2 vsTexCoord;
-            layout(location = 2) in vec4 vsColor;
-            layout(location = 0) out vec2 fsTexCoord;
-            layout(location = 1) out vec4 fsColor;
-
-            out gl_PerVertex
-            {
-                vec4 gl_Position;
-            };
-
-            void main()
-            {
-                gl_Position = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-                fsTexCoord = vsTexCoord;
-                fsColor = vsColor;
-            }
-        )";
-        gvk::spirv::ShaderInfo fragmentShaderInfo{ };
-        fragmentShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
-        fragmentShaderInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        fragmentShaderInfo.lineOffset = __LINE__;
-        fragmentShaderInfo.source = R"(
-            #version 450
-
-            layout(location = 0) in vec2 fsTexCoord;
-            layout(location = 1) in vec4 fsColor;
-            layout(location = 0) out vec4 fragColor;
-
-            void main()
-            {
-                fragColor = fsColor;
-            }
-        )";
-        gvk::Pipeline cubePipeline;
-        gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionTexcoordColor>(
-            renderTarget.get_render_pass(),
-            VK_CULL_MODE_NONE,
-            VK_POLYGON_MODE_FILL,
-            vertexShaderInfo,
-            fragmentShaderInfo,
-            &cubePipeline
-        ));
-
-        // Create resources for our floor object...this includes a gvk::Mesh, a uniform
-        //  gvk::Buffer, a gvk::math::Transform, and a gvk::Pipeline...
-        gvk::Mesh floorMesh;
-        gvk_result(create_mesh(gvkContext, { 6, 0, 6 }, gvk::math::Color::White, gvk::math::Color::SlateGray, &floorMesh));
-        gvk::Buffer floorUniformBuffer;
-        gvk_result(dst_sample_create_uniform_buffer<ObjectUniforms>(gvkContext.get_devices()[0], &floorUniformBuffer));
-        gvk::math::Transform floorTransform;
-        vertexShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
-        vertexShaderInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        vertexShaderInfo.lineOffset = __LINE__;
-        vertexShaderInfo.source = R"(
-            #version 450
-
-            layout(set = 0, binding = 0)
-            uniform CameraUniformBuffer
-            {
-                mat4 view;
-                mat4 projection;
-            } camera;
-
-            layout(set = 1, binding = 0)
-            uniform ObjectUniformBuffer
-            {
-                mat4 world;
-            } object;
-
-            layout(location = 0) in vec3 vsPosition;
-            layout(location = 1) in vec2 vsTexcoord;
-            layout(location = 2) in vec4 vsColor;
-            layout(location = 0) out vec4 fsPosition;
-            layout(location = 1) out vec2 fsTexcoord;
-            layout(location = 2) out vec4 fsColor;
-
-            out gl_PerVertex
-            {
-                vec4 gl_Position;
-            };
-            
-            void main()
-            {
-                fsPosition = camera.projection * camera.view * object.world * vec4(vsPosition, 1);
-                gl_Position = fsPosition;
-                fsTexcoord = vsTexcoord;
-                fsColor = vsColor;
-            }
-        )";
-        fragmentShaderInfo.language = gvk::spirv::ShadingLanguage::Glsl;
-        fragmentShaderInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        fragmentShaderInfo.lineOffset = __LINE__;
-        fragmentShaderInfo.source = R"(
-            #version 450
-
-            layout(set = 1, binding = 1) uniform sampler2D reflectionImage;
-            layout(location = 0) in vec4 fsPosition;
-            layout(location = 1) in vec2 fsTexcoord;
-            layout(location = 2) in vec4 fsColor;
-            layout(location = 0) out vec4 fragColor;
-
-            void main()
-            {
-                // Calculate surface color
-                vec4 surfaceColor;
-                surfaceColor.rb = fsTexcoord;
-                surfaceColor.g = dot(surfaceColor.rb, vec2(0.5));
-
-                // Calculate reflection texcoord
-                vec2 reflectionTexcoord = fsPosition.xy * (1.0 / fsPosition.w);
-                reflectionTexcoord += vec2(1, 1);
-                reflectionTexcoord *= 0.5;
-
-                // Calculate reflection color
-                vec4 reflectionColor = texture(reflectionImage, reflectionTexcoord);
-                reflectionColor.a *= 0.34;
-                reflectionColor.rgb *= reflectionColor.a;
-                fragColor.rgb = surfaceColor.rgb + reflectionColor.rgb;
-                fragColor.a = 1;
-            }
-        )";
-        gvk::Pipeline floorPipeline;
-        gvk_result(dst_sample_create_pipeline<dst::gfx::VertexPositionTexcoordColor>(
-            renderTarget.get_render_pass(),
-            VK_CULL_MODE_BACK_BIT,
-            VK_POLYGON_MODE_FILL,
-            vertexShaderInfo,
-            fragmentShaderInfo,
-            &floorPipeline
-        ));
-#endif
-
-#if 0
-        // Create camera uniform gvk::Buffer objects...
-        gvk::Buffer cameraUniformBuffer;
-        gvk::Buffer reflectionCameraUniformBuffer;
-        gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gvkContext.get_devices()[0], &cameraUniformBuffer));
-        gvk_result(dst_sample_create_uniform_buffer<CameraUniforms>(gvkContext.get_devices()[0], &reflectionCameraUniformBuffer));
-#endif
-
-#if 0
-        // Allocate gvk::DescriptorSet objects...because both gvk::Pipeline objects
-        //  have individual camera and object uniforms we expect 2 gvk::DescriptorSet
-        //  objects for each, with the camera gvk::DescriptorSet at index 0 and the
-        //  object gvk::DescriptorSet at index 1 as defined in the vertex shader GLSL.
-        //  The gvk::Pipeline that will be used to draw the floor object uses the
-        //  gvk::RenderTarget as a texture to create the reflection of the cube object.
-        //  The gvk::ImageView for the gvk::RenderTarget color attachment will be at
-        //  gvk::DescriptorSet 1 and binding index 1...
-        std::vector<gvk::DescriptorSet> descriptorSets;
-        gvk_result(dst_sample_allocate_descriptor_sets(cubePipeline, descriptorSets));
-        assert(descriptorSets.size() == 2);
-        auto reflectionCameraDescriptorSet = descriptorSets[0];
-        auto cubeDescriptorSet = descriptorSets[1];
-        gvk_result(dst_sample_allocate_descriptor_sets(floorPipeline, descriptorSets));
-        assert(descriptorSets.size() == 2);
-        auto cameraDescriptorSet = descriptorSets[0];
-        auto floorDescriptorSet = descriptorSets[1];
-
-        // Prepare descriptors...
-        auto cubeUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        cubeUniformBufferDescriptorInfo.buffer = cubeUniformBuffer;
-        auto floorUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        floorUniformBufferDescriptorInfo.buffer = floorUniformBuffer;
-        auto cameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        cameraUniformBufferDescriptorInfo.buffer = cameraUniformBuffer;
-        auto reflectionCameraUniformBufferDescriptorInfo = gvk::get_default<VkDescriptorBufferInfo>();
-        reflectionCameraUniformBufferDescriptorInfo.buffer = reflectionCameraUniformBuffer;
-#endif
-
-#if 0
-        // For the VkDescriptorImageInfo we'll use the gvk::RenderTarget object's
-        //  color attachment.  If the gvk::RenderTarget has multisample anti aliasing
-        //  enabled, the MSAA attachment will be at index 0 and the resolve attachment
-        //  will be the gvk::ImageView at index 1...
-        auto colorAttachmentIndex = VK_SAMPLE_COUNT_1_BIT < renderTargetCreateInfo.sampleCount ? 1 : 0;
-        assert(!renderTarget.get_framebuffer().get<gvk::ImageViews>().empty());
-        auto renderTargetColorAttachmentDescriptorInfo = gvk::get_default<VkDescriptorImageInfo>();
-        renderTargetColorAttachmentDescriptorInfo.sampler = sampler;
-        renderTargetColorAttachmentDescriptorInfo.imageView = renderTarget.get_framebuffer().get<gvk::ImageViews>()[colorAttachmentIndex];
-        renderTargetColorAttachmentDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        // Write the descriptors...
-        std::array<VkWriteDescriptorSet, 5> writeDescriptorSets{
-            VkWriteDescriptorSet {
-                /* .sType            = */ gvk::get_stype<VkWriteDescriptorSet>(),
-                /* .pNext            = */ nullptr,
-                /* .dstSet           = */ cubeDescriptorSet,
-                /* .dstBinding       = */ 0,
-                /* .dstArrayElement  = */ 0,
-                /* .descriptorCount  = */ 1,
-                /* .descriptorType   = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /* .pImageInfo       = */ nullptr,
-                /* .pBufferInfo      = */ &cubeUniformBufferDescriptorInfo,
-                /* .pTexelBufferView = */ nullptr,
-            },
-            VkWriteDescriptorSet {
-                /* .sType            = */ gvk::get_stype<VkWriteDescriptorSet>(),
-                /* .pNext            = */ nullptr,
-                /* .dstSet           = */ floorDescriptorSet,
-                /* .dstBinding       = */ 0,
-                /* .dstArrayElement  = */ 0,
-                /* .descriptorCount  = */ 1,
-                /* .descriptorType   = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /* .pImageInfo       = */ nullptr,
-                /* .pBufferInfo      = */ &floorUniformBufferDescriptorInfo,
-                /* .pTexelBufferView = */ nullptr,
-            },
-            VkWriteDescriptorSet {
-                /* .sType            = */ gvk::get_stype<VkWriteDescriptorSet>(),
-                /* .pNext            = */ nullptr,
-                /* .dstSet           = */ floorDescriptorSet,
-                /* .dstBinding       = */ 1,
-                /* .dstArrayElement  = */ 0,
-                /* .descriptorCount  = */ 1,
-                /* .descriptorType   = */ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                /* .pImageInfo       = */ &renderTargetColorAttachmentDescriptorInfo,
-                /* .pBufferInfo      = */ nullptr,
-                /* .pTexelBufferView = */ nullptr,
-            },
-            VkWriteDescriptorSet {
-                /* .sType            = */ gvk::get_stype<VkWriteDescriptorSet>(),
-                /* .pNext            = */ nullptr,
-                /* .dstSet           = */ cameraDescriptorSet,
-                /* .dstBinding       = */ 0,
-                /* .dstArrayElement  = */ 0,
-                /* .descriptorCount  = */ 1,
-                /* .descriptorType   = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /* .pImageInfo       = */ nullptr,
-                /* .pBufferInfo      = */ &cameraUniformBufferDescriptorInfo,
-                /* .pTexelBufferView = */ nullptr,
-            },
-            VkWriteDescriptorSet {
-                /* .sType            = */ gvk::get_stype<VkWriteDescriptorSet>(),
-                /* .pNext            = */ nullptr,
-                /* .dstSet           = */ reflectionCameraDescriptorSet,
-                /* .dstBinding       = */ 0,
-                /* .dstArrayElement  = */ 0,
-                /* .descriptorCount  = */ 1,
-                /* .descriptorType   = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /* .pImageInfo       = */ nullptr,
-                /* .pBufferInfo      = */ &reflectionCameraUniformBufferDescriptorInfo,
-                /* .pTexelBufferView = */ nullptr,
-            },
-        };
-        vkUpdateDescriptorSets(gvkContext.get_devices()[0], (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
-
-        // In addition to the DescriptorSets used for the 3D scene, we'll need one more
-        //  to provide ImGui with the render target for display in the gui
-        std::vector<gvk::DescriptorSet> guiDescriptorSets;
-        gvk_result(dst_sample_allocate_descriptor_sets(guiRenderer.get_pipeline(), guiDescriptorSets));
-        assert(guiDescriptorSets.size() == 1);
-        auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
-        writeDescriptorSet.dstSet = guiDescriptorSets[0];
-        writeDescriptorSet.descriptorCount = 1;
-        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeDescriptorSet.pImageInfo = &renderTargetColorAttachmentDescriptorInfo;
-        vkUpdateDescriptorSets(gvkContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
-#endif
-
         // These variables will be controlled via gui widgets
         bool showGui = false;
-        // float anchor = 1.5f;
-        // float amplitude = 0.5f;
-        // float frequency = 3;
-        // float yRotation = 90.0f;
-        // float zRotation = 45.0f;
-        float guiImageScale = 0.125f;
-        (void)guiImageScale;
-        int forceType = 0;
         int lookType = 0;
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -651,77 +231,11 @@ int main(int, const char*[])
         gvk::DescriptorPool cameraDescriptorPool;
         gvk_result(gvk::DescriptorPool::create(gvkContext.get_devices()[0], &cameraDescriptorPoolCreateInfo, nullptr, &cameraDescriptorPool));
 
-#if 0
-        const auto& spriteRendererPipeline = shapeShooterContext.spriteRenderer.get_pipeline();
-        const auto& spriteRendererPipelineLayout = spriteRendererPipeline.get<gvk::PipelineLayout>();
-        const auto& spriteRendererDescriptorSetLayouts = spriteRendererPipelineLayout.get<gvk::DescriptorSetLayouts>();
-        gvk_result(spriteRendererDescriptorSetLayouts.empty() ? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS);
-        gvk_result(create_camera_resources(cameraDescriptorPool, spriteRendererDescriptorSetLayouts[0], shapeShooterContext.gameCameraResources));
-#else
         const auto& fontRendererPipeline = fontRenderer.get_pipeline();
         const auto& fontRendererPipelineLayout = fontRendererPipeline.get<gvk::PipelineLayout>();
         const auto& fontRendererDescriptorSetLayouts = fontRendererPipelineLayout.get<gvk::DescriptorSetLayouts>();
         gvk_result(fontRendererDescriptorSetLayouts.empty() ? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS);
         gvk_result(create_camera_resources(cameraDescriptorPool, fontRendererDescriptorSetLayouts[0], shapeShooterContext.gameCameraResources));
-#endif
-
-#if 0
-        ///////////////////////////////////////////////////////////////////////////////
-        // Lines
-        auto lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
-        dst::gfx::LineRenderer lineRenderer0;
-        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer0));
-#if 0
-        std::vector<dst::gfx::Point> points0(4);
-        for (int i = 0; i < points0.size(); ++i) {
-            points0[i].position.x = (float)i;
-            points0[i].position.y = (float)(i % 2 ? i * 0.5f : i * -0.5f);
-        }
-        points0[0].color.r = 1;
-        points0[1].color.g = 0;
-        points0[2].color.b = 1;
-        auto curveBegin = points0.back().position;
-        const int AdditionalPointCount = 64;
-        points0.reserve(points0.size() + AdditionalPointCount);
-        for (int i = 0; i < AdditionalPointCount; ++i) {
-            auto t = (float)i / (float)AdditionalPointCount;
-            dst::gfx::Point point{ };
-            point.position = curveBegin;
-            point.position.x += t * 4;
-            point.position.y += 0.5f * std::sin(4 * t);
-            point.width.r = glm::lerp(4.0f, 16.0f, t);
-            points0.push_back(point);
-        }
-#else
-        std::vector<dst::gfx::Point> points0(4);
-        for (int i = 0; i < points0.size(); ++i) {
-            points0[i].position.x = (float)i;
-            points0[i].position.y = 8;
-        }
-#endif
-
-        lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
-        lineRendererCreateInfo.capVertexCount = 4;
-        dst::gfx::LineRenderer lineRenderer1;
-        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &lineRenderer1));
-        std::vector<dst::gfx::Point> points1;
-        int spiralPointCount = 512;
-        int spiralHeight = 16;
-        float spiralWidth = 8;
-        glm::vec4 spiralColor0 = gvk::math::Color::AliceBlue;
-        glm::vec4 spiralColor1 = gvk::math::Color::MediumPurple;
-        create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
-
-        lineRendererCreateInfo = gvk::get_default<dst::gfx::LineRenderer::CreateInfo>();
-        lineRendererCreateInfo.capVertexCount = 4;
-        dst::gfx::LineRenderer gridRenderer;
-        gvk_result(dst::gfx::LineRenderer::create(gvkContext, wsiManager.get_render_pass(), lineRendererCreateInfo, &gridRenderer));
-        std::vector<dst::gfx::Point> gridPoints;
-        glm::vec2 gridExtent{ 64, 32 };
-        glm::vec2 gridCellCount{ 128, 64 };
-        create_grid(gridExtent, gridCellCount, gridPoints);
-        ///////////////////////////////////////////////////////////////////////////////
-#endif
 
         ///////////////////////////////////////////////////////////////////////////////
         // Grid
@@ -782,53 +296,15 @@ int main(int, const char*[])
                 }
             }
 
-#if 0
-            // Update the floating cube object's gvk::math::Transform...
-            cubeTransform.translation.y = anchor + amplitude * glm::sin(frequency * clock.total<gvk::system::Seconds<float>>());
-            auto cubeRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3 { 0, 1, 0 });
-            auto cubeRotationZ = glm::angleAxis(glm::radians(zRotation * deltaTime), glm::vec3 { 0, 0, 1 });
-            cubeTransform.rotation = glm::normalize(cubeRotationY * cubeTransform.rotation * cubeRotationZ);
-
-            // Update the floor transform
-            floorTransform.translation.y = -0.1f;
-#endif
-
             // Uddate the gvk::math::Camera uniform data...
             CameraUniforms cameraUbo { };
             cameraUbo.view = shapeShooterContext.gameCamera.view();
             cameraUbo.projection = shapeShooterContext.gameCamera.projection();
             VmaAllocationInfo allocationInfo{ };
-#if 0
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-#else
             const auto& gameCameraUniformBuffer = shapeShooterContext.gameCameraResources.first;
             vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), gameCameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-#endif
             assert(allocationInfo.pMappedData);
             memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
-
-#if 0
-            // Setup the reflection vk::math::Camera uniforms by scaling the view by -1 on
-            //  the y axis then update the reflection gvk::math::Camera uniform data...
-            cameraUbo.view = cameraUbo.view * glm::scale(glm::vec3 { 1, -1, 1 });
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), reflectionCameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-            assert(allocationInfo.pMappedData);
-            memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
-
-            // Update the cube uniform data...
-            ObjectUniforms cubeUbo{ };
-            cubeUbo.world = cubeTransform.world_from_local();
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cubeUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-            assert(allocationInfo.pMappedData);
-            memcpy(allocationInfo.pMappedData, &cubeUbo, sizeof(ObjectUniforms));
-
-            // Update the floor uniform data...
-            ObjectUniforms floorUbo{ };
-            floorUbo.world = floorTransform.world_from_local();
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), floorUniformBuffer.get<VmaAllocation>(), &allocationInfo);
-            assert(allocationInfo.pMappedData);
-            memcpy(allocationInfo.pMappedData, &floorUbo, sizeof(ObjectUniforms));
-#endif
 
             ///////////////////////////////////////////////////////////////////////////////
             // CoordinateRenderer
@@ -837,12 +313,7 @@ int main(int, const char*[])
 
             ///////////////////////////////////////////////////////////////////////////////
             // TextMesh
-#if 0
-            auto textMeshRotationY = glm::angleAxis(glm::radians(yRotation * deltaTime), glm::vec3{ 0, 1, 0 });
-            pTextMeshRenderer->transform.rotation = glm::normalize(textMeshRotationY * pTextMeshRenderer->transform.rotation);
-#else
             pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3 { 0, 1, 0 });
-#endif
             textMesh.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
@@ -854,40 +325,13 @@ int main(int, const char*[])
             shapeShooterContext.scoreBoard.update();
             shapeShooterContext.particleManager.update();
             shapeShooterContext.spriteRenderer.begin_sprite_batch();
-#if 0
-            for (uint32_t i = 0; i < (uint32_t)shape_shooter::Sprite::Count; ++i) {
-                gvk::math::Transform transform{ };
-                transform.translation.x = (float)i;
-                transform.translation.y = cubeTransform.translation.y;
-                transform.scale *= 0.1f;
-                spriteRenderer.submit(i % (uint32_t)shape_shooter::Sprite::Count, transform, spriteColor);
-#if 0
-                dst::gfx::Sprite sprite { };
-                sprite.color = spriteColor;
-                sprite.transform.translation.x = (float)i;
-                sprite.transform.translation.y = cubeTransform.translation.y;
-                sprite.transform.scale *= 0.1f;
-                sprite.imageIndex = i % SpriteFilePaths.size();
-                spriteRenderer.submit(sprite);
-#endif
-            }
-#else
+
             // SpriteSortMode.Texture
             shapeShooterContext.entityManager.draw();
             // SpriteSortMode.Deferred
             shapeShooterContext.particleManager.draw();
-#endif
             shapeShooterContext.spriteRenderer.end_sprite_batch();
             ///////////////////////////////////////////////////////////////////////////////
-
-#if 0
-            ///////////////////////////////////////////////////////////////////////////////
-            // Lines
-            lineRenderer0.submit((uint32_t)points0.size(), points0.data());
-            lineRenderer1.submit((uint32_t)points1.size(), points1.data());
-            gridRenderer.submit((uint32_t)gridPoints.size(), gridPoints.data());
-            ///////////////////////////////////////////////////////////////////////////////
-#endif
 
             ///////////////////////////////////////////////////////////////////////////////
             // Grid
@@ -904,93 +348,6 @@ int main(int, const char*[])
                 auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
                 shapeShooterContext.gameCamera.set_aspect_ratio(extent.width, extent.height);
                 shapeShooterContext.renderExtent = { extent.width, extent.height };
-
-                // Calculate mouse ray
-                glm::vec2 normalizedDeviceSpaceMouseRay{
-                    input.mouse.position.current[0] / extent.width * 2 - 1,
-                    input.mouse.position.current[1] / extent.height * 2 - 1
-                };
-                glm::vec4 clipSpaceMouseRay{
-                    normalizedDeviceSpaceMouseRay.x,
-                    normalizedDeviceSpaceMouseRay.y,
-                    1.0f,
-                    1.0f
-                };
-                auto cameraSpaceMouseRay = glm::inverse(shapeShooterContext.gameCamera.projection()) * clipSpaceMouseRay;
-                cameraSpaceMouseRay.z = -1;
-                cameraSpaceMouseRay.w = 0;
-                auto worldSpaceMouseRay = glm::normalize(glm::inverse(shapeShooterContext.gameCamera.view()) * cameraSpaceMouseRay);
-
-#if 0
-                glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
-                auto difference = glm::vec3{ } - camera.transform.translation;
-                auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
-                auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
-                auto distance = dot0 / dot1;
-                auto intersection = camera.transform.translation + direction * distance;
-#endif
-#if 0
-                auto rayOrigin = shapeShooterContext.gameCamera.transform.translation;
-                glm::vec3 rayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
-                glm::vec3 planePoint{ };
-                glm::vec3 planeNormal{ 0, 1, 0 };
-                shapeShooterContext.pPlayerShip->position = shape_shooter::ray_plane_intersection(rayOrigin, rayDirection, planePoint, planeNormal);
-#endif
-
-                if (input.keyboard.pressed(gvk::system::Key::One)) {
-                    forceType = 0;
-                }
-                if (input.keyboard.pressed(gvk::system::Key::Two)) {
-                    forceType = 1;
-                }
-                if (input.keyboard.pressed(gvk::system::Key::Three)) {
-                    forceType = 2;
-                }
-                if (input.mouse.buttons.down(gvk::system::Mouse::Button::Right)) {
-#if 0
-                    points0.clear();
-                    dst::gfx::Point point{ };
-                    point.position.x = camera.transform.translation.x;
-                    point.position.y = camera.transform.translation.y;
-                    point.position.z = camera.transform.translation.z;
-                    points0.push_back(point);
-                    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x;
-                    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y;
-                    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z;
-                    point.color = gvk::math::Color::Red;
-                    points0.push_back(point);
-                    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x * 100;
-                    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y * 100;
-                    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z * 100;
-                    point.color = gvk::math::Color::Green;
-                    points0.push_back(point);
-#endif
-                    // glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
-                    // auto difference = glm::vec3{ } - camera.transform.translation;
-                    // auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
-                    // auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
-                    // auto distance = dot0 / dot1;
-                    // auto intersection = camera.transform.translation + direction * distance;
-
-
-
-                    // switch (forceType) {
-                    // case 0: {
-                    //     // shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
-                    //     shape_shooter::Context::instance().grid.apply_directed_force({ 0, -5000.0f, 0 }, intersection, 50);
-                    // } break;
-                    // case 1: {
-                    //     auto sprayAngle = glm::two_pi<float>() / 50.0f;
-                    //     shape_shooter::Context::instance().grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
-                    // } break;
-                    // case 2: {
-                    //     shape_shooter::Context::instance().grid.apply_explosive_force(4, intersection, 80);
-                    // } break;
-                    // default: {
-                    //     assert(false);
-                    // } break;
-                    // }
-                }
 
                 // Get VkFences from the WsiManager.  The gvk::gui::Renderer will wait on these
                 //  VkFences to ensure that it doesn't destroy any resources that are still in
@@ -1037,45 +394,6 @@ int main(int, const char*[])
                     //  between calls to begin_gui()/end_gui()
                     guiRenderer.begin_gui(guiRendererBeginInfo);
                     ImGui::ShowDemoWindow();
-#if 0
-                    ImGui::ShowDemoWindow();
-                    ImGui::DragFloat("anchor", &anchor, 0.01f);
-                    ImGui::DragFloat("amplitude", &amplitude, 0.1f);
-                    ImGui::DragFloat("frequency", &frequency, 0.1f);
-                    ImGui::DragFloat("yRotation", &yRotation, 0.1f);
-                    ImGui::DragFloat("zRotation", &zRotation, 0.1f);
-                    ImGui::DragFloat("guiImageScale", &guiImageScale, 0.005f, 0.01f, 0.5f);
-                    ImVec2 guiImageExtent { renderTargetCreateInfo.extent.width * guiImageScale, renderTargetCreateInfo.extent.height * guiImageScale };
-                    ImGui::Image(guiDescriptorSets[0], guiImageExtent);
-#else
-#if 0
-                    int pointCount = (int)points0.size();
-                    if (ImGui::InputInt("pointCount", &pointCount)) {
-                        points0.resize(std::max(0, pointCount));
-                    }
-                    for (size_t i = 0; i < points0.size(); ++i) {
-                        ImGui::InputFloat4(("point[" + std::to_string(i) + "].position").c_str(), &points0[i].position[0]);
-                        ImGui::ColorPicker4(("point[" + std::to_string(i) + "].color").c_str(), &points0[i].color[0]);
-                        ImGui::InputFloat4(("point[" + std::to_string(i) + "].width").c_str(), &points0[i].width[0]);
-                    }
-#endif
-
-                    // float textScale = pTextMeshRenderer->transform.scale.x;
-                    // if (ImGui::DragFloat("Text Scale", &textScale)) {
-                    //     pTextMeshRenderer->transform.scale = glm::vec3(textScale);
-                    // }
-                    // ImGui::InputInt("spriteCount", &spriteCount);
-                    // ImGui::ColorPicker4("spritecolor", &spriteColor[0]);
-                    // 
-                    // bool spiralPointCountUpdated = ImGui::InputInt("spiralPointCount", &spiralPointCount);
-                    // bool spiralHeightUpdate = ImGui::InputInt("spiralHeight", &spiralHeight);
-                    // bool spiralWidthUpdated = ImGui::DragFloat("spiralWidth", &spiralWidth, 0.01f, 0.01f, 832.0f);
-                    // bool spiralColor1Updated = ImGui::ColorPicker4("spiralColor1", &spiralColor1[0]);
-                    // bool spiralColor0Updated = ImGui::ColorPicker4("spiralColor0", &spiralColor0[0]);
-                    // if (spiralPointCountUpdated || spiralHeightUpdate || spiralWidthUpdated || spiralColor0Updated || spiralColor1Updated) {
-                    //     create_spiral(spiralPointCount, spiralHeight, spiralWidth, spiralColor0, spiralColor1, points1);
-                    // }
-#endif
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
 
@@ -1085,31 +403,6 @@ int main(int, const char*[])
 
                 const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
                 gvk_result(vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
-
-#if 0
-                // Begin a gvk::RenderPass with our gvk::RenderTarget...
-                auto renderPassBeginInfo = renderTarget.get_render_pass_begin_info();
-                vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-                {
-                    VkRect2D scissor { { }, renderPassBeginInfo.renderArea.extent };
-                    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-                    VkViewport viewport { 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
-                    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-                    // Bind cube gvk::Pipeline, reflection gvk::math::Camera uniform gvk::Buffer,
-                    //  and the cube uniform gvk::Buffer, then render the cube gvk::Mesh.  This
-                    //  will draw the cube into the gvk::RenderTarget with the reflection view
-                    //  matrix...in the next gvk::RenderPass, we'll use this gvk::RenderTarget as
-                    //  the texture for the floor to create the illusion of a reflection on the
-                    //  floor...
-                    auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)reflectionCameraDescriptorSet, 0, nullptr);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    // cubeMesh.record_cmds(commandBuffer);
-                }
-                vkCmdEndRenderPass(commandBuffer);
-#endif
 
                 // Begin the gvk::RenderPass that renders into the gvk::WsiManager...
                 auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
@@ -1127,17 +420,6 @@ int main(int, const char*[])
                     //  gvk::DescriptorSet at index 0...then issue a draw call for the floating
                     //  cube...
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
-#if 0
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, floorPipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &(const VkDescriptorSet&)cameraDescriptorSet, 0, nullptr);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)floorDescriptorSet, 0, nullptr);
-                    // floorMesh.record_cmds(commandBuffer);
-                    vkCmdBindPipeline(commandBuffer, pipelineBindPoint, cubePipeline);
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, cubePipeline.get<gvk::PipelineLayout>(), 1, 1, &(const VkDescriptorSet&)cubeDescriptorSet, 0, nullptr);
-                    // cubeMesh.record_cmds(commandBuffer);
-#endif
-
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
                     ///////////////////////////////////////////////////////////////////////////////
@@ -1146,25 +428,12 @@ int main(int, const char*[])
                     const auto& fontDescriptorSet = fontRenderer.get_descriptor_set();
                     vkCmdBindPipeline(commandBuffer, pipelineBindPoint, fontPipeline);
                     const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
-#if 0
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, floorPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-#else
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-#endif
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontPipeline.get<gvk::PipelineLayout>(), 1, 1, &fontDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
                     pTextMeshRenderer->record_draw_cmds(commandBuffer, fontRenderer);
 
                     shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera);
                     ///////////////////////////////////////////////////////////////////////////////
-
-#if 0
-                    ///////////////////////////////////////////////////////////////////////////////
-                    // Lines
-                    // lineRenderer0.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
-                    // lineRenderer1.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
-                    gridRenderer.record_draw_cmds(commandBuffer, camera, { (float)imageExtent.width, (float)imageExtent.height });
-                    ///////////////////////////////////////////////////////////////////////////////
-#endif
 
                     ///////////////////////////////////////////////////////////////////////////////
                     // Grid

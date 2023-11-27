@@ -704,3 +704,215 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
     } gvk_result_scope_end;
     return gvkResult;
 }
+
+#if 0
+
+VkResult create_mesh(
+    const gvk::Context& context,
+    const glm::vec3& dimensions,
+    const glm::vec4& topColor,
+    const glm::vec4& bottomColor,
+    gvk::Mesh* pMesh
+)
+{
+    float w = dimensions[0] * 0.5f;
+    float h = dimensions[1] * 0.5f;
+    float d = dimensions[2] * 0.5f;
+    std::array<dst::gfx::VertexPositionTexcoordColor, 24> vertices{
+        // Top
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 1, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 1, 1 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 1 }, { topColor }},
+        // Left
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+        // Front
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h,  w }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  w }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  w }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  w }, { 0, 0 }, { bottomColor }},
+        // Right
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h,  d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor}},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor}},
+        // Back
+        dst::gfx::VertexPositionTexcoordColor {{  w,  h, -d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w,  h, -d }, { 0, 0 }, { topColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
+        // Bottom
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h,  d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h,  d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{  w, -h, -d }, { 0, 0 }, { bottomColor }},
+        dst::gfx::VertexPositionTexcoordColor {{ -w, -h, -d }, { 0, 0 }, { bottomColor }},
+    };
+    size_t index_i = 0;
+    size_t vertex_i = 0;
+    constexpr size_t FaceCount = 6;
+    constexpr size_t IndicesPerFace = 6;
+    std::array<uint16_t, IndicesPerFace* FaceCount> indices;
+    for (size_t face_i = 0; face_i < FaceCount; ++face_i) {
+        indices[index_i++] = (uint16_t)(vertex_i + 0);
+        indices[index_i++] = (uint16_t)(vertex_i + 1);
+        indices[index_i++] = (uint16_t)(vertex_i + 2);
+        indices[index_i++] = (uint16_t)(vertex_i + 2);
+        indices[index_i++] = (uint16_t)(vertex_i + 3);
+        indices[index_i++] = (uint16_t)(vertex_i + 0);
+        vertex_i += 4;
+    }
+    return pMesh->write(
+        context.get_devices()[0],
+        gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
+        context.get_command_buffers()[0],
+        VK_NULL_HANDLE,
+        (uint32_t)vertices.size(),
+        vertices.data(),
+        (uint32_t)indices.size(),
+        indices.data()
+    );
+}
+
+void create_spiral(int pointCount, int height, float width, const glm::vec4& color0, const glm::vec4& color1, std::vector<dst::gfx::Point>& points)
+{
+    points.resize(pointCount);
+    for (int i = 0; i < pointCount; ++i) {
+        auto& point = points[i];
+        auto t = i / (float)pointCount;
+        auto angle = t * 2.0f * glm::pi<float>() * height;
+        point.position.x = std::cos(angle) * t;
+        point.position.y = t * height;
+        point.position.z = std::sin(angle) * t;
+        point.color = glm::lerp(color0, color1, t);
+        point.width.r = t * width;
+        point.width.g = (float)(i % 2);
+    }
+}
+
+void create_grid(const glm::vec2& extent, const glm::vec2& cellCount, std::vector<dst::gfx::Point>& points)
+{
+    points.clear();
+    auto halfExtent = extent * 0.5f;
+    auto cellExtent = extent / cellCount;
+    auto makePoint = [](auto v) { return dst::gfx::Point{ glm::vec4 { v.x, 0, v.y, 1 } }; };
+    for (uint32_t y = 0; y < cellCount.y; ++y) {
+        for (uint32_t x = 0; x < cellCount.x; ++x) {
+            auto i = points.size();
+            points.push_back({ });
+            points.back().width.r = 0;
+            auto corner = -extent * 0.5f + cellExtent * glm::vec2{ x, y };
+            if (!x) {
+                points.push_back(makePoint(corner));
+            }
+            points.push_back(makePoint(corner + glm::vec2{ 0, cellExtent.y }));
+            points.push_back(makePoint(corner + cellExtent));
+            points.push_back(makePoint(corner + glm::vec2{ cellExtent.x, 0 }));
+            if (!y) {
+                points.push_back(makePoint(corner));
+            }
+            points[i].position = points[i + 1].position;
+            points.push_back(points.back());
+            points.back().width.r = 0;
+        }
+    }
+    for (auto& point : points) {
+        point.color.r = (point.position.x + extent.x * 0.5f) / extent.x;
+        point.color.g = 0;
+        point.color.b = (point.position.z + extent.y * 0.5f) / extent.y;
+        point.position.y = (std::sin(point.position.x) + std::sin(point.position.z)) * 0.5f;
+        if (point.width.r) {
+            point.width.r = glm::lerp(point.width.r, 32.0f, point.color.r);
+        }
+        point.position.y += 32;
+    }
+}
+
+#endif
+
+#if 0
+glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+auto difference = glm::vec3{ } - camera.transform.translation;
+auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
+auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
+auto distance = dot0 / dot1;
+auto intersection = camera.transform.translation + direction * distance;
+#endif
+#if 0
+auto rayOrigin = shapeShooterContext.gameCamera.transform.translation;
+glm::vec3 rayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+glm::vec3 planePoint{ };
+glm::vec3 planeNormal{ 0, 1, 0 };
+shapeShooterContext.pPlayerShip->position = shape_shooter::ray_plane_intersection(rayOrigin, rayDirection, planePoint, planeNormal);
+#endif
+
+#if 0
+// Calculate mouse ray
+glm::vec2 normalizedDeviceSpaceMouseRay{
+    input.mouse.position.current[0] / extent.width * 2 - 1,
+    input.mouse.position.current[1] / extent.height * 2 - 1
+};
+glm::vec4 clipSpaceMouseRay{
+    normalizedDeviceSpaceMouseRay.x,
+    normalizedDeviceSpaceMouseRay.y,
+    1.0f,
+    1.0f
+};
+auto cameraSpaceMouseRay = glm::inverse(shapeShooterContext.gameCamera.projection()) * clipSpaceMouseRay;
+cameraSpaceMouseRay.z = -1;
+cameraSpaceMouseRay.w = 0;
+auto worldSpaceMouseRay = glm::normalize(glm::inverse(shapeShooterContext.gameCamera.view()) * cameraSpaceMouseRay);
+if (input.keyboard.pressed(gvk::system::Key::One)) {
+    forceType = 0;
+}
+if (input.keyboard.pressed(gvk::system::Key::Two)) {
+    forceType = 1;
+}
+if (input.keyboard.pressed(gvk::system::Key::Three)) {
+    forceType = 2;
+}
+if (input.mouse.buttons.down(gvk::system::Mouse::Button::Right)) {
+#if 0
+    points0.clear();
+    dst::gfx::Point point{ };
+    point.position.x = camera.transform.translation.x;
+    point.position.y = camera.transform.translation.y;
+    point.position.z = camera.transform.translation.z;
+    points0.push_back(point);
+    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x;
+    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y;
+    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z;
+    point.color = gvk::math::Color::Red;
+    points0.push_back(point);
+    point.position.x = camera.transform.translation.x + worldSpaceMouseRay.x * 100;
+    point.position.y = camera.transform.translation.y + worldSpaceMouseRay.y * 100;
+    point.position.z = camera.transform.translation.z + worldSpaceMouseRay.z * 100;
+    point.color = gvk::math::Color::Green;
+    points0.push_back(point);
+#endif
+    // glm::vec3 direction{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+    // auto difference = glm::vec3{ } - camera.transform.translation;
+    // auto dot0 = glm::dot(difference, glm::vec3{ 0, 1, 0 });
+    // auto dot1 = glm::dot(glm::vec3{ direction }, glm::vec3{ 0, 1, 0 });
+    // auto distance = dot0 / dot1;
+    // auto intersection = camera.transform.translation + direction * distance;
+    // switch (forceType) {
+    // case 0: {
+    //     // shape_shooter::Context::instance().grid.apply_directed_force({ 0, -0.5f, 0 }, intersection, 5);
+    //     shape_shooter::Context::instance().grid.apply_directed_force({ 0, -5000.0f, 0 }, intersection, 50);
+    // } break;
+    // case 1: {
+    //     auto sprayAngle = glm::two_pi<float>() / 50.0f;
+    //     shape_shooter::Context::instance().grid.apply_implosive_force(glm::sin(sprayAngle / 2) * 10 + 20, intersection, 200);
+    // } break;
+    // case 2: {
+    //     shape_shooter::Context::instance().grid.apply_explosive_force(4, intersection, 80);
+    // } break;
+    // default: {
+    //     assert(false);
+    // } break;
+    // }
+}
+#endif
