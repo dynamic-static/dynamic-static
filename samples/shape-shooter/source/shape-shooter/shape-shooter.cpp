@@ -399,6 +399,8 @@ int main(int, const char*[])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
+                    // TODO : Draw sprites additively w/depth, then render grid
+
                     // Grid
                     shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
 
