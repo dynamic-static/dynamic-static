@@ -399,19 +399,11 @@ int main(int, const char*[])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
                     const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
-                    const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
-                    (void)gameCameraDescriptorSet;
-                    const auto& scoreBoardCameraDescriptorSet = shapeShooterContext.scoreBoardCameraResources.second;
-                    (void)scoreBoardCameraDescriptorSet;
-
-                    // ScoreBoard
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &scoreBoardCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.scoreBoardCamera);
-
                     // Grid
                     shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
 
                     // CoordinateRenderer
+                    const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
                     vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
                     coordinateRenderer.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
 
@@ -420,6 +412,11 @@ int main(int, const char*[])
                     // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
                     shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
+
+                    // ScoreBoard
+                    const auto& scoreBoardCameraDescriptorSet = shapeShooterContext.scoreBoardCameraResources.second;
+                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &scoreBoardCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.scoreBoardCamera);
                 }
 
                 // If the gvk::gui::Renderer is enabled, record cmds to render it
