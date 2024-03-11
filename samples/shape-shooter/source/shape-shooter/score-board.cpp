@@ -48,16 +48,18 @@ VkResult ScoreBoard::create(const gvk::Context& gvkContext, const gvk::RenderPas
     assert(pScoreBoard);
     pScoreBoard->reset();
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        dst::text::Font::create("C:\\Windows\\Fonts\\georgia.ttf", nullptr, 64, &pScoreBoard->mspFont);
+        dst::text::Font::create("C:\\Windows\\Fonts\\bauhs93.ttf", nullptr, 64, &pScoreBoard->mspFont);
         dst::gfx::Renderer<dst::text::Font>::create(gvkContext, renderPass, *pScoreBoard->mspFont, &pScoreBoard->mFontRenderer);
         pScoreBoard->mScoreTextMesh.set_font(pScoreBoard->mspFont);
         pScoreBoard->mHighScoreTextMesh.set_font(pScoreBoard->mspFont);
-        auto createTextMeshRenderer = [&](const auto& /* textMesh */, auto& renderer)
+        pScoreBoard->mLivesTextMesh.set_font(pScoreBoard->mspFont);
+        auto createTextMeshRenderer = [&](const auto& textMesh, auto& renderer)
         {
-            return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], pScoreBoard->mScoreTextMesh, pScoreBoard->mFontRenderer, &renderer);
+            return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], textMesh, pScoreBoard->mFontRenderer, &renderer);
         };
         gvk_result(pScoreBoard->mScoreTextMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(createTextMeshRenderer));
         gvk_result(pScoreBoard->mHighScoreTextMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(createTextMeshRenderer));
+        gvk_result(pScoreBoard->mLivesTextMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(createTextMeshRenderer));
         pScoreBoard->reset_score();
     } gvk_result_scope_end;
     return gvkResult;
@@ -78,6 +80,7 @@ void ScoreBoard::reset()
     mspFont.reset();
     mScoreTextMesh = { };
     mHighScoreTextMesh = { };
+    mLivesTextMesh = { };
     mFontRenderer = { };
 }
 
@@ -123,17 +126,24 @@ void ScoreBoard::update()
     auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
 
     mScoreTextMesh.set_text(std::to_string(mScore));
-    auto pScoreTextMeshRenderer = get_text_mesh_renderer(mScoreTextMesh);
-    pScoreTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });
-    pScoreTextMeshRenderer->transform.translation.y = 64;
+    auto pTextMeshRenderer = get_text_mesh_renderer(mScoreTextMesh);
+    pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });
+    pTextMeshRenderer->transform.translation.y = 64;
     mScoreTextMesh.update(deltaTime);
 
-    mHighScoreTextMesh.set_text("hi " + std::to_string(mHighScore));
-    auto pHighScoreTextMeshRenderer = get_text_mesh_renderer(mHighScoreTextMesh);
-    pHighScoreTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });
-    pHighScoreTextMeshRenderer->transform.translation.y = 32;
-    pHighScoreTextMeshRenderer->transform.scale = { 0.5f, 0.5f, 0.5f };
+    mHighScoreTextMesh.set_text("hi : " + std::to_string(mHighScore));
+    pTextMeshRenderer = get_text_mesh_renderer(mHighScoreTextMesh);
+    pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });
+    pTextMeshRenderer->transform.translation.y = 32;
+    pTextMeshRenderer->transform.scale = { 0.5f, 0.5f, 0.5f };
     mHighScoreTextMesh.update(deltaTime);
+
+    mLivesTextMesh.set_text("lives : " + std::to_string(3));
+    pTextMeshRenderer = get_text_mesh_renderer(mLivesTextMesh);
+    pTextMeshRenderer->transform.rotation = glm::angleAxis(glm::radians(180.0f), glm::vec3{ 0, 1, 0 });
+    pTextMeshRenderer->transform.translation.y = 8;
+    pTextMeshRenderer->transform.scale = { 0.5f, 0.5f, 0.5f };
+    mLivesTextMesh.update(deltaTime);
 }
 
 void ScoreBoard::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera) const
@@ -148,6 +158,7 @@ void ScoreBoard::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const
     dispatchTable.gvkCmdBindDescriptorSets(commandBuffer, bindPoint, fontPipelineLayout, 1, 1, &fontDescriptorSet, 0, nullptr);
     get_text_mesh_renderer(mScoreTextMesh)->record_draw_cmds(commandBuffer, mFontRenderer);
     get_text_mesh_renderer(mHighScoreTextMesh)->record_draw_cmds(commandBuffer, mFontRenderer);
+    get_text_mesh_renderer(mLivesTextMesh)->record_draw_cmds(commandBuffer, mFontRenderer);
 }
 
 int ScoreBoard::load_high_score()

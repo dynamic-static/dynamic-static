@@ -62,6 +62,7 @@ private:
     std::shared_ptr<dst::text::Font> mspFont;
     dst::text::Mesh mScoreTextMesh;
     dst::text::Mesh mHighScoreTextMesh;
+    dst::text::Mesh mLivesTextMesh;
     dst::gfx::Renderer<dst::text::Font> mFontRenderer;
 
     ScoreBoard(const ScoreBoard&) = delete;

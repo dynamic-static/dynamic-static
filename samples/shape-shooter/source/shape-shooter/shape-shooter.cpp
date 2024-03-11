@@ -173,7 +173,7 @@ int main(int, const char*[])
         // CoordinateRenderer
         dst::gfx::CoordinateRenderer::CreateInfo coordinateRendererCreateInfo{ };
         coordinateRendererCreateInfo.renderPass = wsiManager.get_render_pass();
-        coordinateRendererCreateInfo.pTtfFilePath = "C:\\Windows\\Fonts\\georgia.ttf";
+        coordinateRendererCreateInfo.pTtfFilePath = "C:\\Windows\\Fonts\\bauhs93.ttf";
         dst::gfx::CoordinateRenderer coordinateRenderer;
         gvk_result(dst::gfx::CoordinateRenderer::create(gvkContext, coordinateRendererCreateInfo, &coordinateRenderer));
         ///////////////////////////////////////////////////////////////////////////////
@@ -197,6 +197,11 @@ int main(int, const char*[])
         shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
         shapeShooterContext.particleManager.resize(2048);
+
+#if 0
+        shapeShooterContext.scoreBoardCamera.transform.translation = { 12.1287f, 32.5891f, -438.474f };
+        shapeShooterContext.scoreBoardCamera.transform.rotation = glm::quat(glm::vec3{ 16.0f, -45.0f, -2.0f } * glm::pi<float>() / 180.0f);
+#endif
 
         shapeShooterContext.gameCamera.farPlane = 1000.0f;
         shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
@@ -282,6 +287,17 @@ int main(int, const char*[])
             static bool lockScoreBoardCamera = false;
             if (input.keyboard.pressed(gvk::system::Key::L)) {
                 lockScoreBoardCamera = !lockScoreBoardCamera;
+#if 0
+                const auto& t = shapeShooterContext.gameCamera.transform;
+                const auto& p = t.translation;
+                const auto& r = glm::eulerAngles(t.rotation) * 180.0f / glm::pi<float>();
+                const auto& s = t.scale;
+                std::cout << "================================================================================" << std::endl;
+                std::cout << "translation : {" << p.x << "," << p.y << "," << p.z << "}" << std::endl;
+                std::cout << "rotation    : {" << r.x << "," << r.y << "," << r.z << "}" << std::endl;
+                std::cout << "scale       : {" << s.x << "," << s.y << "," << s.z << "}" << std::endl;
+                std::cout << "================================================================================" << std::endl;
+#endif
             }
             if (!lockScoreBoardCamera) {
                 shapeShooterContext.scoreBoardCamera = shapeShooterContext.gameCamera;
