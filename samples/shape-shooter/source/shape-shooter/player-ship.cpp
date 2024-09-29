@@ -52,6 +52,7 @@ void PlayerShip::update()
     auto& rng = context.rng;
     const auto& playField = context.playField;
     auto& entityManager = context.entityManager;
+    (void)entityManager;
     const auto& inputManager = context.inputManager;
     auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
 
@@ -62,12 +63,16 @@ void PlayerShip::update()
         // auto bulletOrientation = get_orientation(aimDirection);
         auto aimAngle = std::atan2(aimDirection.z, aimDirection.x);
         auto aimRotation = glm::angleAxis(aimAngle, glm::vec3{ 0, 1, 0 });
+        (void)aimRotation;
 
         float bulletSpread = rng.range(-0.04f, 0.04f) + rng.range(-0.04f, 0.04f);
         auto bulletVelocity = from_polar(aimAngle + bulletSpread, 11.0f);
+        (void)bulletVelocity;
 
+#if 0 // Disabled to debug grid
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0, -8 } * aimRotation, bulletVelocity);
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0,  8 } * aimRotation, bulletVelocity);
+#endif
     }
     mCooldownTimer -= deltaTime;
 

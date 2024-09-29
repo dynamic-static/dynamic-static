@@ -8,7 +8,7 @@ dst_add_static_library(
     target
         dynamic-static.core
     linkLibraries
-        glm
+        glm-header-only
         stb
         stb_truetype
     includeDirectories

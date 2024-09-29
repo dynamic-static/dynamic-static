@@ -28,6 +28,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "shape-shooter/utilities.hpp"
 
+#include "imgui.h"
+
 namespace shape_shooter {
 
 void Grid::PointMass::apply_force(const glm::vec3& force)
@@ -43,8 +45,35 @@ void Grid::PointMass::increase_damping(float factor)
 void Grid::PointMass::update(float deltaTime)
 {
     (void)deltaTime;
+#if 0
     velocity += acceleration;
     position += velocity; // *deltaTime;
+    acceleration = { };
+    if (glm::length2(velocity) < 0.001f * 0.001f) {
+        velocity = { };
+    }
+    velocity *= damping;
+    damping = 0.98f;
+#endif
+#if 0
+    auto previousPosition = position;
+    position = 2.0f * position - position + acceleration * deltaTime * deltaTime;
+    velocity = (position - previousPosition) / (deltaTime * 2.0f);
+#endif
+
+
+#if 1
+    // Symplectic Euler integration
+    velocity += acceleration;// *deltaTime;
+    position += velocity;// *deltaTime;
+    // position += velocity * deltaTime + acceleration * 0.5f * deltaTime * deltaTime;
+    // velocity += acceleration * deltaTime;
+#else
+    // Verlet integration
+    auto previousPosition = position;
+    position = 2.0f * position - position + acceleration * deltaTime * deltaTime;
+    velocity = (position - previousPosition) / (deltaTime * 2.0f);
+#endif
     acceleration = { };
     if (glm::length2(velocity) < 0.001f * 0.001f) {
         velocity = { };
@@ -95,13 +124,16 @@ void Grid::apply_directed_force(const glm::vec3& force, const glm::vec3& positio
     (void)force;
     (void)position;
     (void)radius;
-#if 0
+    std::cout << "apply_directed_force" << std::endl;
     for (auto& pointMass : mPointMasses) {
         if (glm::distance2(position, pointMass.position) < radius * radius) {
+#if 0
             pointMass.apply_force(10.0f * force / (10.0f + glm::distance(position, pointMass.position)));
+#else
+            pointMass.apply_force(10.0f * force);
+#endif
         }
     }
-#endif
 }
 
 void Grid::apply_implosive_force(float force, const glm::vec3& position, float radius)
@@ -109,7 +141,7 @@ void Grid::apply_implosive_force(float force, const glm::vec3& position, float r
     (void)force;
     (void)position;
     (void)radius;
-#if 0
+    std::cout << "apply_implosive_force" << std::endl;
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {
@@ -117,7 +149,6 @@ void Grid::apply_implosive_force(float force, const glm::vec3& position, float r
             pointMass.increase_damping(0.6f);
         }
     }
-#endif
 }
 
 void Grid::apply_explosive_force(float force, const glm::vec3& position, float radius)
@@ -125,16 +156,14 @@ void Grid::apply_explosive_force(float force, const glm::vec3& position, float r
     (void)force;
     (void)position;
     (void)radius;
-#if 0
+    std::cout << "apply_explosive_force" << std::endl;
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {
-            // pointMass.apply_force(100.0f * force * (pointMass.position - position) / (10000.0f + distanceSqrd));
             pointMass.apply_force(100.0f * force * (pointMass.position - position) / (10000.0f + distanceSqrd));
             pointMass.increase_damping(0.6f);
         }
     }
-#endif
 }
 
 void Grid::update(float deltaTime)
@@ -180,6 +209,26 @@ void Grid::record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::
     mLineRenderer.record_draw_cmds(commandBuffer, camera, resolution);
 }
 
+void Grid::draw_gui()
+{
+    auto stiffness = mStiffness;
+    if (ImGui::DragFloat("Spring stiffness", &mStiffness)) {
+        for (auto& spring : mSprings) {
+            if (spring.mStiffness == stiffness) {
+                spring.mStiffness = mStiffness;
+            }
+        }
+    }
+    auto damping = mDamping;
+    if (ImGui::DragFloat("Spring damping", &mDamping)) {
+        for (auto& spring : mSprings) {
+            if (spring.mDamping == damping) {
+                spring.mDamping = mDamping;
+            }
+        }
+    }
+}
+
 void Grid::create_grid()
 {
     auto w = mCreateInfo.cells.x + 1;
@@ -216,15 +265,15 @@ void Grid::create_grid()
             }
         
             // TODO : Documentation
-            const float Stiffness = 0.28f;
-            const float Damping = 0.06f;
+            const float Stiffness = 0.28f; (void)Stiffness;
+            const float Damping = 0.06f; (void)Damping;
             if (x) {
                 auto i_1 = y * w + (x - 1);
-                mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
+                mSprings.push_back(Spring(mPointMasses, i_0, i_1, mStiffness, mDamping));
             }
             if (y) {
                 auto i_1 = (y - 1) * w + x;
-                mSprings.push_back(Spring(mPointMasses, i_0, i_1, Stiffness, Damping));
+                mSprings.push_back(Spring(mPointMasses, i_0, i_1, mStiffness, mDamping));
             }
         }
     }

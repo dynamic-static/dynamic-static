@@ -37,6 +37,7 @@ public:
 
     glm::vec3 get_movement_direction() const;
     glm::vec3 get_aim_direction() const;
+    glm::vec3 get_mouse_aim_point() const;
     void update(const gvk::system::Input& input);
 
 private:

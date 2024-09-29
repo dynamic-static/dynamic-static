@@ -60,7 +60,7 @@ public:
         Spring(const std::vector<PointMass>& pointMasses, uint32_t p0_i, uint32_t p1_i, float stiffness, float damping);
         void update(std::vector<PointMass>& pointMasses);
 
-    private:
+    // private:
         uint32_t mP0_i{ };
         uint32_t mP1_i{ };
         float mTargetLength{ };
@@ -74,6 +74,7 @@ public:
     void apply_explosive_force(float force, const glm::vec3& position, float radius);
     void update(float deltaTime);
     void record_draw_cmds(const gvk::CommandBuffer& commandBuffer, const gvk::math::Camera& camera, const glm::vec2& resolution) const;
+    void draw_gui();
 
 private:
     void create_grid();
@@ -83,6 +84,9 @@ private:
     std::vector<PointMass> mPointMasses;
     dst::gfx::LineRenderer mLineRenderer;
     std::vector<dst::gfx::Point> mPoints;
+
+    float mStiffness{ 0.28f };
+    float mDamping{ 0.06f };
 };
 
 } // namespace shape_shooter

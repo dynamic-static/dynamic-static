@@ -137,7 +137,7 @@ inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk:
     auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
     contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
     contextCreateInfo.loadApiDumpLayer = VK_FALSE;
-    contextCreateInfo.loadValidationLayer = VK_TRUE;
+    contextCreateInfo.loadValidationLayer = VK_FALSE;
     contextCreateInfo.loadWsiExtensions = VK_TRUE;
     contextCreateInfo.pDebugUtilsMessengerCreateInfo = &debugUtilsMessengerCreateInfo;
     contextCreateInfo.pDeviceCreateInfo = &deviceCreateInfo;

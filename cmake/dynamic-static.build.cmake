@@ -100,7 +100,7 @@ macro(dst_add_target_test)
             add_test(NAME ${args_target}.test COMMAND ${args_target}.test)
             add_custom_command(
                 TARGET ${args_target}.test POST_BUILD
-                COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION> --verbose --output-on-failures
+                COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIGURATION> --verbose --output-on-failure
             )
         endif()
         if(DST_CREATE_TEST_PACKAGE)

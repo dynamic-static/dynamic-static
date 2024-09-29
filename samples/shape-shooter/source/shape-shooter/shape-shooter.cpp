@@ -43,6 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <array>
 #include <cassert>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 struct ObjectUniforms
@@ -132,7 +133,7 @@ int main(int, const char*[])
         wsiManagerCreateInfo.pWin32SurfaceCreateInfoKHR = &win32SurfaceCreateInfo;
         wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
         wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
-        wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR; // VK_PRESENT_MODE_MAILBOX_KHR;
         wsiManagerCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
         gvk::WsiManager wsiManager;
         gvk_result(gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager));
@@ -203,7 +204,7 @@ int main(int, const char*[])
         shapeShooterContext.scoreBoardCamera.transform.rotation = glm::quat(glm::vec3{ 16.0f, -45.0f, -2.0f } * glm::pi<float>() / 180.0f);
 #endif
 
-        shapeShooterContext.gameCamera.farPlane = 1000.0f;
+        shapeShooterContext.gameCamera.farPlane = 10000.0f;
         shapeShooterContext.gameCamera.transform.translation = { 0, 2, -7 };
         gvk::math::FreeCameraController cameraController;
         cameraController.set_camera(&shapeShooterContext.gameCamera);
@@ -233,6 +234,8 @@ int main(int, const char*[])
         gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
         ///////////////////////////////////////////////////////////////////////////////
 
+        float spawnInExplosionForce = 5000.0f;
+
         // gvk::system::Clock clock;
         auto& clock = shapeShooterContext.clock;
         while (
@@ -240,6 +243,8 @@ int main(int, const char*[])
             !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
             gvk::system::Surface::update();
             clock.update();
+
+            auto frameStart = gvk::system::HighResolutionClock::now();
 
             // Update the gvk::math::FreeCameraController...
             auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
@@ -274,6 +279,23 @@ int main(int, const char*[])
                     shapeShooterContext.gameCamera.fieldOfView = 60.0f;
                 }
                 cameraController.update(cameraControllerUpdateInfo);
+            }
+
+            auto mouseAimPoint = shape_shooter::Context::instance().inputManager.get_mouse_aim_point();
+            if (input.keyboard.pressed(gvk::system::Key::C)) {
+                // std::cout << glm::to_string(shapeShooterContext.gameCamera.transform.translation) << std::endl; // 0.35, 996.331, -16.84
+                // shape_shooter::Context::instance().grid.apply_directed_force({ 0, 0, 5000 }, { }, 50);
+
+                // apply_directed_force() is used just once, for the ship spawn in
+                shape_shooter::Context::instance().grid.apply_directed_force({ 0, spawnInExplosionForce, 0 }, mouseAimPoint, 50.0f);
+            }
+            if (input.keyboard.pressed(gvk::system::Key::V)) {
+                // apply_directed_force() is used just once, for the black hole
+                shape_shooter::Context::instance().grid.apply_implosive_force({ }, mouseAimPoint, 0);
+            }
+            if (input.keyboard.pressed(gvk::system::Key::B)) {
+                // apply_directed_force() is used just once, for the bullets
+                shape_shooter::Context::instance().grid.apply_explosive_force({ }, mouseAimPoint, 80);
             }
 
             if (input.keyboard.pressed(gvk::system::Key::Backspace)) {
@@ -314,7 +336,7 @@ int main(int, const char*[])
             // shape_shooter::Context
             shapeShooterContext.inputManager.update(input);
             shapeShooterContext.entityManager.update();
-            shapeShooterContext.enemySpawner.update();
+            // shapeShooterContext.enemySpawner.update();
             shapeShooterContext.scoreBoard.update();
             shapeShooterContext.particleManager.update();
             shapeShooterContext.spriteRenderer.begin_sprite_batch();
@@ -386,7 +408,11 @@ int main(int, const char*[])
                     // Call guiRenderer.begin_gui().  Note that all ImGui widgets must be handled
                     //  between calls to begin_gui()/end_gui()
                     guiRenderer.begin_gui(guiRendererBeginInfo);
+#if 1
                     ImGui::ShowDemoWindow();
+#endif
+                    ImGui::DragFloat("spawnInExplosionForce", &spawnInExplosionForce);
+                    shape_shooter::Context::instance().grid.draw_gui();
                     guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
                 }
 
@@ -475,6 +501,11 @@ int main(int, const char*[])
                 vkResult = vkQueuePresentKHR(gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0], &presentInfo);
                 gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
             }
+
+            auto frameEnd = gvk::system::HighResolutionClock::now();
+            auto frameTime = frameEnd - frameStart;
+            static const gvk::system::Milliseconds<float> FrameLimit(1.0f / 60.0f * 1000);
+            std::this_thread::sleep_for(FrameLimit - frameTime);
         }
         gvk_result(vkDeviceWaitIdle(gvkContext.get_devices()[0]));
     } gvk_result_scope_end;

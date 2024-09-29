@@ -28,6 +28,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/context.hpp"
 #include "shape-shooter/utilities.hpp"
 
+#include "glm/gtx/fast_trigonometry.hpp"
+
 namespace shape_shooter {
 
 Enemy::Enemy(Sprite sprite)
@@ -84,7 +86,7 @@ void Enemy::update()
         color = gvk::math::Color::White * (1.0f - mTimeUntilStart);
     }
     // TODO : Hardcoded values...
-    position += velocity;
+    // position += velocity;
     const auto& halfPlayFieldExtent = Context::instance().playField.extent * 0.5f;
     position = glm::clamp(position, -halfPlayFieldExtent, halfPlayFieldExtent);
     velocity *= 0.8f;

@@ -9,7 +9,11 @@ dst_add_static_library(
         dynamic-static.graphics
     linkLibraries
         dynamic-static.core
-        gvk
+        gvk-gui
+        gvk-handles
+        gvk-math
+        gvk-spirv
+        gvk-system
         stb
     includeDirectories
         "${includeDirectory}"

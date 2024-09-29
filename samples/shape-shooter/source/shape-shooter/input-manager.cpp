@@ -56,6 +56,30 @@ glm::vec3 InputManager::get_aim_direction() const
     return mMouseAimEnabled ? get_mouse_aim_direction() : get_gamepad_aim_direction();
 }
 
+glm::vec3 InputManager::get_mouse_aim_point() const
+{
+    const auto& context = Context::instance();
+    const auto& renderExtent = context.renderExtent;
+    glm::vec2 normalizedDeviceSpaceMouseRay{
+        mInput.mouse.position.current[0] / renderExtent.x * 2 - 1,
+        mInput.mouse.position.current[1] / renderExtent.y * 2 - 1,
+    };
+    glm::vec4 clipSpaceMouseRay{
+        normalizedDeviceSpaceMouseRay.x,
+        normalizedDeviceSpaceMouseRay.y,
+        1.0f,
+        1.0f
+    };
+    const auto& gameCamera = context.gameCamera;
+    auto cameraSpaceMouseRay = glm::inverse(gameCamera.projection()) * clipSpaceMouseRay;
+    cameraSpaceMouseRay.z = -1;
+    cameraSpaceMouseRay.w = 0;
+    auto worldSpaceMouseRay = glm::normalize(glm::inverse(gameCamera.view()) * cameraSpaceMouseRay);
+    auto worldSpaceMouseRayOrigin = gameCamera.transform.translation;
+    glm::vec3 worldSpaceMouseRayDirection{ worldSpaceMouseRay.x, worldSpaceMouseRay.y, worldSpaceMouseRay.z };
+    return ray_plane_intersection(worldSpaceMouseRayOrigin, worldSpaceMouseRayDirection, { }, { 0, 1, 0 });
+}
+
 void InputManager::update(const gvk::system::Input& input)
 {
     mInput = input;

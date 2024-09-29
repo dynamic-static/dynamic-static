@@ -50,7 +50,7 @@ void Bullet::update()
     const auto& playField = context.playField;
     auto& particleManager = context.particleManager;
 
-    position += velocity; // deltaTime
+    // position += velocity; // deltaTime
     // Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, /* from_1920x1080(64, 80) */ 2.666666666666669f);
     Context::instance().grid.apply_explosive_force(0.5f * glm::length(velocity), position, 80.0f);
     if (!playField.contains(position)) {
