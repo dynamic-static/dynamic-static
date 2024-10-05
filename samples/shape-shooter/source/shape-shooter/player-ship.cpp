@@ -57,7 +57,7 @@ void PlayerShip::update()
     auto deltaTime = Context::instance().clock.elapsed<gvk::system::Seconds<float>>();
 
     auto aimDirection = inputManager.get_aim_direction();
-    if (glm::length2(aimDirection) && mCooldownTimer <= 0) {
+    if (0 < glm::length2(aimDirection) && mCooldownTimer <= 0) {
         mCooldownTimer = mCooldownTime;
         // TODO : Sort out inconsistent rotations from get_orientation()
         // auto bulletOrientation = get_orientation(aimDirection);
@@ -69,7 +69,7 @@ void PlayerShip::update()
         auto bulletVelocity = from_polar(aimAngle + bulletSpread, 11.0f);
         (void)bulletVelocity;
 
-#if 0 // Disabled to debug grid
+#if 1 // Disabled to debug grid
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0, -8 } * aimRotation, bulletVelocity);
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0,  8 } * aimRotation, bulletVelocity);
 #endif

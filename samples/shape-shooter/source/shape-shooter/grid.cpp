@@ -78,7 +78,7 @@ void Grid::PointMass::update(float deltaTime)
     if (glm::length2(velocity) < 0.001f * 0.001f) {
         velocity = { };
     }
-    velocity *= damping;
+    velocity *= damping;// *deltaTime;
     damping = 0.98f;
 }
 
@@ -127,11 +127,7 @@ void Grid::apply_directed_force(const glm::vec3& force, const glm::vec3& positio
     std::cout << "apply_directed_force" << std::endl;
     for (auto& pointMass : mPointMasses) {
         if (glm::distance2(position, pointMass.position) < radius * radius) {
-#if 0
             pointMass.apply_force(10.0f * force / (10.0f + glm::distance(position, pointMass.position)));
-#else
-            pointMass.apply_force(10.0f * force);
-#endif
         }
     }
 }
@@ -180,11 +176,17 @@ void Grid::update(float deltaTime)
     for (auto& spring : mSprings) {
         spring.update(mPointMasses);
     }
+#if 0
     for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
         for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {
             mPointMasses[index(x, y)].update(deltaTime);
         }
     }
+#else
+    for (auto& pointMass : mPointMasses) {
+        pointMass.update(deltaTime);
+    }
+#endif
     mPoints.clear();
     for (uint32_t y = 0; y < mCreateInfo.cells.y; ++y) {
         for (uint32_t x = 0; x < mCreateInfo.cells.x; ++x) {

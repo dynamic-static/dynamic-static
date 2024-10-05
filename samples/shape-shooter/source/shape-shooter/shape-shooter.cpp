@@ -244,7 +244,7 @@ int main(int, const char*[])
             gvk::system::Surface::update();
             clock.update();
 
-            auto frameStart = gvk::system::HighResolutionClock::now();
+            auto frameStart = gvk::system::SteadyClock::now();
 
             // Update the gvk::math::FreeCameraController...
             auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
@@ -287,15 +287,15 @@ int main(int, const char*[])
                 // shape_shooter::Context::instance().grid.apply_directed_force({ 0, 0, 5000 }, { }, 50);
 
                 // apply_directed_force() is used just once, for the ship spawn in
-                shape_shooter::Context::instance().grid.apply_directed_force({ 0, spawnInExplosionForce, 0 }, mouseAimPoint, 50.0f);
+                shape_shooter::Context::instance().grid.apply_directed_force({ 0, -spawnInExplosionForce, 0 }, mouseAimPoint, 50);
             }
             if (input.keyboard.pressed(gvk::system::Key::V)) {
                 // apply_directed_force() is used just once, for the black hole
-                shape_shooter::Context::instance().grid.apply_implosive_force({ }, mouseAimPoint, 0);
+                shape_shooter::Context::instance().grid.apply_implosive_force((float)(std::sin(M_PI_2) * 10.0 + 20.0), mouseAimPoint, 200);
             }
             if (input.keyboard.pressed(gvk::system::Key::B)) {
                 // apply_directed_force() is used just once, for the bullets
-                shape_shooter::Context::instance().grid.apply_explosive_force({ }, mouseAimPoint, 80);
+                shape_shooter::Context::instance().grid.apply_explosive_force(8, mouseAimPoint, 80);
             }
 
             if (input.keyboard.pressed(gvk::system::Key::Backspace)) {
@@ -502,10 +502,22 @@ int main(int, const char*[])
                 gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
             }
 
-            auto frameEnd = gvk::system::HighResolutionClock::now();
+            static const gvk::system::Milliseconds<> FrameDuration(1.0f / 60.0f * 1000);
+            auto frameEnd = gvk::system::SteadyClock::now();
             auto frameTime = frameEnd - frameStart;
-            static const gvk::system::Milliseconds<float> FrameLimit(1.0f / 60.0f * 1000);
-            std::this_thread::sleep_for(FrameLimit - frameTime);
+            if (frameTime < FrameDuration) {
+                std::this_thread::sleep_for(gvk::system::duration_cast<gvk::system::Milliseconds<>>(FrameDuration - frameTime));
+            }
+
+            static uint64_t sFrameCount;
+            ++sFrameCount;
+            static decltype(clock.elapsed<gvk::system::Seconds<>>()) sFpsTimer;
+            sFpsTimer += clock.elapsed<gvk::system::Seconds<>>();
+            if (1.0f <= sFpsTimer) {
+                std::cout << sFrameCount << " / " << sFpsTimer << std::endl;
+                sFrameCount = 0;
+                sFpsTimer = 0;
+            }
         }
         gvk_result(vkDeviceWaitIdle(gvkContext.get_devices()[0]));
     } gvk_result_scope_end;
