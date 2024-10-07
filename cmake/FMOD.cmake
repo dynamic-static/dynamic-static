@@ -8,7 +8,7 @@ macro(import_fmod_target target directory)
 endmacro()
 
 if(MSVC)
-    get_filename_component(fmodApiDirectory "[HKEY_CURRENT_USER\\Software\\FMOD Studio API Windows]" ABSOLUTE CACHE)
+    cmake_host_system_information(RESULT fmodApiDirectory QUERY WINDOWS_REGISTRY "HKEY_CURRENT_USER\\Software\\FMOD Studio API Windows")
     set(fmodApiDirectory "${fmodApiDirectory}/api/")
     string(REPLACE "\\" "/" fmodApiDirectory "${fmodApiDirectory}")
 endif()
@@ -25,3 +25,11 @@ else()
     set(DST_FMOD_ENABLED OFF CACHE BOOL "" FORCE)
     set(DST_AUDIO_ENABLED OFF CACHE BOOL "" FORCE)
 endif()
+
+# TODO : Documentation
+# Create free FMOD account
+# Goto Download
+# Select [FMOD Engine "For integration of the FMOD run-time with custom engines"]
+# Default recent-stable version should be fine
+# Select platform specific download
+#   On Windows, run the installer default options should be fine, restart required

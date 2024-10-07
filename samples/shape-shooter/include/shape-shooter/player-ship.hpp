@@ -36,8 +36,6 @@ class PlayerShip
     : public Entity
 {
 public:
-    static constexpr uint32_t CooldownFrames{ 6 };
-
     PlayerShip();
 
     uint64_t get_type_id() const override final;
@@ -50,7 +48,6 @@ private:
 
     float mSpeed{ 8.0f / (1.0f / 60.0f) };
     float mCooldownTime{ 0.1f };
-    // float mCooldownTime{ 0.25f };
     float mCooldownTimer{ };
 };
 

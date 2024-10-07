@@ -30,7 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dynamic-static/image.hpp"
 #include "dynamic-static/random.hpp"
 #include "dynamic-static/state-machine.hpp"
-// #include "dynamic-static.audio/defines.hpp"
+#include "dynamic-static.audio/context.hpp"
 #include "dynamic-static.graphics/defines.hpp"
 #include "dynamic-static.graphics/primitives.hpp"
 #include "dynamic-static.graphics/sprite.hpp"

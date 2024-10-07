@@ -67,11 +67,11 @@ void PlayerShip::update()
 
         float bulletSpread = rng.range(-0.04f, 0.04f) + rng.range(-0.04f, 0.04f);
         auto bulletVelocity = from_polar(aimAngle + bulletSpread, 11.0f);
-        (void)bulletVelocity;
 
 #if 1 // Disabled to debug grid
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0, -8 } * aimRotation, bulletVelocity);
         entityManager.create_entity<Bullet>(position + glm::vec3{ 35, 0,  8 } * aimRotation, bulletVelocity);
+        context.audio.play(SoundEffect::Shot);
 #endif
     }
     mCooldownTimer -= deltaTime;

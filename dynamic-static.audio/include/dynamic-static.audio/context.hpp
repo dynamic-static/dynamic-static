@@ -24,26 +24,36 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#include "shape-shooter/context.hpp"
+#pragma once
 
-namespace shape_shooter {
+#include "dynamic-static.audio/defines.hpp"
 
-Context& Context::instance()
+#include <memory>
+
+namespace dst {
+namespace audio {
+
+class Context final
 {
-    return get_context();
-}
+public:
+    struct CreateInfo
+    {
+    };
 
-bool Context::create(const CreateInfo& createInfo, Context* pContext)
-{
-    (void)createInfo;
-    assert(pContext);
+    Context();
+    static bool create(const CreateInfo& createInfo, Context* pContext);
+    ~Context();
 
-    auto success = Audio::create(&pContext->audio);
-    if (!success) {
-        return false;
-    }
+    void update();
 
-    return true;
-}
+    void load_song();
+    uint64_t load_sound_effect(const char* pFilePath);
+    void play_sound_effect(uint64_t soundEffectId) const;
 
-} // namespace shape_shooter
+private:
+    class Impl;
+    std::unique_ptr<Impl> mupImpl;
+};
+
+} // namespace audio
+} // namespace dst

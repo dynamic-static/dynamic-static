@@ -149,10 +149,6 @@ void Grid::apply_implosive_force(float force, const glm::vec3& position, float r
 
 void Grid::apply_explosive_force(float force, const glm::vec3& position, float radius)
 {
-    (void)force;
-    (void)position;
-    (void)radius;
-    std::cout << "apply_explosive_force" << std::endl;
     for (auto& pointMass : mPointMasses) {
         auto distanceSqrd = glm::distance2(position, pointMass.position);
         if (distanceSqrd < radius * radius) {

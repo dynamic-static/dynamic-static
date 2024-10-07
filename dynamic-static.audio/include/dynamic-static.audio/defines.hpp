@@ -26,12 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "fmod.hpp"
-
 namespace dst {
 namespace audio {
-
-void test();
 
 } // namespace audio
 } // namespace dst

@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "shape-shooter/audio.hpp"
 #include "shape-shooter/defines.hpp"
 #include "shape-shooter/enemy-spawner.hpp"
 #include "shape-shooter/entity-manager.hpp"
@@ -41,7 +42,15 @@ namespace shape_shooter {
 class Context final
 {
 public:
+    struct CreateInfo
+    {
+    };
+
     static Context& instance();
+
+    Context() = default;
+    static bool create(const CreateInfo& createInfo, Context* pContext);
+
     gvk::system::Clock clock;
     glm::vec2 renderExtent{ };
     dst::RandomNumberGenerator rng;
@@ -58,13 +67,18 @@ public:
     std::pair<gvk::Buffer, gvk::DescriptorSet> gameCameraResources;
     gvk::math::Camera scoreBoardCamera;
     std::pair<gvk::Buffer, gvk::DescriptorSet> scoreBoardCameraResources;
+    Audio audio;
     Grid grid;
 
 private:
-    Context();
-
     Context(const Context&) = delete;
     Context& operator=(const Context&) = delete;
 };
+
+inline Context& get_context()
+{
+    static Context sContext;
+    return sContext;
+}
 
 } // namespace shape_shooter

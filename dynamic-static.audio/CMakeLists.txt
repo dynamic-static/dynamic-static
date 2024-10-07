@@ -14,9 +14,10 @@ dst_add_static_library(
     includeDirectories
         "${includeDirectory}"
     includeFiles
+        "${includePath}/context.hpp"
         "${includePath}/defines.hpp"
     sourceFiles
-        "${sourcePath}/placeholder.cpp"
+        "${sourcePath}/context.cpp"
 )
 
 ################################################################################

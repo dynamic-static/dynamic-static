@@ -24,19 +24,38 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
 
-#include "dynamic-static.audio/defines.hpp"
+#pragma once
 
-#include "fmod.hpp"
+#include "shape-shooter/defines.hpp"
 
-namespace dst {
-namespace audio {
+#include "dynamic-static.audio/context.hpp"
 
+namespace shape_shooter {
 
-
-void test()
+enum class SoundEffect
 {
+    Explosion,
+    Shot,
+    Spawn,
+};
 
-}
+class Audio final
+{
+public:
+    Audio() = default;
+    static bool create(Audio* pAudio);
 
-} // namespace audio
-} // namespace dst
+    void play(SoundEffect soundEffect);
+    void update();
+
+private:
+    dst::audio::Context mContext;
+    std::vector<uint64_t> mExplosionSounedEffects;
+    std::vector<uint64_t> mShotSoundEffects;
+    std::vector<uint64_t> mSpawnSoundEffects;
+
+    Audio(const Audio&) = delete;
+    Audio& operator=(const Audio&) = delete;
+};
+
+} // namespace shape_shooter

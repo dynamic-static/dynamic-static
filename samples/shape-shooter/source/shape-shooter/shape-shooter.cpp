@@ -109,6 +109,10 @@ void update_camera_uniform_buffer(const gvk::math::Camera& camera, gvk::Buffer u
 int main(int, const char*[])
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+
+        auto& shapeShooterContext = shape_shooter::Context::instance();
+        shape_shooter::Context::create({ }, &shapeShooterContext);
+
         // Create a gvk::Context.  This will initialize a VkInstance and VkDevice.
         DstSampleGvkContext gvkContext;
         gvk_result(dst_sample_create_gvk_context("dynamic-static - Shape Shooter", &gvkContext));
@@ -190,11 +194,10 @@ int main(int, const char*[])
         spriteRendererCreateInfo.renderPass = wsiManager.get_render_pass();
         spriteRendererCreateInfo.imageCount = (uint32_t)spriteImages.size();
         spriteRendererCreateInfo.pImages = spriteImages.data();
-        gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &shape_shooter::Context::instance().spriteRenderer));
+        gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &shapeShooterContext.spriteRenderer));
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
-        auto& shapeShooterContext = shape_shooter::Context::instance();
         shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
         shapeShooterContext.particleManager.resize(2048);
@@ -235,6 +238,7 @@ int main(int, const char*[])
         ///////////////////////////////////////////////////////////////////////////////
 
         float spawnInExplosionForce = 5000.0f;
+        dst::RandomNumberGenerator rng;
 
         // gvk::system::Clock clock;
         auto& clock = shapeShooterContext.clock;
@@ -242,6 +246,7 @@ int main(int, const char*[])
             !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
             !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
             gvk::system::Surface::update();
+            shapeShooterContext.audio.update();
             clock.update();
 
             auto frameStart = gvk::system::SteadyClock::now();
