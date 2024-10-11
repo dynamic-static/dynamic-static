@@ -55,7 +55,7 @@ VkResult ScoreBoard::create(const gvk::Context& gvkContext, const gvk::RenderPas
         pScoreBoard->mLivesTextMesh.set_font(pScoreBoard->mspFont);
         auto createTextMeshRenderer = [&](const auto& textMesh, auto& renderer)
         {
-            return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get_devices()[0], textMesh, pScoreBoard->mFontRenderer, &renderer);
+            return dst::gfx::Renderer<dst::text::Mesh>::create(gvkContext.get<gvk::Devices>()[0], textMesh, pScoreBoard->mFontRenderer, &renderer);
         };
         gvk_result(pScoreBoard->mScoreTextMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(createTextMeshRenderer));
         gvk_result(pScoreBoard->mHighScoreTextMesh.create_renderer<dst::gfx::Renderer<dst::text::Mesh>>(createTextMeshRenderer));

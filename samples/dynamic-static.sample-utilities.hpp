@@ -84,7 +84,7 @@ class DstSampleGvkContext final
     : public gvk::Context
 {
 public:
-    VkResult create_devices(const VkDeviceCreateInfo* pDeviceCreateInfo, const VkAllocationCallbacks* pAllocator) override final
+    VkResult create_devices(const VkDeviceCreateInfo* pDeviceCreateInfo, std::vector<gvk::Device>* pDevices) const override final
     {
         assert(pDeviceCreateInfo);
         auto deviceCreateInfo = *pDeviceCreateInfo;
@@ -109,7 +109,7 @@ public:
         deviceCreateInfo.enabledExtensionCount = (uint32_t)extensions.size();
         deviceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
-        return gvk::Context::create_devices(&deviceCreateInfo, pAllocator);
+        return gvk::Context::create_devices(&deviceCreateInfo, pDevices);
     }
 };
 
@@ -440,11 +440,11 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
         dst::Image<> stagingImage;
         if (dst::load_png(pFilePath, &stagingImage)) {
             // TODO : Documentation
-            gvk_result(gvk::create_staging_buffer(gvkContext.get_devices()[0], stagingImage.size_bytes(), pStagingBuffer));
+            gvk_result(gvk::create_staging_buffer(gvkContext.get<gvk::Devices>()[0], stagingImage.size_bytes(), pStagingBuffer));
             uint8_t* pStagingData = nullptr;
-            gvk_result(vmaMapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), pStagingBuffer->get<VmaAllocation>(), (void**)&pStagingData));
+            gvk_result(vmaMapMemory(gvkContext.get<gvk::Devices>()[0].get<VmaAllocator>(), pStagingBuffer->get<VmaAllocation>(), (void**)&pStagingData));
             memcpy(pStagingData, stagingImage.data(), stagingImage.size_bytes());
-            vmaUnmapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), pStagingBuffer->get<VmaAllocation>());
+            vmaUnmapMemory(gvkContext.get<gvk::Devices>()[0].get<VmaAllocator>(), pStagingBuffer->get<VmaAllocation>());
 
             // TODO : Documentation
             auto imageCreateInfo = gvk::get_default<VkImageCreateInfo>();
@@ -458,14 +458,13 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
             auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
             allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             gvk::Image image;
-            gvk_result(gvk::Image::create(gvkContext.get_devices()[0], &imageCreateInfo, &allocationCreateInfo, &image));
+            gvk_result(gvk::Image::create(gvkContext.get<gvk::Devices>()[0], &imageCreateInfo, &allocationCreateInfo, &image));
 
             // TODO : Documentation
-            const auto& dispatchTable = gvkContext.get_devices()[0].get<gvk::DispatchTable>();
             gvk_result(gvk::execute_immediately(
-                gvkContext.get_devices()[0],
-                gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0],
-                gvkContext.get_command_buffers()[0],
+                gvkContext.get<gvk::Devices>()[0],
+                gvk::get_queue_family(gvkContext.get<gvk::Devices>()[0], 0).queues[0],
+                gvkContext.get<gvk::CommandBuffers>()[0],
                 VK_NULL_HANDLE,
                 [&](auto)
                 {
@@ -475,8 +474,7 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
                     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
                     imageMemoryBarrier.image = image;
-                    dispatchTable.gvkCmdPipelineBarrier(
-                        gvkContext.get_command_buffers()[0],
+                    gvkContext.get<gvk::CommandBuffers>()[0].CmdPipelineBarrier(
                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                         VK_PIPELINE_STAGE_TRANSFER_BIT,
                         0,
@@ -488,14 +486,13 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
                     auto bufferImageCopy = gvk::get_default<VkBufferImageCopy>();
                     bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     bufferImageCopy.imageExtent = imageCreateInfo.extent;
-                    dispatchTable.gvkCmdCopyBufferToImage(gvkContext.get_command_buffers()[0], *pStagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
+                    gvkContext.get<gvk::CommandBuffers>()[0].CmdCopyBufferToImage(*pStagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopy);
 
                     imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                     imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
                     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
                     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    dispatchTable.gvkCmdPipelineBarrier(
-                        gvkContext.get_command_buffers()[0],
+                    gvkContext.get<gvk::CommandBuffers>()[0].CmdPipelineBarrier(
                         VK_PIPELINE_STAGE_TRANSFER_BIT,
                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                         0,
@@ -511,7 +508,7 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
             imageViewCreateInfo.image = image;
             imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
             imageViewCreateInfo.format = imageCreateInfo.format;
-            gvk_result(gvk::ImageView::create(gvkContext.get_devices()[0], &imageViewCreateInfo, nullptr, pImageView));
+            gvk_result(gvk::ImageView::create(gvkContext.get<gvk::Devices>()[0], &imageViewCreateInfo, nullptr, pImageView));
         }
     } gvk_result_scope_end;
     return gvkResult;
@@ -543,7 +540,7 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
             assert(requestedDepthFormatInfo.componentCount);
             assert(requestedDepthFormatInfo.pComponents);
             auto requestedDepthBits = requestedDepthFormatInfo.pComponents[0].bits;
-            auto physicalDevice = context.get_devices()[0].get<gvk::PhysicalDevice>();
+            auto physicalDevice = context.get<gvk::Devices>()[0].get<gvk::PhysicalDevice>();
             gvk::enumerate_formats(
                 physicalDevice.get<gvk::DispatchTable>().gvkGetPhysicalDeviceFormatProperties2,
                 physicalDevice,
@@ -579,7 +576,7 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
 
         // We do a similar validation for sampleCount...
         if (VK_SAMPLE_COUNT_1_BIT < createInfo.sampleCount) {
-            const auto& physicalDevice = context.get_devices()[0].get<gvk::PhysicalDevice>();
+            const auto& physicalDevice = context.get<gvk::Devices>()[0].get<gvk::PhysicalDevice>();
             auto maxSampleCount = gvk::get_max_framebuffer_sample_count(physicalDevice, VK_TRUE, createInfo.depthFormat != VK_FORMAT_UNDEFINED, VK_FALSE);
             createInfo.sampleCount = std::min(createInfo.sampleCount, maxSampleCount);
         }
@@ -651,21 +648,18 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
         renderPassCreateInfo.subpassCount = 1;
         renderPassCreateInfo.pSubpasses = &subpassDescription;
         gvk::RenderPass renderPass;
-        gvk_result(gvk::RenderPass::create(context.get_devices()[0], &renderPassCreateInfo, nullptr, &renderPass));
+        gvk_result(gvk::RenderPass::create(context.get<gvk::Devices>()[0], &renderPassCreateInfo, nullptr, &renderPass));
 
+        // Create gvk::RenderTarget...
         // Prepare VkFramebufferCreateInfo.  Any attachments that aren't proivded via
         //  the VkFramebufferCreateInfo pAttachments member will be automatically
         //  created by gvk::RenderTarget.  We're not creating any here explicitly, so
         //  all of the attachments are created by the gvk::RenderTarget implicitly...
-        auto framebufferCreateInfo = gvk::get_default<VkFramebufferCreateInfo>();
-        framebufferCreateInfo.renderPass = renderPass;
-        framebufferCreateInfo.width = createInfo.extent.width;
-        framebufferCreateInfo.height = createInfo.extent.height;
-
-        // Create gvk::RenderTarget...
-        auto renderTargetCreateInfo = gvk::get_default<gvk::RenderTarget::CreateInfo>();
-        renderTargetCreateInfo.pFramebufferCreateInfo = &framebufferCreateInfo;
-        gvk_result(gvk::RenderTarget::create(context.get_devices()[0], &renderTargetCreateInfo, nullptr, pRenderTarget));
+        auto renderTargetCreateInfo = gvk::get_default<VkFramebufferCreateInfo>();
+        renderTargetCreateInfo.renderPass = renderPass;
+        renderTargetCreateInfo.width = createInfo.extent.width;
+        renderTargetCreateInfo.height = createInfo.extent.height;
+        gvk_result(gvk::RenderTarget::create(context.get<gvk::Devices>()[0], &renderTargetCreateInfo, nullptr, pRenderTarget));
 
         // Transition the gvk::RenderTarget object's gvk::Image objects to the correct
         //  VkImageLayouts.  gvk::RenderTarget::get_image_memory_barrier() returns a
@@ -676,20 +670,20 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
         //  changed by something besides the associated gvk::RenderPass, your
         //  application must keep track of this.
         gvk::execute_immediately(
-            context.get_devices()[0],
-            gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
-            context.get_command_buffers()[0],
+            context.get<gvk::Devices>()[0],
+            gvk::get_queue_family(context.get<gvk::Devices>()[0], 0).queues[0],
+            context.get<gvk::CommandBuffers>()[0],
             VK_NULL_HANDLE,
             [&](auto)
             {
-                auto attachmentCount = pRenderTarget->get_framebuffer().get<gvk::ImageViews>().size();
+                auto attachmentCount = pRenderTarget->get<gvk::Framebuffer>().get<gvk::ImageViews>().size();
                 for (size_t i = 0; i < attachmentCount; ++i) {
-                    auto imageMemoryBarrier = pRenderTarget->get_image_memory_barrier((uint32_t)i);
+                    auto imageMemoryBarrier = pRenderTarget->get<VkImageMemoryBarrier>((uint32_t)i);
                     if (imageMemoryBarrier.oldLayout) {
                         imageMemoryBarrier.newLayout = imageMemoryBarrier.oldLayout;
                         imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                         vkCmdPipelineBarrier(
-                            context.get_command_buffers()[0],
+                            context.get<gvk::CommandBuffers>()[0],
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                             0,

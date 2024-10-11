@@ -154,7 +154,7 @@ VkResult SpriteRenderer::create(const gvk::Context& gvkContext, const CreateInfo
         auto samplerCreateInfo = gvk::get_default<VkSamplerCreateInfo>();
         samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &samplerCreateInfo, nullptr, &pSpriteRenderer->mSampler));
+        gvk_result(gvk::Sampler::create(gvkContext.get<gvk::Devices>()[0], &samplerCreateInfo, nullptr, &pSpriteRenderer->mSampler));
         gvk_result(pSpriteRenderer->create_pipeline(gvkContext, createInfo.renderPass));
         gvk_result(pSpriteRenderer->allocate_descriptor_set(gvkContext));
     } gvk_result_scope_end;
@@ -399,7 +399,7 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         vertexShaderModuleCreateInfo.codeSize = vertexShaderInfo.spirv.size() * sizeof(uint32_t);
         vertexShaderModuleCreateInfo.pCode = !vertexShaderInfo.spirv.empty() ? vertexShaderInfo.spirv.data() : nullptr;
         gvk::ShaderModule vertexShaderModule;
-        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &vertexShaderModuleCreateInfo, nullptr, &vertexShaderModule));
+        gvk_result(gvk::ShaderModule::create(gvkContext.get<gvk::Devices>()[0], &vertexShaderModuleCreateInfo, nullptr, &vertexShaderModule));
         auto vertexPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
         vertexPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertexPipelineShaderStageCreateInfo.module = vertexShaderModule;
@@ -408,7 +408,7 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         fragmentShaderModuleCreateInfo.codeSize = fragmentShaderInfo.spirv.size() * sizeof(uint32_t);
         fragmentShaderModuleCreateInfo.pCode = !fragmentShaderInfo.spirv.empty() ? fragmentShaderInfo.spirv.data() : nullptr;
         gvk::ShaderModule fragmentShaderModule;
-        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &fragmentShaderModuleCreateInfo, nullptr, &fragmentShaderModule));
+        gvk_result(gvk::ShaderModule::create(gvkContext.get<gvk::Devices>()[0], &fragmentShaderModuleCreateInfo, nullptr, &fragmentShaderModule));
         auto fragmentPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
         fragmentPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragmentPipelineShaderStageCreateInfo.module = fragmentShaderModule;
@@ -493,7 +493,7 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         spirvBindingInfo.descriptorSetLayoutBindings[0][1].descriptorCount = (uint32_t)mImages.size();
 
         gvk::PipelineLayout pipelineLayout;
-        gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get_devices()[0], spirvBindingInfo, nullptr, &pipelineLayout));
+        gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get<gvk::Devices>()[0], spirvBindingInfo, nullptr, &pipelineLayout));
 
         auto graphicsPipelineCreateInfo = gvk::get_default<VkGraphicsPipelineCreateInfo>();
         graphicsPipelineCreateInfo.stageCount = (uint32_t)pipelineShaderStageCreateInfos.size();
@@ -505,7 +505,7 @@ VkResult SpriteRenderer::create_pipeline(const gvk::Context& gvkContext, const g
         graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationStateCreateInfo;
         graphicsPipelineCreateInfo.layout = pipelineLayout;
         graphicsPipelineCreateInfo.renderPass = renderPass;
-        gvk_result(gvk::Pipeline::create(gvkContext.get_devices()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
+        gvk_result(gvk::Pipeline::create(gvkContext.get<gvk::Devices>()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
     } gvk_result_scope_end;
     return gvkResult;
 }

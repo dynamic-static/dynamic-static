@@ -310,39 +310,40 @@ int main(int, const char* [])
     // Create a gvk::Context.  This will initialize a VkInstance and VkDevice.
     gvk::Context gvkContext;
     dst_vk_result(dst_sample_create_gvk_context("dynamic-static - Brick Breaker", &gvkContext));
-    auto gvkDevice = gvkContext.get_devices()[0];
+    auto gvkDevice = gvkContext.get<gvk::Devices>()[0];
     auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
 
     // Create a gvk::system::Surface.  This is used to control a system window.
     auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
-    systemSurfaceCreateInfo.pTitle = gvkContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
+    systemSurfaceCreateInfo.pTitle = gvkContext.get<gvk::Instance>().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
     systemSurfaceCreateInfo.extent = { 1280, 720 };
-    gvk::system::Surface systemSurface;
-    auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
-    (void)success;
-    assert(success);
+    gvk::system::Surface gvkSystemSurface = gvk::nullref;
+    dst_vk_result((VkResult)gvk::system::Surface::create(&systemSurfaceCreateInfo, &gvkSystemSurface));
+
+    // Create a gvk::SurfaceKHR
+    auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
+    win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
+    win32SurfaceCreateInfo.hwnd = gvkSystemSurface.get<gvk::system::Surface::PlatformInfo>().hwnd;
+    gvk::SurfaceKHR gvkSurface = VK_NULL_HANDLE;
+    dst_vk_result(gvk::SurfaceKHR::create(gvkContext.get<gvk::Instance>(), &win32SurfaceCreateInfo, nullptr, &gvkSurface));
 
     // Create a gvk::WsiManager.  This is used to manage a connection between the
     //  Vulkan context and the system window.
-    auto wsiManagerCreateInfo = gvk::get_default<gvk::WsiManager::CreateInfo>();
-    auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
-    win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
-    win32SurfaceCreateInfo.hwnd = (HWND)systemSurface.get_hwnd();
-    wsiManagerCreateInfo.pWin32SurfaceCreateInfoKHR = &win32SurfaceCreateInfo;
-    wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
-    wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
-    wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-    wsiManagerCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
-    gvk::WsiManager wsiManager;
-    dst_vk_result(gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager));
+    auto wsiContextCreateInfo = gvk::get_default<gvk::wsi::Context::CreateInfo>();
+    wsiContextCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
+    wsiContextCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
+    wsiContextCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+    wsiContextCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
+    gvk::wsi::Context wsiContext = gvk::nullref;
+    dst_vk_result(gvk::wsi::Context::create(gvkDevice, gvkSurface, &wsiContextCreateInfo, nullptr, &wsiContext));
 
     // Create two Pipelines.  These are identical except for the VkPolygonMode.
     //  polygonPipeline is used normally.  The wireframePipeline can be toggled for
     //  debugging.
     gvk::Pipeline polygonPipeline;
-    dst_vk_result(create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_FILL, &polygonPipeline));
+    dst_vk_result(create_pipeline(wsiContext.get<gvk::RenderPass>(), VK_POLYGON_MODE_FILL, &polygonPipeline));
     gvk::Pipeline wireframePipeline;
-    dst_vk_result(create_pipeline(wsiManager.get_render_pass(), VK_POLYGON_MODE_LINE, &wireframePipeline));
+    dst_vk_result(create_pipeline(wsiContext.get<gvk::RenderPass>(), VK_POLYGON_MODE_LINE, &wireframePipeline));
     auto pipeline = polygonPipeline;
 
     // Create a DescriptorPool.  This DescriptorPool provides 1000 uniform Buffer
@@ -358,7 +359,7 @@ int main(int, const char* [])
     descriptorPoolCreateInfo.poolSizeCount = 1;
     descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
     gvk::DescriptorPool descriptorPool;
-    dst_vk_result(gvk::DescriptorPool::create(gvkContext.get_devices()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+    dst_vk_result(gvk::DescriptorPool::create(gvkContext.get<gvk::Devices>()[0], &descriptorPoolCreateInfo, nullptr, &descriptorPool));
 
     // Get the DescriptorSetLayouts from the Pipeline.  There should be two...
     //      `layout(set = 0, binding = 0) uniform CameraUniforms`
@@ -400,7 +401,7 @@ int main(int, const char* [])
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &cameraDescriptorSetLayout.get<VkDescriptorSetLayout>();
     gvk::DescriptorSet cameraDescriptorSet;
-    dst_vk_result(gvk::DescriptorSet::allocate(gvkContext.get_devices()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet));
+    dst_vk_result(gvk::DescriptorSet::allocate(gvkContext.get<gvk::Devices>()[0], &descriptorSetAllocateInfo, &cameraDescriptorSet));
 
     // Update the Camera's DescriptorSet to reference the Camera's uniform Buffer.
     auto descriptorBufferInfo = gvk::get_default<VkDescriptorBufferInfo>();
@@ -410,7 +411,7 @@ int main(int, const char* [])
     writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     writeDescriptorSet.dstSet = cameraDescriptorSet;
     writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-    vkUpdateDescriptorSets(gvkContext.get_devices()[0], 1, &writeDescriptorSet, 0, nullptr);
+    vkUpdateDescriptorSets(gvkContext.get<gvk::Devices>()[0], 1, &writeDescriptorSet, 0, nullptr);
 
     // Create the play field made up of the side and top barriers that the player
     //  sees.
@@ -437,7 +438,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = PlayFieldBarrierRestitution;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(PlayFieldBarrierPositions[i]);
-        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &playFieldBarriers[i]);
+        gameObjectFactory.create_game_object(gvkContext.get<gvk::CommandBuffers>()[0], gameObjectCreateInfo, &playFieldBarriers[i]);
         physicsWorld.make_static(playFieldBarriers[i].rigidBody);
     }
 
@@ -469,7 +470,7 @@ int main(int, const char* [])
         GameObject::CreateInfo gameObjectCreateInfo { };
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(ContainerBarrierPositions[i]);
-        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &containerBarriers[i]);
+        gameObjectFactory.create_game_object(gvkContext.get<gvk::CommandBuffers>()[0], gameObjectCreateInfo, &containerBarriers[i]);
         physicsWorld.make_static(containerBarriers[i].rigidBody);
     }
 
@@ -516,7 +517,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
         gameObjectCreateInfo.rigidBodyCreateInfo.mass = BrickMass;
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BrickPositions[i]);
-        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &bricks[i]);
+        gameObjectFactory.create_game_object(gvkContext.get<gvk::CommandBuffers>()[0], gameObjectCreateInfo, &bricks[i]);
         bricks[i].color = BrickRowColors[i / BrickColumCount];
         physicsWorld.make_static(bricks[i].rigidBody);
         liveBricks.insert(&bricks[i]);
@@ -550,7 +551,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.material.restitution = BallRestitution;
         gameObjectCreateInfo.rigidBodyCreateInfo.linearFactor = { 1, 1, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin(BallPositions[i]);
-        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &balls[i]);
+        gameObjectFactory.create_game_object(gvkContext.get<gvk::CommandBuffers>()[0], gameObjectCreateInfo, &balls[i]);
         balls[i].color = gvk::math::Color::SlateGray;
     }
 
@@ -572,7 +573,7 @@ int main(int, const char* [])
         gameObjectCreateInfo.rigidBodyCreateInfo.angularFactor = { 0, 0, 0 };
         gameObjectCreateInfo.rigidBodyCreateInfo.initialTransform.setOrigin({ 0, -PlayFieldHeight * 0.5f + PaddleHeight * 4, 0 });
         gameObjectCreateInfo.pBoxCreateInfo = &gameObjectBoxCreateInfo;
-        gameObjectFactory.create_game_object(gvkContext.get_command_buffers()[0], gameObjectCreateInfo, &paddle);
+        gameObjectFactory.create_game_object(gvkContext.get<gvk::CommandBuffers>()[0], gameObjectCreateInfo, &paddle);
         paddle.color = gvk::math::Color::Brown;
         physicsWorld.make_dynamic(paddle.rigidBody);
     }
@@ -586,8 +587,8 @@ int main(int, const char* [])
 
     // Loop until the user presses [Esc] or closes the app window.
     while (
-        !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
-        !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
+        !(gvkSystemSurface.get<gvk::system::Input>().keyboard.down(gvk::system::Key::Escape)) &&
+        !(gvkSystemSurface.get<gvk::system::Surface::StatusFlags>() & gvk::system::Surface::CloseRequested)) {
 
         // Update the Clock and get the time (in seconds, represented as a float)
         //  elapsed since the last call to clock.update().
@@ -598,7 +599,7 @@ int main(int, const char* [])
         //  gvk::system::Surface objects to process window/input events.  Get a
         //  reference to the Surface's Input object.
         gvk::system::Surface::update();
-        const auto& input = systemSurface.get_input();
+        const auto& input = gvkSystemSurface.get<gvk::system::Input>();
 
         // If the user pressed [~], toggle polygon/wireframe rendering
         if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
@@ -805,24 +806,25 @@ int main(int, const char* [])
         physicsWorld.update(deltaTime);
 
         // Update GameObject uniform buffers
-        paddle.update_uniform_buffer(gvkContext.get_devices()[0]);
+        paddle.update_uniform_buffer(gvkContext.get<gvk::Devices>()[0]);
         for (const auto& wall : playFieldBarriers) {
-            wall.update_uniform_buffer(gvkContext.get_devices()[0]);
+            wall.update_uniform_buffer(gvkContext.get<gvk::Devices>()[0]);
         }
         for (const auto& brick : bricks) {
-            brick.update_uniform_buffer(gvkContext.get_devices()[0]);
+            brick.update_uniform_buffer(gvkContext.get<gvk::Devices>()[0]);
         }
         for (const auto& ball : balls) {
-            ball.update_uniform_buffer(gvkContext.get_devices()[0]);
+            ball.update_uniform_buffer(gvkContext.get<gvk::Devices>()[0]);
         }
 
         // If wireframe (debug) mode is enabled, update the container uniform buffers.
         if (pipeline == wireframePipeline) {
             for (const auto& containerBarrier : containerBarriers) {
-                containerBarrier.update_uniform_buffer(gvkContext.get_devices()[0]);
+                containerBarrier.update_uniform_buffer(gvkContext.get<gvk::Devices>()[0]);
             }
         }
 
+#if 0
         // Call wsiManager.update().  This will cause WsiManager to respond to system
         //  updates for the SurfaceKHR it's managing.  This call may cause resources to
         //  be created/destroyed.  If there's a valid SwapchainKHR, render and present.
@@ -833,13 +835,24 @@ int main(int, const char* [])
             //  Camera's uniform buffer
             auto extent = wsiManager.get_swapchain().get<VkSwapchainCreateInfoKHR>().imageExtent;
             camera.set_aspect_ratio(extent.width, extent.height);
+#else
+        // TODO : Documentation
+        gvk::wsi::AcquiredImageInfo acquiredImageInfo{ };
+        gvk::RenderTarget acquiredImageRenderTarget{ };
+        auto wsiStatus = wsiContext.acquire_next_image(UINT64_MAX, VK_NULL_HANDLE, &acquiredImageInfo, &acquiredImageRenderTarget);
+        if (wsiStatus == VK_SUCCESS || wsiStatus == VK_SUBOPTIMAL_KHR) {
+            auto extent = wsiContext.get<gvk::SwapchainKHR>().get<VkSwapchainCreateInfoKHR>().imageExtent;
+            camera.set_aspect_ratio(extent.width, extent.height);
+#endif
+
             CameraUniforms cameraUbo { };
             cameraUbo.view = camera.view();
             cameraUbo.projection = camera.projection();
             VmaAllocationInfo allocationInfo { };
-            vmaGetAllocationInfo(gvkContext.get_devices()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
+            vmaGetAllocationInfo(gvkContext.get<gvk::Devices>()[0].get<VmaAllocator>(), cameraUniformBuffer.get<VmaAllocation>(), &allocationInfo);
             memcpy(allocationInfo.pMappedData, &cameraUbo, sizeof(CameraUniforms));
 
+#if 0
             // Acquire the next Image to render to.  The index will be used to access the
             //  acquired Image as well as the CommandBuffer and Fence associated with that
             //  Image.  Note that this method may return VK_SUBOPTIMAL_KHR when the window
@@ -856,64 +869,63 @@ int main(int, const char* [])
             const auto& vkFences = wsiManager.get_vk_fences();
             dst_vk_result(vkWaitForFences(gvkDevice, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX));
             dst_vk_result(vkResetFences(gvkDevice, 1, &vkFences[imageIndex]));
+#endif
 
             // Begin CommandBuffer recording and begin a RenderPass.
-            const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
-            dst_vk_result(vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
-            auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
-            vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            dst_vk_result(vkBeginCommandBuffer(acquiredImageInfo.commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
+            const auto& renderPassBeginInfo = acquiredImageRenderTarget.get<VkRenderPassBeginInfo>();
+            vkCmdBeginRenderPass(acquiredImageInfo.commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
             // Set the scissor and viewport to match the renderPassBeginInfo.renderArea
-            VkRect2D scissor { .extent = renderPassBeginInfo.renderArea.extent };
-            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-            VkViewport viewport { .width = (float)scissor.extent.width, .height = (float)scissor.extent.height, .minDepth = 0, .maxDepth = 1 };
-            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+            VkRect2D scissor{ { }, renderPassBeginInfo.renderArea.extent };
+            vkCmdSetScissor(acquiredImageInfo.commandBuffer, 0, 1, &scissor);
+            VkViewport viewport{ 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
+            vkCmdSetViewport(acquiredImageInfo.commandBuffer, 0, 1, &viewport);
 
             // Bind the current Pipeline
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdBindPipeline(acquiredImageInfo.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
             // Bind the Camera's DescriptorSet.  Since all objects are being drawn with the
             //  same Camera this binding will be used for all subsequent draw calls in this
             //  RenderPass.
             const auto& pipelineLayout = pipeline.get<gvk::PipelineLayout>();
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+            vkCmdBindDescriptorSets(acquiredImageInfo.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
 
             // Record draw calls for all of the GameObjects.
-            paddle.record_draw_cmds(commandBuffer, pipelineLayout);
+            paddle.record_draw_cmds(acquiredImageInfo.commandBuffer, pipelineLayout);
             for (const auto& playFieldBarrier : playFieldBarriers) {
-                playFieldBarrier.record_draw_cmds(commandBuffer, pipelineLayout);
+                playFieldBarrier.record_draw_cmds(acquiredImageInfo.commandBuffer, pipelineLayout);
             }
             for (const auto& brick : bricks) {
-                brick.record_draw_cmds(commandBuffer, pipelineLayout);
+                brick.record_draw_cmds(acquiredImageInfo.commandBuffer, pipelineLayout);
             }
             for (const auto& ball : balls) {
-                ball.record_draw_cmds(commandBuffer, pipelineLayout);
+                ball.record_draw_cmds(acquiredImageInfo.commandBuffer, pipelineLayout);
             }
 
             // If wireframe (debug) mode is enabled, draw the container.
             if (pipeline == wireframePipeline) {
                 for (const auto& containerBarrier : containerBarriers) {
-                    containerBarrier.record_draw_cmds(commandBuffer, pipelineLayout);
+                    containerBarrier.record_draw_cmds(acquiredImageInfo.commandBuffer, pipelineLayout);
                 }
             }
 
             // End the RenderPass and CommandBuffer.
-            vkCmdEndRenderPass(commandBuffer);
-            dst_vk_result(vkEndCommandBuffer(commandBuffer));
+            vkCmdEndRenderPass(acquiredImageInfo.commandBuffer);
+            dst_vk_result(vkEndCommandBuffer(acquiredImageInfo.commandBuffer));
 
             // Submit the CommandBuffer for execution on the GPU.
-            auto submitInfo = wsiManager.get_submit_info(imageIndex);
-            dst_vk_result(vkQueueSubmit(gvkQueue, 1, &submitInfo, vkFences[imageIndex]));
+            const auto& queue = gvk::get_queue_family(gvkContext.get<gvk::Devices>()[0], 0).queues[0];
+            dst_vk_result(vkQueueSubmit(queue, 1, &wsiContext.get<VkSubmitInfo>(acquiredImageInfo), acquiredImageInfo.fence));
 
             // Present the SwapchainKHR Image that was drawn into.
-            auto presentInfo = wsiManager.get_present_info(&imageIndex);
-            vkResult = vkQueuePresentKHR(gvkQueue, &presentInfo);
-            assert(vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR);
+            wsiStatus = wsiContext.queue_present(queue, &acquiredImageInfo);
+            dst_vk_result((wsiStatus == VK_SUBOPTIMAL_KHR || wsiStatus == VK_ERROR_OUT_OF_DATE_KHR) ? VK_SUCCESS : wsiStatus);
         }
     }
 
     // Wait for the GPU to be idle before allowing graphics destructors to run.
-    dst_vk_result(vkDeviceWaitIdle(gvkContext.get_devices()[0]));
+    dst_vk_result(vkDeviceWaitIdle(gvkContext.get<gvk::Devices>()[0]));
 
     // Reset the dst::physics::World before allowing physics destructors to run.
     physicsWorld.reset();

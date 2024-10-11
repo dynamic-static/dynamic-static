@@ -131,7 +131,7 @@ VkResult Renderer<dst::text::Font>::create(const gvk::Context& context, const gv
     assert(pRenderer);
     return dvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         dvk_result(pRenderer->create_pipline(renderPass, font));
-        dvk_result(gvk::Sampler::create(context.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pRenderer->mSampler));
+        dvk_result(gvk::Sampler::create(context.get<gvk::Devices>()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pRenderer->mSampler));
         dvk_result(pRenderer->create_image_views(context, font));
         dvk_result(pRenderer->allocate_descriptor_set());
         pRenderer->update_descriptor_set();
@@ -333,7 +333,7 @@ VkResult Renderer<dst::text::Font>::create_pipline(const gvk::RenderPass& render
 VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Context& context, const dst::text::Font& font)
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
-        const auto& device = context.get_devices()[0];
+        const auto& device = context.get<gvk::Devices>()[0];
         gvk_result(gvk::Sampler::create(device, &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &mSampler));
         gvk::Buffer stagingBuffer;
         mImageViews.reserve(font.get_atlas().pages.size());
@@ -366,8 +366,8 @@ VkResult Renderer<dst::text::Font>::create_image_views(const gvk::Context& conte
             // TODO : Documentation
             gvk_result(gvk::execute_immediately(
                 device,
-                gvk::get_queue_family(context.get_devices()[0], 0).queues[0],
-                context.get_command_buffers()[0],
+                gvk::get_queue_family(context.get<gvk::Devices>()[0], 0).queues[0],
+                context.get<gvk::CommandBuffers>()[0],
                 VK_NULL_HANDLE,
                 [&](const auto& commandBuffer)
                 {
@@ -449,7 +449,11 @@ void Renderer<dst::text::Font>::update_descriptor_set()
     writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writeDescriptorSet.pImageInfo = &descriptorImageInfo;
     const auto& device = mPipeline.get<gvk::Device>();
+#if 0
     device.get<gvk::DispatchTable>().gvkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+#else
+    device.UpdateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+#endif
 }
 
 VkResult Renderer<dst::text::Mesh>::create(const gvk::Device& device, const dst::text::Mesh& textMesh, const Renderer<dst::text::Font>& fontRenderer, Renderer<dst::text::Mesh>* pRenderer)

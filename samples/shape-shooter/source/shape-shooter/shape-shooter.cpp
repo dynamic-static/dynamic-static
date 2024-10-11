@@ -116,39 +116,40 @@ int main(int, const char*[])
         // Create a gvk::Context.  This will initialize a VkInstance and VkDevice.
         DstSampleGvkContext gvkContext;
         gvk_result(dst_sample_create_gvk_context("dynamic-static - Shape Shooter", &gvkContext));
-        auto gvkDevice = gvkContext.get_devices()[0];
+        auto gvkDevice = gvkContext.get<gvk::Devices>()[0];
         auto gvkQueue = gvk::get_queue_family(gvkDevice, 0).queues[0];
 
         // Create a gvk::system::Surface.  This is used to control a system window.
         auto systemSurfaceCreateInfo = gvk::get_default<gvk::system::Surface::CreateInfo>();
-        systemSurfaceCreateInfo.pTitle = gvkContext.get_instance().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
+        systemSurfaceCreateInfo.pTitle = gvkContext.get<gvk::Instance>().get<VkInstanceCreateInfo>().pApplicationInfo->pApplicationName;
         systemSurfaceCreateInfo.extent = { 1280, 720 };
-        gvk::system::Surface systemSurface;
-        auto success = gvk::system::Surface::create(&systemSurfaceCreateInfo, &systemSurface);
-        (void)success;
-        assert(success);
+        gvk::system::Surface gvkSystemSurface = gvk::nullref;
+        dst_vk_result((VkResult)gvk::system::Surface::create(&systemSurfaceCreateInfo, &gvkSystemSurface));
+
+        // Create a gvk::SurfaceKHR
+        auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
+        win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
+        win32SurfaceCreateInfo.hwnd = gvkSystemSurface.get<gvk::system::Surface::PlatformInfo>().hwnd;
+        gvk::SurfaceKHR gvkSurface = VK_NULL_HANDLE;
+        dst_vk_result(gvk::SurfaceKHR::create(gvkContext.get<gvk::Instance>(), &win32SurfaceCreateInfo, nullptr, &gvkSurface));
 
         // Create a gvk::WsiManager.  This is used to manage a connection between the
         //  Vulkan context and the system window.
-        auto wsiManagerCreateInfo = gvk::get_default<gvk::WsiManager::CreateInfo>();
-        auto win32SurfaceCreateInfo = gvk::get_default<VkWin32SurfaceCreateInfoKHR>();
-        win32SurfaceCreateInfo.hinstance = GetModuleHandle(NULL);
-        win32SurfaceCreateInfo.hwnd = (HWND)systemSurface.get_hwnd();
-        wsiManagerCreateInfo.pWin32SurfaceCreateInfoKHR = &win32SurfaceCreateInfo;
-        wsiManagerCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
-        wsiManagerCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
-        wsiManagerCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR; // VK_PRESENT_MODE_MAILBOX_KHR;
-        wsiManagerCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
-        gvk::WsiManager wsiManager;
-        gvk_result(gvk::WsiManager::create(gvkDevice, &wsiManagerCreateInfo, nullptr, &wsiManager));
+        auto wsiContextCreateInfo = gvk::get_default<gvk::wsi::Context::CreateInfo>();
+        wsiContextCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
+        wsiContextCreateInfo.depthFormat = VK_FORMAT_D32_SFLOAT;
+        wsiContextCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+        wsiContextCreateInfo.queueFamilyIndex = gvkQueue.get<VkDeviceQueueCreateInfo>().queueFamilyIndex;
+        gvk::wsi::Context wsiContext = gvk::nullref;
+        dst_vk_result(gvk::wsi::Context::create(gvkDevice, gvkSurface, &wsiContextCreateInfo, nullptr, &wsiContext));
 
         // Create a gvk::gui::Renderer
         gvk::gui::Renderer guiRenderer;
         gvk_result(gvk::gui::Renderer::create(
-            gvkContext.get_devices()[0],
-            gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0],
-            gvkContext.get_command_buffers()[0],
-            wsiManager.get_render_pass(),
+            gvkContext.get<gvk::Devices>()[0],
+            gvk::get_queue_family(gvkContext.get<gvk::Devices>()[0], 0).queues[0],
+            gvkContext.get<gvk::CommandBuffers>()[0],
+            wsiContext.get<gvk::RenderPass>(),
             nullptr,
             &guiRenderer
         ));
@@ -157,18 +158,19 @@ int main(int, const char*[])
         //  this gvk::RenderTarget and the gvk::WsiManager gvk::RenderTarget objects
         //  using the same gvk::Pipeline objects so the gvk::RenderPass objects need to
         //  be compatible...
+        auto wsiContextInfo = wsiContext.get<gvk::wsi::Context::Info>();
         DstSampleRenderTargetCreateInfo renderTargetCreateInfo{ };
         renderTargetCreateInfo.extent = { 1024, 1024 };
-        renderTargetCreateInfo.sampleCount = wsiManager.get_sample_count();
-        renderTargetCreateInfo.colorFormat = wsiManager.get_color_format();
-        renderTargetCreateInfo.depthFormat = wsiManager.get_depth_format();
+        renderTargetCreateInfo.sampleCount = wsiContextInfo.sampleCount;
+        renderTargetCreateInfo.colorFormat = wsiContextInfo.surfaceFormat.format;
+        renderTargetCreateInfo.depthFormat = wsiContextInfo.depthFormat;
         gvk::RenderTarget renderTarget;
         gvk_result(dst_sample_create_render_target(gvkContext, renderTargetCreateInfo, &renderTarget));
 
         // Create the gvk::Sampler that we'll use when we bind the gvk::RenderTarget
         //  color attachment as a shader resource...
         gvk::Sampler sampler;
-        gvk_result(gvk::Sampler::create(gvkContext.get_devices()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &sampler));
+        gvk_result(gvk::Sampler::create(gvkContext.get<gvk::Devices>()[0], &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &sampler));
 
         // These variables will be controlled via gui widgets
         bool showGui = false;
@@ -177,7 +179,7 @@ int main(int, const char*[])
         ///////////////////////////////////////////////////////////////////////////////
         // CoordinateRenderer
         dst::gfx::CoordinateRenderer::CreateInfo coordinateRendererCreateInfo{ };
-        coordinateRendererCreateInfo.renderPass = wsiManager.get_render_pass();
+        coordinateRendererCreateInfo.renderPass = wsiContext.get<gvk::RenderPass>();
         coordinateRendererCreateInfo.pTtfFilePath = "C:\\Windows\\Fonts\\bauhs93.ttf";
         dst::gfx::CoordinateRenderer coordinateRenderer;
         gvk_result(dst::gfx::CoordinateRenderer::create(gvkContext, coordinateRendererCreateInfo, &coordinateRenderer));
@@ -191,14 +193,14 @@ int main(int, const char*[])
             gvk_result(dst_sample_load_image(gvkContext, shape_shooter::SpriteFilePaths[i], &spriteStagingBuffer, &spriteImages[i]));
         }
         dst::gfx::SpriteRenderer::CreateInfo spriteRendererCreateInfo { };
-        spriteRendererCreateInfo.renderPass = wsiManager.get_render_pass();
+        spriteRendererCreateInfo.renderPass = wsiContext.get<gvk::RenderPass>();
         spriteRendererCreateInfo.imageCount = (uint32_t)spriteImages.size();
         spriteRendererCreateInfo.pImages = spriteImages.data();
         gvk_result(dst::gfx::SpriteRenderer::create(gvkContext, spriteRendererCreateInfo, &shapeShooterContext.spriteRenderer));
         auto spriteColor = gvk::math::Color::White;
         ///////////////////////////////////////////////////////////////////////////////
 
-        shape_shooter::ScoreBoard::create(gvkContext, wsiManager.get_render_pass(), &shapeShooterContext.scoreBoard);
+        shape_shooter::ScoreBoard::create(gvkContext, wsiContext.get<gvk::RenderPass>(), &shapeShooterContext.scoreBoard);
         shapeShooterContext.pPlayerShip = shapeShooterContext.entityManager.create_entity<shape_shooter::PlayerShip>();
         shapeShooterContext.particleManager.resize(2048);
 
@@ -220,7 +222,7 @@ int main(int, const char*[])
         cameraDescriptorPoolCreateInfo.poolSizeCount = 1;
         cameraDescriptorPoolCreateInfo.pPoolSizes = &cameraDescriptorPoolSize;
         gvk::DescriptorPool cameraDescriptorPool;
-        gvk_result(gvk::DescriptorPool::create(gvkContext.get_devices()[0], &cameraDescriptorPoolCreateInfo, nullptr, &cameraDescriptorPool));
+        gvk_result(gvk::DescriptorPool::create(gvkContext.get<gvk::Devices>()[0], &cameraDescriptorPoolCreateInfo, nullptr, &cameraDescriptorPool));
 
         const auto& fontRendererPipeline = shapeShooterContext.scoreBoard.get_font_renderer().get_pipeline();
         const auto& fontRendererPipelineLayout = fontRendererPipeline.get<gvk::PipelineLayout>();
@@ -234,7 +236,7 @@ int main(int, const char*[])
         shape_shooter::Grid::CreateInfo gridCreateInfo{ };
         gridCreateInfo.extent = { 1920, 1080 };
         gridCreateInfo.cells = { 64, 32 };
-        gvk_result(shape_shooter::Grid::create(gvkContext, wsiManager.get_render_pass(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
+        gvk_result(shape_shooter::Grid::create(gvkContext, wsiContext.get<gvk::RenderPass>(), &gridCreateInfo, &shape_shooter::Context::instance().grid));
         ///////////////////////////////////////////////////////////////////////////////
 
         float spawnInExplosionForce = 5000.0f;
@@ -243,8 +245,8 @@ int main(int, const char*[])
         // gvk::system::Clock clock;
         auto& clock = shapeShooterContext.clock;
         while (
-            !(systemSurface.get_input().keyboard.down(gvk::system::Key::Escape)) &&
-            !(systemSurface.get_status() & gvk::system::Surface::CloseRequested)) {
+            !(gvkSystemSurface.get<gvk::system::Input>().keyboard.down(gvk::system::Key::Escape)) &&
+            !(gvkSystemSurface.get<gvk::system::Surface::StatusFlags>() & gvk::system::Surface::CloseRequested)) {
             gvk::system::Surface::update();
             shapeShooterContext.audio.update();
             clock.update();
@@ -253,7 +255,7 @@ int main(int, const char*[])
 
             // Update the gvk::math::FreeCameraController...
             auto deltaTime = clock.elapsed<gvk::system::Seconds<float>>();
-            const auto& input = systemSurface.get_input();
+            const auto& input = gvkSystemSurface.get<gvk::system::Input>();
 
             // Toggle the gui display with [`]
             if (input.keyboard.pressed(gvk::system::Key::OEM_Tilde)) {
@@ -276,9 +278,9 @@ int main(int, const char*[])
                 };
                 cameraController.lookEnabled = input.mouse.buttons.down(gvk::system::Mouse::Button::Left);
                 if (cameraController.lookEnabled) {
-                    systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Hidden);
+                    gvkSystemSurface.set(gvk::system::Surface::CursorMode::Hidden);
                 } else {
-                    systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Visible);
+                    gvkSystemSurface.set(gvk::system::Surface::CursorMode::Visible);
                 }
                 if (input.mouse.buttons.pressed(gvk::system::Mouse::Button::Right)) {
                     shapeShooterContext.gameCamera.fieldOfView = 60.0f;
@@ -358,6 +360,7 @@ int main(int, const char*[])
             shape_shooter::Context::instance().grid.update(deltaTime);
             ///////////////////////////////////////////////////////////////////////////////
 
+#if 0
             wsiManager.update();
             auto swapchain = wsiManager.get_swapchain();
             if (swapchain) {
@@ -373,36 +376,46 @@ int main(int, const char*[])
                 //  VkFences to ensure that it doesn't destroy any resources that are still in
                 //  use by the WsiManager
                 const auto& vkFences = wsiManager.get_vk_fences();
+#else
+            gvk::wsi::AcquiredImageInfo acquiredImageInfo{ };
+            gvk::RenderTarget acquiredImageRenderTarget = VK_NULL_HANDLE;
+            auto wsiStatus = wsiContext.acquire_next_image(UINT64_MAX, VK_NULL_HANDLE, &acquiredImageInfo, &acquiredImageRenderTarget);
+            if (wsiStatus == VK_SUCCESS || wsiStatus == VK_SUBOPTIMAL_KHR) {
+                const auto& device = gvkContext.get<gvk::Devices>()[0];
+                auto extent = wsiContext.get<gvk::SwapchainKHR>().get<VkSwapchainCreateInfoKHR>().imageExtent;
+                shapeShooterContext.gameCamera.set_aspect_ratio(extent.width, extent.height);
+                shapeShooterContext.renderExtent = { extent.width, extent.height };
+#endif
 
                 // If the gvk::gui::Renderer is enabled, update values based on gui interaction
                 if (showGui) {
                     // Update the gvk::system::Surface::CursorMode mode based on gui interaction
                     auto imguiCursor = ImGui::GetMouseCursor();
                     if (imguiCursor == ImGuiMouseCursor_None || ImGui::GetIO().MouseDrawCursor) {
-                        systemSurface.set_cursor_mode(gvk::system::Surface::CursorMode::Hidden);
+                        gvkSystemSurface.set(gvk::system::Surface::CursorMode::Hidden);
                     } else {
                         switch (imguiCursor) {
-                        case ImGuiMouseCursor_Arrow: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Arrow); break;
-                        case ImGuiMouseCursor_TextInput: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::IBeam); break;
-                        case ImGuiMouseCursor_Hand: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::Hand); break;
-                        case ImGuiMouseCursor_ResizeNS: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNS); break;
-                        case ImGuiMouseCursor_ResizeEW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeEW); break;
-                        case ImGuiMouseCursor_ResizeAll: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeAll); break;
-                        case ImGuiMouseCursor_ResizeNESW: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNESW); break;
-                        case ImGuiMouseCursor_ResizeNWSE: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::ResizeNWSE); break;
-                        case ImGuiMouseCursor_NotAllowed: systemSurface.set_cursor_type(gvk::system::Surface::CursorType::NotAllowed); break;
+                        case ImGuiMouseCursor_Arrow: gvkSystemSurface.set(gvk::system::Surface::CursorType::Arrow); break;
+                        case ImGuiMouseCursor_TextInput: gvkSystemSurface.set(gvk::system::Surface::CursorType::IBeam); break;
+                        case ImGuiMouseCursor_Hand: gvkSystemSurface.set(gvk::system::Surface::CursorType::Hand); break;
+                        case ImGuiMouseCursor_ResizeNS: gvkSystemSurface.set(gvk::system::Surface::CursorType::ResizeNS); break;
+                        case ImGuiMouseCursor_ResizeEW: gvkSystemSurface.set(gvk::system::Surface::CursorType::ResizeEW); break;
+                        case ImGuiMouseCursor_ResizeAll: gvkSystemSurface.set(gvk::system::Surface::CursorType::ResizeAll); break;
+                        case ImGuiMouseCursor_ResizeNESW: gvkSystemSurface.set(gvk::system::Surface::CursorType::ResizeNESW); break;
+                        case ImGuiMouseCursor_ResizeNWSE: gvkSystemSurface.set(gvk::system::Surface::CursorType::ResizeNWSE); break;
+                        case ImGuiMouseCursor_NotAllowed: gvkSystemSurface.set(gvk::system::Surface::CursorType::NotAllowed); break;
                         default: break;
                         }
                     }
-                    if (systemSurface.get_status() & gvk::system::Surface::GainedFocus) {
+                    if (gvkSystemSurface.get<gvk::system::Surface::StatusFlags>() & gvk::system::Surface::GainedFocus) {
                         ImGui::GetIO().AddFocusEvent(true);
                     }
-                    if (systemSurface.get_status() & gvk::system::Surface::LostFocus) {
+                    if (gvkSystemSurface.get<gvk::system::Surface::StatusFlags>() & gvk::system::Surface::LostFocus) {
                         ImGui::GetIO().AddFocusEvent(false);
                     }
 
                     // Prepare a gvk::gui::Renderer::BeginInfo
-                    const auto& textStream = systemSurface.get_text_stream();
+                    const auto& textStream = gvkSystemSurface.get<gvk::system::Surface::TextStream>();
                     auto guiRendererBeginInfo = gvk::get_default<gvk::gui::Renderer::BeginInfo>();
                     guiRendererBeginInfo.deltaTime = deltaTime;
                     guiRendererBeginInfo.extent = { (float)extent.width, (float)extent.height };
@@ -418,24 +431,25 @@ int main(int, const char*[])
 #endif
                     ImGui::DragFloat("spawnInExplosionForce", &spawnInExplosionForce);
                     shape_shooter::Context::instance().grid.draw_gui();
-                    guiRenderer.end_gui((uint32_t)vkFences.size(), !vkFences.empty() ? vkFences.data() : nullptr);
+                    guiRenderer.end_gui(acquiredImageInfo.index);
                 }
 
-                const auto& device = gvkContext.get_devices()[0];
+#if 0
+                const auto& device = gvkContext.get<gvk::Devices>()[0];
                 gvk_result(vkWaitForFences(device, 1, &vkFences[imageIndex], VK_TRUE, UINT64_MAX));
                 gvk_result(vkResetFences(device, 1, &vkFences[imageIndex]));
+#endif
 
-                const auto& commandBuffer = wsiManager.get_command_buffers()[imageIndex];
-                gvk_result(vkBeginCommandBuffer(commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
+                gvk_result(vkBeginCommandBuffer(acquiredImageInfo.commandBuffer, &gvk::get_default<VkCommandBufferBeginInfo>()));
 
                 // Begin the gvk::RenderPass that renders into the gvk::WsiManager...
-                auto renderPassBeginInfo = wsiManager.get_render_targets()[imageIndex].get_render_pass_begin_info();
-                vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+                auto renderPassBeginInfo = acquiredImageRenderTarget.get<VkRenderPassBeginInfo>();
+                vkCmdBeginRenderPass(acquiredImageInfo.commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
                 {
                     VkRect2D scissor{ { }, renderPassBeginInfo.renderArea.extent };
-                    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+                    vkCmdSetScissor(acquiredImageInfo.commandBuffer, 0, 1, &scissor);
                     VkViewport viewport{ 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
-                    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+                    vkCmdSetViewport(acquiredImageInfo.commandBuffer, 0, 1, &viewport);
 
                     // Bind the gvk::math::Camera uniform gvk::Buffer and the floor resources then
                     //  issue a draw call for the floor.  Then bind the floating cube resources...
@@ -444,48 +458,47 @@ int main(int, const char*[])
                     //  gvk::DescriptorSet at index 0...then issue a draw call for the floating
                     //  cube...
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-                    const auto& imageExtent = wsiManager.get_render_targets()[imageIndex].get_image(0).get<VkImageCreateInfo>().extent;
 
                     // TODO : Draw sprites additively w/depth, then render grid
 
                     // Grid
-                    shape_shooter::Context::instance().grid.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
+                    shape_shooter::Context::instance().grid.record_draw_cmds(acquiredImageInfo.commandBuffer, shapeShooterContext.gameCamera, shapeShooterContext.renderExtent);
 
                     // CoordinateRenderer
                     const auto& gameCameraDescriptorSet = shapeShooterContext.gameCameraResources.second;
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-                    coordinateRenderer.record_draw_cmds(commandBuffer, shapeShooterContext.gameCamera, { (float)imageExtent.width, (float)imageExtent.height });
+                    vkCmdBindDescriptorSets(acquiredImageInfo.commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &gameCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+                    coordinateRenderer.record_draw_cmds(acquiredImageInfo.commandBuffer, shapeShooterContext.gameCamera, shapeShooterContext.renderExtent);
 
                     // Sprites
                     auto spriteCamera = shapeShooterContext.gameCamera;
                     // spriteCamera.projectionMode = gvk::math::Camera::ProjectionMode::Orthographic;
                     //spriteCamera.fieldOfView = viewport.width;
-                    shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(commandBuffer, spriteCamera);
+                    shape_shooter::Context::instance().spriteRenderer.record_draw_cmds(acquiredImageInfo.commandBuffer, spriteCamera);
 
                     // ScoreBoard
                     const auto& scoreBoardCameraDescriptorSet = shapeShooterContext.scoreBoardCameraResources.second;
-                    vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &scoreBoardCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(commandBuffer, shapeShooterContext.scoreBoardCamera);
+                    vkCmdBindDescriptorSets(acquiredImageInfo.commandBuffer, pipelineBindPoint, fontRendererPipelineLayout, 0, 1, &scoreBoardCameraDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+                    shape_shooter::Context::instance().scoreBoard.record_draw_cmds(acquiredImageInfo.commandBuffer, shapeShooterContext.scoreBoardCamera);
                 }
 
                 // If the gvk::gui::Renderer is enabled, record cmds to render it
                 if (showGui) {
-                    guiRenderer.record_cmds(commandBuffer);
+                    guiRenderer.record_cmds(acquiredImageInfo.commandBuffer, acquiredImageInfo.index);
                 }
 
-                vkCmdEndRenderPass(commandBuffer);
+                vkCmdEndRenderPass(acquiredImageInfo.commandBuffer);
 
                 // Ensure the gvk::RenderTarget attachments are transitioned back to the
                 //  VkImageLayout expected when the gvk::RenderPass is next executed...the
                 //  VkImageMemoryBarrier objects provided by gvk::RenderTarget do not
                 //  account for layout transitions that occur outside of the associated
                 //  gvk::RenderPass, those must be handled by your application...
-                auto attachmentCount = renderTarget.get_render_pass().get<VkRenderPassCreateInfo2>().attachmentCount;
+                auto attachmentCount = renderTarget.get<gvk::Framebuffer>().get<gvk::RenderPass>().get<VkRenderPassCreateInfo2>().attachmentCount;
                 for (size_t attachment_i = 0; attachment_i < attachmentCount; ++attachment_i) {
-                    auto imageMemoryBarrier = renderTarget.get_image_memory_barrier((uint32_t)attachment_i);
+                    auto imageMemoryBarrier = renderTarget.get<VkImageMemoryBarrier>((uint32_t)attachment_i);
                     if (imageMemoryBarrier.oldLayout != imageMemoryBarrier.newLayout) {
                         vkCmdPipelineBarrier(
-                            commandBuffer,
+                            acquiredImageInfo.commandBuffer,
                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                             0,
@@ -496,15 +509,13 @@ int main(int, const char*[])
                     }
                 }
 
-                gvk_result(vkEndCommandBuffer(commandBuffer));
+                gvk_result(vkEndCommandBuffer(acquiredImageInfo.commandBuffer));
 
                 const auto& queue = gvk::get_queue_family(device, 0).queues[0];
-                auto submitInfo = wsiManager.get_submit_info(imageIndex);
-                gvk_result(vkQueueSubmit(queue, 1, &submitInfo, vkFences[imageIndex]));
+                gvk_result(vkQueueSubmit(queue, 1, &wsiContext.get<VkSubmitInfo>(acquiredImageInfo), acquiredImageInfo.fence));
 
-                auto presentInfo = wsiManager.get_present_info(&imageIndex);
-                vkResult = vkQueuePresentKHR(gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0], &presentInfo);
-                gvk_result((vkResult == VK_SUCCESS || vkResult == VK_SUBOPTIMAL_KHR) ? VK_SUCCESS : vkResult);
+                wsiStatus = wsiContext.queue_present(queue, &acquiredImageInfo);
+                gvk_result((wsiStatus == VK_SUBOPTIMAL_KHR || wsiStatus == VK_ERROR_OUT_OF_DATE_KHR) ? VK_SUCCESS : wsiStatus);
             }
 
             static const gvk::system::Milliseconds<> FrameDuration(1.0f / 60.0f * 1000);
@@ -524,7 +535,7 @@ int main(int, const char*[])
                 sFpsTimer = 0;
             }
         }
-        gvk_result(vkDeviceWaitIdle(gvkContext.get_devices()[0]));
+        gvk_result(vkDeviceWaitIdle(gvkContext.get<gvk::Devices>()[0]));
     } gvk_result_scope_end;
     if (gvkResult) {
         std::cerr << gvk::to_string(gvkResult) << std::endl;

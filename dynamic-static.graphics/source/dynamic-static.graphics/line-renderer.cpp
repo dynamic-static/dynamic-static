@@ -358,7 +358,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         vertexShaderModuleCreateInfo.codeSize = vertexShaderInfo.spirv.size() * sizeof(uint32_t);
         vertexShaderModuleCreateInfo.pCode = !vertexShaderInfo.spirv.empty() ? vertexShaderInfo.spirv.data() : nullptr;
         gvk::ShaderModule vertexShaderModule;
-        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &vertexShaderModuleCreateInfo, nullptr, &vertexShaderModule));
+        gvk_result(gvk::ShaderModule::create(gvkContext.get<gvk::Devices>()[0], &vertexShaderModuleCreateInfo, nullptr, &vertexShaderModule));
         auto vertexPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
         vertexPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertexPipelineShaderStageCreateInfo.module = vertexShaderModule;
@@ -367,7 +367,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         fragmentShaderModuleCreateInfo.codeSize = fragmentShaderInfo.spirv.size() * sizeof(uint32_t);
         fragmentShaderModuleCreateInfo.pCode = !fragmentShaderInfo.spirv.empty() ? fragmentShaderInfo.spirv.data() : nullptr;
         gvk::ShaderModule fragmentShaderModule;
-        gvk_result(gvk::ShaderModule::create(gvkContext.get_devices()[0], &fragmentShaderModuleCreateInfo, nullptr, &fragmentShaderModule));
+        gvk_result(gvk::ShaderModule::create(gvkContext.get<gvk::Devices>()[0], &fragmentShaderModuleCreateInfo, nullptr, &fragmentShaderModule));
         auto fragmentPipelineShaderStageCreateInfo = gvk::get_default<VkPipelineShaderStageCreateInfo>();
         fragmentPipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragmentPipelineShaderStageCreateInfo.module = fragmentShaderModule;
@@ -431,7 +431,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         // spirvBindingInfo.descriptorSetLayoutBindings[0][1].descriptorCount = (uint32_t)mImages.size();
 
         gvk::PipelineLayout pipelineLayout;
-        gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get_devices()[0], spirvBindingInfo, nullptr, &pipelineLayout));
+        gvk_result(gvk::spirv::create_pipeline_layout(gvkContext.get<gvk::Devices>()[0], spirvBindingInfo, nullptr, &pipelineLayout));
 
         auto graphicsPipelineCreateInfo = gvk::get_default<VkGraphicsPipelineCreateInfo>();
         graphicsPipelineCreateInfo.stageCount = (uint32_t)pipelineShaderStageCreateInfos.size();
@@ -444,7 +444,7 @@ VkResult LineRenderer::create_pipeline(const gvk::Context& gvkContext, const gvk
         graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationStateCreateInfo;
         graphicsPipelineCreateInfo.layout = pipelineLayout;
         graphicsPipelineCreateInfo.renderPass = renderPass;
-        gvk_result(gvk::Pipeline::create(gvkContext.get_devices()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
+        gvk_result(gvk::Pipeline::create(gvkContext.get<gvk::Devices>()[0], VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &mPipeline));
     } gvk_result_scope_end;
     return gvkResult;
 }
@@ -484,29 +484,29 @@ VkResult LineRenderer::create_vertex_buffer(const gvk::Context& gvkContext, uint
 
         gvk::Buffer stagingBuffer;
         auto vertexDataSize = mVertexCount * sizeof(glm::vec3);
-        gvk_result(gvk::create_staging_buffer(gvkContext.get_devices()[0], vertexDataSize, &stagingBuffer));
+        gvk_result(gvk::create_staging_buffer(gvkContext.get<gvk::Devices>()[0], vertexDataSize, &stagingBuffer));
         uint8_t* pVertexData = nullptr;
-        gvk_result(vmaMapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>(), (void**)&pVertexData));
+        gvk_result(vmaMapMemory(gvkContext.get<gvk::Devices>()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>(), (void**)&pVertexData));
         memcpy(pVertexData, vertices.data(), vertexDataSize);
-        vmaUnmapMemory(gvkContext.get_devices()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>());
+        vmaUnmapMemory(gvkContext.get<gvk::Devices>()[0].get<VmaAllocator>(), stagingBuffer.get<VmaAllocation>());
 
         auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
         bufferCreateInfo.size = vertexDataSize;
         bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
         auto allocationCreateInfo = gvk::get_default<VmaAllocationCreateInfo>();
         allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        gvk_result(gvk::Buffer::create(gvkContext.get_devices()[0], &bufferCreateInfo, &allocationCreateInfo, &mVertexBuffer));
+        gvk_result(gvk::Buffer::create(gvkContext.get<gvk::Devices>()[0], &bufferCreateInfo, &allocationCreateInfo, &mVertexBuffer));
 
         gvk_result(gvk::execute_immediately(
-            gvkContext.get_devices()[0],
-            gvk::get_queue_family(gvkContext.get_devices()[0], 0).queues[0],
-            gvkContext.get_command_buffers()[0],
+            gvkContext.get<gvk::Devices>()[0],
+            gvk::get_queue_family(gvkContext.get<gvk::Devices>()[0], 0).queues[0],
+            gvkContext.get<gvk::CommandBuffers>()[0],
             VK_NULL_HANDLE,
-            [&](auto commandBuffer)
+            [&](auto)
             {
                 auto bufferCopy = gvk::get_default<VkBufferCopy>();
                 bufferCopy.size = vertexDataSize;
-                gvkContext.get_devices()[0].get<gvk::DispatchTable>().gvkCmdCopyBuffer(commandBuffer, stagingBuffer, mVertexBuffer, 1, &bufferCopy);
+                gvkContext.get<gvk::CommandBuffers>()[0].CmdCopyBuffer(stagingBuffer, mVertexBuffer, 1, &bufferCopy);
             }
         ));
     } gvk_result_scope_end;
