@@ -50,6 +50,7 @@ public:
 
 private:
     dst::audio::Context mContext;
+    uint64_t mSong{ };
     std::vector<uint64_t> mExplosionSounedEffects;
     std::vector<uint64_t> mShotSoundEffects;
     std::vector<uint64_t> mSpawnSoundEffects;

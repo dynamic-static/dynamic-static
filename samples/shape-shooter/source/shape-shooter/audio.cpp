@@ -27,13 +27,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "shape-shooter/audio.hpp"
 #include "shape-shooter/context.hpp"
 
+#define DST_FMOD_ENABLED 0
+
 namespace shape_shooter {
 
 bool Audio::create(Audio* pAudio)
 {
+#if DST_FMOD_ENABLED
     assert(pAudio);
     dst::audio::Context::CreateInfo audioContextCreateInfo{ };
     auto success = dst::audio::Context::create(audioContextCreateInfo, &pAudio->mContext);
+    pAudio->mSong = pAudio->mContext.load_song(SHAPE_SHOOTER_CONTENT "/Audio/Music.mp3");
     for (const auto& directoryEntry : std::filesystem::directory_iterator(SHAPE_SHOOTER_CONTENT "/Audio/")) {
         if (gvk::string::contains(directoryEntry.path().filename().string(), "explosion")) {
             pAudio->mExplosionSounedEffects.push_back(pAudio->mContext.load_sound_effect(directoryEntry.path().string().c_str()));
@@ -45,11 +49,17 @@ bool Audio::create(Audio* pAudio)
             pAudio->mSpawnSoundEffects.push_back(pAudio->mContext.load_sound_effect(directoryEntry.path().string().c_str()));
         }
     }
+    pAudio->mContext.play_song(pAudio->mSong);
     return success;
+#else
+    (void)pAudio;
+    return true;
+#endif
 }
 
 void Audio::play(SoundEffect soundEffect)
 {
+#if DST_FMOD_ENABLED
     auto& rng = get_context().rng;
     switch (soundEffect) {
     case SoundEffect::Explosion: {
@@ -65,11 +75,16 @@ void Audio::play(SoundEffect soundEffect)
         assert(false);
     } break;
     }
+#else
+    (void)soundEffect;
+#endif
 }
 
 void Audio::update()
 {
+#if DST_FMOD_ENABLED
     mContext.update();
+#endif
 }
 
 } // namespace shape_shooter

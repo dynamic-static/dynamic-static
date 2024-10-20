@@ -75,17 +75,26 @@ bool Context::create(const CreateInfo& createInfo, Context* pContext)
     return result == FMOD_OK;
 }
 
-Context::~Context() = default;
-
-void Context::load_song()
+Context::~Context()
 {
-    std::cout << "load_song()" << std::endl;
+    // TODO : Cleanup
 }
 
 void Context::update()
 {
     auto fmodResult = mupImpl->pFmodSystem->update();
     assert(fmodResult == FMOD_OK);
+}
+
+uint64_t Context::load_song(const char* pFilePath)
+{
+    assert(mupImpl);
+    FMOD::Sound* pSound = nullptr;
+    auto result = mupImpl->pFmodSystem->createSound(pFilePath, FMOD_LOOP_NORMAL, nullptr, &pSound);
+    assert(result == FMOD_OK);
+    auto inserted = mupImpl->soundEffects.insert({ pSound, nullptr }).second;
+    assert(inserted);
+    return (uint64_t)pSound;
 }
 
 uint64_t Context::load_sound_effect(const char* pFilePath)
@@ -97,6 +106,12 @@ uint64_t Context::load_sound_effect(const char* pFilePath)
     auto inserted = mupImpl->soundEffects.insert({ pSound, nullptr }).second;
     assert(inserted);
     return (uint64_t)pSound;
+}
+
+void Context::play_song(uint64_t soundEffectId) const
+{
+    auto fmodResult = mupImpl->pFmodSystem->playSound((FMOD::Sound*)soundEffectId, nullptr, false, nullptr);
+    assert(fmodResult == FMOD_OK);
 }
 
 void Context::play_sound_effect(uint64_t soundEffectId) const

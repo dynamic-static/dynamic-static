@@ -45,9 +45,9 @@ public:
     ~Context();
 
     void update();
-
-    void load_song();
+    uint64_t load_song(const char* pFilePath);
     uint64_t load_sound_effect(const char* pFilePath);
+    void play_song(uint64_t soundEffectId) const;
     void play_sound_effect(uint64_t soundEffectId) const;
 
 private:
