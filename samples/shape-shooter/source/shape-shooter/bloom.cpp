@@ -256,8 +256,8 @@ VkResult BloomRenderer::create(const gvk::Context& gvkContext, const CreateInfo*
                     vec2 offset = 1.0 / textureSize(image, 0) * pc.offset * pc.scale;
                     vec3 result = texture(image, fsTexcoord).rgb * weight[0];
                     for (int i = 0; i < 5; ++i) {
-                        fragColor += texture(image, fsTexcoord + offset) * weight[i] * pc.strength;
-                        fragColor += texture(image, fsTexcoord - offset) * weight[i] * pc.strength;
+                        fragColor += texture(image, fsTexcoord + offset * i) * weight[i] * pc.strength;
+                        fragColor += texture(image, fsTexcoord - offset * i) * weight[i] * pc.strength;
                     }
                     fragColor.a = 1;
                 }
@@ -314,10 +314,31 @@ VkResult BloomRenderer::create(const gvk::Context& gvkContext, const CreateInfo*
         };
 
         // TODO : Documentation
+        gvk::spirv::ShaderInfo blitFragmentShaderInfo{
+            .language = gvk::spirv::ShadingLanguage::Glsl,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .lineOffset = __LINE__,
+            .source = R"(
+                #version 450
+
+                layout(set = 0, binding = 0) uniform sampler2D image;
+
+                layout(location = 0) in vec2 inTexCoord;
+                layout(location = 0) out vec4 outColor;
+
+                void main()
+                {
+                    outColor = texture(image, inTexCoord);
+                }
+            )"
+        };
+
+        // TODO : Documentation
         auto renderPass = pBloom->mRenderTargets[0].get<gvk::Framebuffer>().get<gvk::RenderPass>();
         gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, extractFragmentShaderInfo, &pBloom->mExtractPipeline));
         gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, blurFragmentShaderInfo, &pBloom->mBlurPipeline));
         gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, combineFragmentShaderInfo, &pBloom->mCombinePipeline));
+        gvk_result(create_bloom_pipeline(pCreateInfo->renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, blitFragmentShaderInfo, &pBloom->mBlitPipeline));
 
         // TODO : Documentation
         std::vector<gvk::DescriptorSet> descriptorSets;
@@ -334,6 +355,11 @@ VkResult BloomRenderer::create(const gvk::Context& gvkContext, const CreateInfo*
         gvk_result(dst_sample_allocate_descriptor_sets(pBloom->mCombinePipeline, descriptorSets));
         gvk_result(descriptorSets.size() == 1 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
         pBloom->mCombineDescriptorSet = descriptorSets[0];
+
+        // TODO : Documentation
+        gvk_result(dst_sample_allocate_descriptor_sets(pBloom->mBlitPipeline, descriptorSets));
+        gvk_result(descriptorSets.size() == 1 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
+        pBloom->mBlitDescriptorSet = descriptorSets[0];
 
         // TODO : Documentation
         gvk_result(gvk::Sampler::create(renderPass.get<gvk::Device>(), &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pBloom->mSampler));
@@ -382,11 +408,6 @@ void BloomRenderer::end_render_pass(const gvk::CommandBuffer& commandBuffer)
     commandBuffer.CmdEndRenderPass();
 }
 #endif
-
-void BloomRenderer::draw_render_target(const gvk::CommandBuffer& commandBuffer)
-{
-    (void)commandBuffer;
-}
 
 VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget)
 {
@@ -477,10 +498,10 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline);
             commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline.get<gvk::PipelineLayout>(), 0, 1, &mCombineDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
             CombinePushConstants combinePushConstants{ };
-            combinePushConstants.baseIntensity = 1.0f;
-            combinePushConstants.baseSaturation = 1.0f;
-            combinePushConstants.bloomIntensity = 1.25f;
-            combinePushConstants.bloomSaturation = 1.0f;
+            combinePushConstants.baseIntensity = mBaseIntensity;
+            combinePushConstants.baseSaturation = mBaseSaturation;
+            combinePushConstants.bloomIntensity = mBloomIntensity;
+            combinePushConstants.bloomSaturation = mBloomSaturation;
             commandBuffer.CmdPushConstants(mCombinePipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CombinePushConstants), &combinePushConstants);
             commandBuffer.CmdDraw(3, 1, 0, 0);
         }
@@ -488,6 +509,24 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
 #endif
     } gvk_result_scope_end;
     return gvkResult;
+}
+
+void BloomRenderer::draw_render_target(const gvk::CommandBuffer& commandBuffer)
+{
+    // TODO : Documentation
+    auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
+    descriptorImageInfo.sampler = mSampler;
+    descriptorImageInfo.imageView = mRenderTargets[0].get<gvk::Framebuffer>().get<gvk::ImageViews>()[0];
+    descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+    writeDescriptorSet.dstSet = mBlitDescriptorSet;
+    writeDescriptorSet.descriptorCount = 1;
+    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeDescriptorSet.pImageInfo = &descriptorImageInfo;
+    commandBuffer.get<gvk::Device>().UpdateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+    commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlitPipeline);
+    commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlitPipeline.get<gvk::PipelineLayout>(), 0, 1, &mBlitDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+    commandBuffer.CmdDraw(3, 1, 0, 0);
 }
 
 void BloomRenderer::on_gui()

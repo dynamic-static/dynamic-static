@@ -454,6 +454,7 @@ int main(int, const char*[])
                     //  between calls to begin_gui()/end_gui(), which are called once per frame
                     guiRenderer.begin_gui(guiRendererBeginInfo);
                     shape_shooter::on_gui(gameContext);
+                    bloomRenderer.on_gui();
                     guiRenderer.end_gui(acquiredImageInfo.index);
                 }
 
@@ -532,6 +533,9 @@ int main(int, const char*[])
                     VkViewport viewport{ 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
                     vkCmdSetViewport(acquiredImageInfo.commandBuffer, 0, 1, &viewport);
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+                    // Bloom result
+                    bloomRenderer.draw_render_target(acquiredImageInfo.commandBuffer);
 
                     // ScoreBoard
                     const auto& gameCameraDescriptorSet = gameContext.cameraResources.second;

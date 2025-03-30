@@ -43,9 +43,9 @@ public:
     static VkResult create(const gvk::Context& gvkContext, const CreateInfo* pCreateInfo, BloomRenderer* pBloom);
     VkResult begin_render_pass(const gvk::CommandBuffer& commandBuffer, const gvk::RenderTarget& renderTarget);
     void end_render_pass(const gvk::CommandBuffer& commandBuffer);
-    void draw_render_target(const gvk::CommandBuffer& commandBuffer);
 
     VkResult record_cmds(const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget);
+    void draw_render_target(const gvk::CommandBuffer& commandBuffer);
 
     void on_gui();
 
@@ -62,6 +62,8 @@ private:
     gvk::DescriptorSet mBlurDescriptorSet;
     gvk::Pipeline mCombinePipeline;
     gvk::DescriptorSet mCombineDescriptorSet;
+    gvk::Pipeline mBlitPipeline;
+    gvk::DescriptorSet mBlitDescriptorSet;
     std::array<gvk::RenderTarget, 2> mRenderTargets;
     gvk::Sampler mSampler;
 };
