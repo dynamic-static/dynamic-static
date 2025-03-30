@@ -71,6 +71,7 @@ public:
     std::pair<gvk::Buffer, gvk::DescriptorSet> cameraResources;
     Audio audio;
     Grid grid;
+    BloomRenderer::Settings bloomSettings;
 
 private:
     Context(const Context&) = delete;

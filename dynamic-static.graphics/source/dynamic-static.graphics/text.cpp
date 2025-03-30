@@ -482,9 +482,15 @@ void Renderer<dst::text::Mesh>::update(float deltaTime, const dst::text::Mesh& t
         mIndexDataOffset = vertexDataSize;
         auto indexDataSize = indices.size() * sizeof(indices[0]);
         auto vertexIndexDataSize = vertexDataSize + indexDataSize;
-        if (!mVertexIndexBuffer || mVertexIndexBuffer.get<VkBufferCreateInfo>().size < vertexIndexDataSize) {
+
+        // HACK :
+        static const size_t MinimumVertexDataSize = 64 * sizeof(vertices[0]);
+        static const size_t MinimumIndexDataSize = MinimumVertexDataSize / 4 * sizeof(indices[0]);
+        static const size_t MinimumVertexIndexDataSize = MinimumVertexDataSize + MinimumIndexDataSize;
+
+        if (!mVertexIndexBuffer || mVertexIndexBuffer.get<VkBufferCreateInfo>().size < vertexIndexDataSize || mVertexIndexBuffer.get<VkBufferCreateInfo>().size < MinimumVertexIndexDataSize) {
             auto bufferCreateInfo = gvk::get_default<VkBufferCreateInfo>();
-            bufferCreateInfo.size = vertexIndexDataSize;
+            bufferCreateInfo.size = std::max(vertexIndexDataSize, MinimumVertexIndexDataSize);
             bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
             VmaAllocationCreateInfo allocationCreateInfo { };
             allocationCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;

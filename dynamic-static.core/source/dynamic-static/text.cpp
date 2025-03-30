@@ -438,7 +438,7 @@ void Mesh::update(float deltaTime)
         size_t vertex_i = 0;
         size_t faceCount = mVertices.size() / 4;
         constexpr size_t IndicesPerFace = 6;
-        mIndices.resize(IndicesPerFace* faceCount);
+        mIndices.resize(IndicesPerFace * faceCount);
         for (size_t face_i = 0; face_i < faceCount; ++face_i) {
             mIndices[index_i++] = (uint16_t)(vertex_i + 0);
             mIndices[index_i++] = (uint16_t)(vertex_i + 1);

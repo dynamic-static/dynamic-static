@@ -454,7 +454,7 @@ int main(int, const char*[])
                     //  between calls to begin_gui()/end_gui(), which are called once per frame
                     guiRenderer.begin_gui(guiRendererBeginInfo);
                     shape_shooter::on_gui(gameContext);
-                    bloomRenderer.on_gui();
+                    bloomRenderer.on_gui(gameContext.bloomSettings);
                     guiRenderer.end_gui(acquiredImageInfo.index);
                 }
 
@@ -522,7 +522,7 @@ int main(int, const char*[])
                 vkCmdEndRenderPass(acquiredImageInfo.commandBuffer);
 #if 1
                 // TODO : Documentation
-                bloomRenderer.record_cmds(gvkContext, acquiredImageInfo.commandBuffer, wsiContext.get<gvk::wsi::Context::Info>().surfaceFormat.format, renderTarget);
+                bloomRenderer.record_cmds(gameContext.bloomSettings, gvkContext, acquiredImageInfo.commandBuffer, wsiContext.get<gvk::wsi::Context::Info>().surfaceFormat.format, renderTarget);
 #endif
                 // TODO : Documentation
                 renderPassBeginInfo = acquiredImageRenderTarget.get<VkRenderPassBeginInfo>();
@@ -535,7 +535,7 @@ int main(int, const char*[])
                     auto pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
                     // Bloom result
-                    bloomRenderer.draw_render_target(acquiredImageInfo.commandBuffer);
+                    bloomRenderer.draw_render_target(gameContext.bloomSettings, acquiredImageInfo.commandBuffer);
 
                     // ScoreBoard
                     const auto& gameCameraDescriptorSet = gameContext.cameraResources.second;

@@ -33,29 +33,37 @@ namespace shape_shooter {
 class BloomRenderer final
 {
 public:
-    class CreateInfo
+    class Settings final
+    {
+    public:
+        bool enabled{ true };
+        float threshold{ 0.5f };
+        float blurScale{ 1.0f };
+        float blurStrength{ 1.5f };
+        float baseIntensity{ 0.5f };
+        float bloomIntensity{ 0.5f };
+        float baseSaturation{ 0.5f };
+        float bloomSaturation{ 0.5f };
+    };
+
+    class CreateInfo final
     {
     public:
         VkFormat format{ };
         gvk::RenderPass renderPass;
+        Settings settings{ };
     };
 
     static VkResult create(const gvk::Context& gvkContext, const CreateInfo* pCreateInfo, BloomRenderer* pBloom);
     VkResult begin_render_pass(const gvk::CommandBuffer& commandBuffer, const gvk::RenderTarget& renderTarget);
     void end_render_pass(const gvk::CommandBuffer& commandBuffer);
 
-    VkResult record_cmds(const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget);
-    void draw_render_target(const gvk::CommandBuffer& commandBuffer);
+    VkResult record_cmds(const Settings& settings, const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget);
+    void draw_render_target(const Settings& settings, const gvk::CommandBuffer& commandBuffer);
 
-    void on_gui();
+    void on_gui(Settings& settings);
 
 private:
-    bool mEnabled{ true };
-    float mThreshold{ 0.5f };
-    float mBaseIntensity{ 0.5f };
-    float mBloomIntensity{ 0.5f };
-    float mBaseSaturation{ 0.5f };
-    float mBloomSaturation{ 0.5f };
     gvk::Pipeline mExtractPipeline;
     gvk::DescriptorSet mExtractDescriptorSet;
     gvk::Pipeline mBlurPipeline;

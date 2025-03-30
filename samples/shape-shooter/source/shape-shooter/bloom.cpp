@@ -409,7 +409,7 @@ void BloomRenderer::end_render_pass(const gvk::CommandBuffer& commandBuffer)
 }
 #endif
 
-VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget)
+VkResult BloomRenderer::record_cmds(const Settings& settings, const gvk::Context& gvkContext, const gvk::CommandBuffer& commandBuffer, VkFormat outputColorFormat, const gvk::RenderTarget& inputRenderTarget)
 {
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         gvk_result(inputRenderTarget ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
@@ -449,7 +449,7 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
             commandBuffer.CmdSetViewport(0, 1, &viewport);
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mExtractPipeline);
             commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mExtractPipeline.get<gvk::PipelineLayout>(), 0, 1, &mExtractDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
-            commandBuffer.CmdPushConstants(mExtractPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &mThreshold);
+            commandBuffer.CmdPushConstants(mExtractPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &settings.threshold);
             commandBuffer.CmdDraw(3, 1, 0, 0);
         }
         commandBuffer.CmdEndRenderPass();
@@ -466,8 +466,8 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlurPipeline);
             commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlurPipeline.get<gvk::PipelineLayout>(), 0, 1, &mBlurDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
             BloomPushConstants bloomPushConstants{ };
-            bloomPushConstants.scale = 1.0f;
-            bloomPushConstants.strength = 1.5f;
+            bloomPushConstants.scale = settings.blurScale;
+            bloomPushConstants.strength = settings.blurScale;
             // H
             bloomPushConstants.offset = { 1, 0 };
             commandBuffer.CmdPushConstants(mBlurPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &bloomPushConstants);
@@ -498,10 +498,10 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline);
             commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline.get<gvk::PipelineLayout>(), 0, 1, &mCombineDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
             CombinePushConstants combinePushConstants{ };
-            combinePushConstants.baseIntensity = mBaseIntensity;
-            combinePushConstants.baseSaturation = mBaseSaturation;
-            combinePushConstants.bloomIntensity = mBloomIntensity;
-            combinePushConstants.bloomSaturation = mBloomSaturation;
+            combinePushConstants.baseIntensity = settings.baseIntensity;
+            combinePushConstants.baseSaturation = settings.baseSaturation;
+            combinePushConstants.bloomIntensity = settings.bloomIntensity;
+            combinePushConstants.bloomSaturation = settings.bloomSaturation;
             commandBuffer.CmdPushConstants(mCombinePipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CombinePushConstants), &combinePushConstants);
             commandBuffer.CmdDraw(3, 1, 0, 0);
         }
@@ -511,8 +511,9 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
     return gvkResult;
 }
 
-void BloomRenderer::draw_render_target(const gvk::CommandBuffer& commandBuffer)
+void BloomRenderer::draw_render_target(const Settings& settings, const gvk::CommandBuffer& commandBuffer)
 {
+    (void)settings;
     // TODO : Documentation
     auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
     descriptorImageInfo.sampler = mSampler;
@@ -529,17 +530,20 @@ void BloomRenderer::draw_render_target(const gvk::CommandBuffer& commandBuffer)
     commandBuffer.CmdDraw(3, 1, 0, 0);
 }
 
-void BloomRenderer::on_gui()
+void BloomRenderer::on_gui(Settings& settings)
 {
     if (ImGui::CollapsingHeader("Bloom")) {
         ImGui::Indent();
         {
-            ImGui::Checkbox("Enabled", &mEnabled);
-            ImGui::BeginDisabled(!mEnabled);
-            ImGui::DragFloat("Base Intensity", &mBaseIntensity);
-            ImGui::DragFloat("Bloom Intensity", &mBloomIntensity);
-            ImGui::DragFloat("Base Saturation", &mBaseSaturation);
-            ImGui::DragFloat("Bloom Saturation", &mBloomSaturation);
+            ImGui::Checkbox("Enabled", &settings.enabled);
+            ImGui::BeginDisabled(!settings.enabled);
+            ImGui::DragFloat("Threshold", &settings.threshold, 0.01f, 0.0f, 1.0f);
+            ImGui::DragFloat("Blur Scale", &settings.blurScale, 0.01f, 0.0f, 8.0f);
+            ImGui::DragFloat("Blur Strength", &settings.blurStrength, 0.01f, 0.0f, 8.0f);
+            ImGui::DragFloat("Base Intensity", &settings.baseIntensity, 0.01f, 0.0f, 8.0f);
+            ImGui::DragFloat("Bloom Intensity", &settings.bloomIntensity, 0.01f, 0.0f, 8.0f);
+            ImGui::DragFloat("Base Saturation", &settings.baseSaturation, 0.01f, 0.0f, 8.0f);
+            ImGui::DragFloat("Bloom Saturation", &settings.bloomSaturation, 0.01f, 0.0f, 8.0f);
             ImGui::EndDisabled();
         }
         ImGui::Unindent();
