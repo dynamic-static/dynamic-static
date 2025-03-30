@@ -371,6 +371,8 @@ int main(int, const char*[])
                 gameContext.camera.set_aspect_ratio(extent.width, extent.height);
                 gameContext.renderExtent = { extent.width, extent.height };
 
+                gvk_result(dst_sample_debug_marker_set_render_target_name(acquiredImageRenderTarget, "gvk::SwapchainKHR[" + std::to_string(acquiredImageInfo.index) + "]"));
+
                 // TODO : Documentation
                 auto& renderTarget = renderTargets[acquiredImageInfo.index];
                 auto renderTargetCreateInfo = renderTarget ? renderTarget.get<VkFramebufferCreateInfo>() : gvk::get_default<VkFramebufferCreateInfo>();
@@ -381,12 +383,14 @@ int main(int, const char*[])
                     dstSampleRenderTargetCreateInfo.depthFormat = wsiContext.get<gvk::wsi::Context::Info>().depthFormat;
                     dstSampleRenderTargetCreateInfo.sampleCount = VK_SAMPLE_COUNT_64_BIT;
                     gvk_result(dst_sample_create_render_target(gvkContext, dstSampleRenderTargetCreateInfo, &renderTarget));
+                    gvk_result(dst_sample_debug_marker_set_render_target_name(renderTarget, "Scene[" + std::to_string(acquiredImageInfo.index) + "]"));
                 }
 
                 // TODO : Documentation
                 auto bloomRendererItr = bloomRenderers.find(acquiredImageInfo.index);
                 if (bloomRendererItr == bloomRenderers.end()) {
                     shape_shooter::BloomRenderer::CreateInfo bloomRendererCreateInfo{ };
+                    bloomRendererCreateInfo.format = wsiContext.get<gvk::wsi::Context::Info>().surfaceFormat.format;
                     bloomRendererCreateInfo.renderPass = wsiContext.get<gvk::RenderPass>();
                     bloomRendererItr = bloomRenderers.insert({ acquiredImageInfo.index, { } }).first;
                     gvk_result(shape_shooter::BloomRenderer::create(gvkContext, &bloomRendererCreateInfo, &bloomRendererItr->second));
@@ -515,7 +519,7 @@ int main(int, const char*[])
                     spriteRenderer.record_draw_cmds(acquiredImageInfo.commandBuffer, spriteCamera);
                 }
                 vkCmdEndRenderPass(acquiredImageInfo.commandBuffer);
-#if 0
+#if 1
                 // TODO : Documentation
                 bloomRenderer.record_cmds(gvkContext, acquiredImageInfo.commandBuffer, wsiContext.get<gvk::wsi::Context::Info>().surfaceFormat.format, renderTarget);
 #endif

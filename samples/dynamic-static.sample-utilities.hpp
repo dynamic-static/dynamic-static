@@ -76,6 +76,7 @@ static VkBool32 dst_sample_debug_utils_messenger_callback(
     }
     if (error) {
         error = false;
+        assert(false);
     }
     return VK_FALSE;
 }
@@ -115,25 +116,31 @@ public:
 
 inline VkResult dst_sample_create_gvk_context(const char* pApplicationName, gvk::Context* pGfxContext)
 {
-    // Setup VkInstanceCreateInfo.
+    // Setup VkInstanceCreateInfo
+    std::vector<const char*> instanceExtensions{ VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
     auto applicationInfo = gvk::get_default<VkApplicationInfo>();
     applicationInfo.pApplicationName = pApplicationName;
     auto instanceCreateInfo = gvk::get_default<VkInstanceCreateInfo>();
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
+    instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.size();
+    instanceCreateInfo.ppEnabledExtensionNames = !instanceExtensions.empty() ? instanceExtensions.data() : nullptr;
 
-    // Setup VkDeviceCreateInfo with desired VkPhysicalDeviceFeatures.
+    // Setup VkDeviceCreateInfo with desired VkPhysicalDeviceFeatures
+    std::vector<const char*> deviceExtensions{ };
     auto physicalDeviceFeatures = gvk::get_default<VkPhysicalDeviceFeatures>();
     physicalDeviceFeatures.samplerAnisotropy = VK_TRUE;
     physicalDeviceFeatures.fillModeNonSolid = VK_TRUE;
     auto deviceCreateInfo = gvk::get_default<VkDeviceCreateInfo>();
+    deviceCreateInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
+    deviceCreateInfo.ppEnabledExtensionNames = !deviceExtensions.empty() ? deviceExtensions.data() : nullptr;
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
 
     // VkDebugUtilsMessengerCreateInfoEXT is optional, providing it indicates that
-    //  the debug utils extension should be loaded.
+    //  the debug utils extension should be loaded
     auto debugUtilsMessengerCreateInfo = gvk::get_default<VkDebugUtilsMessengerCreateInfoEXT>();
     debugUtilsMessengerCreateInfo.pfnUserCallback = dst_sample_debug_utils_messenger_callback;
 
-    // Populate the gvk::Context::CreateInfo and call gvk::Context::create().
+    // Populate the gvk::Context::CreateInfo and call gvk::Context::create()
     auto contextCreateInfo = gvk::get_default<gvk::Context::CreateInfo>();
     contextCreateInfo.pInstanceCreateInfo = &instanceCreateInfo;
     contextCreateInfo.loadApiDumpLayer = VK_FALSE;
@@ -514,7 +521,6 @@ inline VkResult dst_sample_load_image(const gvk::Context& gvkContext, const char
     return gvkResult;
 }
 
-
 struct DstSampleRenderTargetCreateInfo
 {
     VkExtent2D extent{ };
@@ -695,6 +701,32 @@ inline VkResult dst_sample_create_render_target(const gvk::Context& context, Dst
                 }
             }
         );
+    } gvk_result_scope_end;
+    return gvkResult;
+}
+
+inline VkResult dst_sample_debug_marker_set_render_target_name(const gvk::RenderTarget& renderTarget, const std::string& name)
+{
+    gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
+        // TODO : Documentation
+        const auto& framebuffer = renderTarget.get<gvk::Framebuffer>();
+        const auto& device = framebuffer.get<gvk::Device>();
+        auto debugMarkerObjectNameInfo = gvk::get_default<VkDebugUtilsObjectNameInfoEXT>();
+        debugMarkerObjectNameInfo.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
+        debugMarkerObjectNameInfo.objectHandle = (uint64_t)framebuffer.get<VkFramebuffer>();
+        auto framebufferName = name + "-gvk::RenderTarget::Framebuffer";
+        debugMarkerObjectNameInfo.pObjectName = framebufferName.c_str();
+        gvk_result(device.SetDebugUtilsObjectNameEXT(&debugMarkerObjectNameInfo));
+
+        // TODO : Documentation
+        int imageIndex = 0;
+        for (const auto& imageView : renderTarget.get<gvk::Framebuffer>().get<gvk::ImageViews>()) {
+            debugMarkerObjectNameInfo.objectType = VK_OBJECT_TYPE_IMAGE;;
+            debugMarkerObjectNameInfo.objectHandle = (uint64_t)imageView.get<gvk::Image>().get<VkImage>();
+            auto imageName = name + "-gvk::Image[" + std::to_string(imageIndex++) + "]";
+            debugMarkerObjectNameInfo.pObjectName = imageName.c_str();
+            gvk_result(device.SetDebugUtilsObjectNameEXT(&debugMarkerObjectNameInfo));
+        }
     } gvk_result_scope_end;
     return gvkResult;
 }

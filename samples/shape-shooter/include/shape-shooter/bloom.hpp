@@ -36,6 +36,7 @@ public:
     class CreateInfo
     {
     public:
+        VkFormat format{ };
         gvk::RenderPass renderPass;
     };
 
@@ -50,14 +51,19 @@ public:
 
 private:
     bool mEnabled{ true };
+    float mThreshold{ 0.5f };
     float mBaseIntensity{ 0.5f };
     float mBloomIntensity{ 0.5f };
     float mBaseSaturation{ 0.5f };
     float mBloomSaturation{ 0.5f };
     gvk::Pipeline mExtractPipeline;
+    gvk::DescriptorSet mExtractDescriptorSet;
     gvk::Pipeline mBlurPipeline;
+    gvk::DescriptorSet mBlurDescriptorSet;
     gvk::Pipeline mCombinePipeline;
+    gvk::DescriptorSet mCombineDescriptorSet;
     std::array<gvk::RenderTarget, 2> mRenderTargets;
+    gvk::Sampler mSampler;
 };
 
 } // namespace shape_shooter

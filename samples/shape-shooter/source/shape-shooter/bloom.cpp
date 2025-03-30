@@ -31,6 +31,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace shape_shooter {
 
+struct BloomPushConstants
+{
+    glm::vec2 offset{ };
+    float scale{ };
+    float strength{ };
+};
+
+struct CombinePushConstants {
+    float baseIntensity{ };
+    float baseSaturation{ };
+    float bloomIntensity{ };
+    float bloomSaturation{ };
+};
+
 static VkResult create_bloom_pipeline(
     const gvk::RenderPass& renderPass,
     VkCullModeFlagBits cullMode,
@@ -163,6 +177,12 @@ VkResult BloomRenderer::create(const gvk::Context& gvkContext, const CreateInfo*
         gvk_result(pBloom ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
 
         // TODO : Documentation
+        DstSampleRenderTargetCreateInfo dstSampleRenderTargetCreateInfo{ };
+        dstSampleRenderTargetCreateInfo.extent = { 16, 16 };
+        dstSampleRenderTargetCreateInfo.colorFormat = pCreateInfo->format;
+        gvk_result(dst_sample_create_render_target(gvkContext, dstSampleRenderTargetCreateInfo, &pBloom->mRenderTargets[0]));
+
+        // TODO : Documentation
         gvk::spirv::ShaderInfo vertexShaderInfo {
             .language = gvk::spirv::ShadingLanguage::Glsl,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -293,9 +313,30 @@ VkResult BloomRenderer::create(const gvk::Context& gvkContext, const CreateInfo*
             )"
         };
 
-        gvk_result(create_bloom_pipeline(pCreateInfo->renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, extractFragmentShaderInfo, &pBloom->mExtractPipeline));
-        gvk_result(create_bloom_pipeline(pCreateInfo->renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, blurFragmentShaderInfo, &pBloom->mBlurPipeline));
-        gvk_result(create_bloom_pipeline(pCreateInfo->renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, combineFragmentShaderInfo, &pBloom->mCombinePipeline));
+        // TODO : Documentation
+        auto renderPass = pBloom->mRenderTargets[0].get<gvk::Framebuffer>().get<gvk::RenderPass>();
+        gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, extractFragmentShaderInfo, &pBloom->mExtractPipeline));
+        gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, blurFragmentShaderInfo, &pBloom->mBlurPipeline));
+        gvk_result(create_bloom_pipeline(renderPass, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL, vertexShaderInfo, combineFragmentShaderInfo, &pBloom->mCombinePipeline));
+
+        // TODO : Documentation
+        std::vector<gvk::DescriptorSet> descriptorSets;
+        gvk_result(dst_sample_allocate_descriptor_sets(pBloom->mExtractPipeline, descriptorSets));
+        gvk_result(descriptorSets.size() == 1 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
+        pBloom->mExtractDescriptorSet = descriptorSets[0];
+
+        // TODO : Documentation
+        gvk_result(dst_sample_allocate_descriptor_sets(pBloom->mBlurPipeline, descriptorSets));
+        gvk_result(descriptorSets.size() == 1 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
+        pBloom->mBlurDescriptorSet = descriptorSets[0];
+
+        // TODO : Documentation
+        gvk_result(dst_sample_allocate_descriptor_sets(pBloom->mCombinePipeline, descriptorSets));
+        gvk_result(descriptorSets.size() == 1 ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
+        pBloom->mCombineDescriptorSet = descriptorSets[0];
+
+        // TODO : Documentation
+        gvk_result(gvk::Sampler::create(renderPass.get<gvk::Device>(), &gvk::get_default<VkSamplerCreateInfo>(), nullptr, &pBloom->mSampler));
     } gvk_result_scope_end;
     return gvkResult;
 }
@@ -352,7 +393,7 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
     gvk_result_scope_begin(VK_ERROR_INITIALIZATION_FAILED) {
         gvk_result(inputRenderTarget ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED);
         auto framebufferCreateInfo = inputRenderTarget.get<VkFramebufferCreateInfo>();
-        if (!mRenderTargets[0] ||
+        if (!mRenderTargets[0] || !mRenderTargets[1] ||
             mRenderTargets[0].get<VkFramebufferCreateInfo>().width != framebufferCreateInfo.width ||
             mRenderTargets[0].get<VkFramebufferCreateInfo>().height != framebufferCreateInfo.height) {
             auto dstSampleRenderTargetCreateInfo = gvk::get_default<DstSampleRenderTargetCreateInfo>();
@@ -363,30 +404,88 @@ VkResult BloomRenderer::record_cmds(const gvk::Context& gvkContext, const gvk::C
             }
         }
 
+        // TODO : Documentation
+        auto descriptorImageInfo = gvk::get_default<VkDescriptorImageInfo>();
+        descriptorImageInfo.sampler = mSampler;
+        // TODO : Currently assuming that Image[1] is the MSAA resolve target...needs to
+        //  be automatically inferred from the RenderTarget.
+        descriptorImageInfo.imageView = inputRenderTarget.get<gvk::Framebuffer>().get<gvk::ImageViews>()[1];
+        descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        auto writeDescriptorSet = gvk::get_default<VkWriteDescriptorSet>();
+        writeDescriptorSet.dstSet = mExtractDescriptorSet;
+        writeDescriptorSet.descriptorCount = 1;
+        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writeDescriptorSet.pImageInfo = &descriptorImageInfo;
+        commandBuffer.get<gvk::Device>().UpdateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+
         // Extract
-        commandBuffer.CmdBeginRenderPass(nullptr, VK_SUBPASS_CONTENTS_INLINE);
+        auto renderPassBeginInfo = mRenderTargets[0].get<VkRenderPassBeginInfo>();
+        commandBuffer.CmdBeginRenderPass(&renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
         {
+            VkRect2D scissor{ { }, renderPassBeginInfo.renderArea.extent };
+            commandBuffer.CmdSetScissor(0, 1, &scissor);
+            VkViewport viewport{ 0, 0, (float)scissor.extent.width, (float)scissor.extent.height, 0, 1 };
+            commandBuffer.CmdSetViewport(0, 1, &viewport);
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mExtractPipeline);
+            commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mExtractPipeline.get<gvk::PipelineLayout>(), 0, 1, &mExtractDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+            commandBuffer.CmdPushConstants(mExtractPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &mThreshold);
+            commandBuffer.CmdDraw(3, 1, 0, 0);
         }
         commandBuffer.CmdEndRenderPass();
+
+#if 1
+        // TODO : Documentation
+        descriptorImageInfo.imageView = mRenderTargets[0].get<gvk::Framebuffer>().get<gvk::ImageViews>()[0];
+        writeDescriptorSet.dstSet = mBlurDescriptorSet;
+        commandBuffer.get<gvk::Device>().UpdateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
 
         // Blur
-        commandBuffer.CmdBeginRenderPass(nullptr, VK_SUBPASS_CONTENTS_INLINE);
+        commandBuffer.CmdBeginRenderPass(&mRenderTargets[1].get<VkRenderPassBeginInfo>(), VK_SUBPASS_CONTENTS_INLINE);
         {
             commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlurPipeline);
+            commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mBlurPipeline.get<gvk::PipelineLayout>(), 0, 1, &mBlurDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+            BloomPushConstants bloomPushConstants{ };
+            bloomPushConstants.scale = 1.0f;
+            bloomPushConstants.strength = 1.5f;
             // H
+            bloomPushConstants.offset = { 1, 0 };
+            commandBuffer.CmdPushConstants(mBlurPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &bloomPushConstants);
             commandBuffer.CmdDraw(3, 1, 0, 0);
             // V
+            bloomPushConstants.offset = { 0, 1 };
+            commandBuffer.CmdPushConstants(mBlurPipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &bloomPushConstants);
             commandBuffer.CmdDraw(3, 1, 0, 0);
         }
         commandBuffer.CmdEndRenderPass();
 
+        // TODO : Documentation
+        std::array<VkDescriptorImageInfo, 2> descriptorImageInfos{ gvk::get_default<VkDescriptorImageInfo>(), gvk::get_default<VkDescriptorImageInfo>() };
+        descriptorImageInfos[0].sampler = mSampler;
+        descriptorImageInfos[0].imageView = inputRenderTarget.get<gvk::Framebuffer>().get<gvk::ImageViews>()[1];
+        descriptorImageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        descriptorImageInfos[1].sampler = mSampler;
+        descriptorImageInfos[1].imageView = mRenderTargets[1].get<gvk::Framebuffer>().get<gvk::ImageViews>()[0];
+        descriptorImageInfos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        writeDescriptorSet.dstSet = mCombineDescriptorSet;
+        writeDescriptorSet.descriptorCount = 2;
+        writeDescriptorSet.pImageInfo = descriptorImageInfos.data();
+        commandBuffer.get<gvk::Device>().UpdateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+
         // Combine
-        commandBuffer.CmdBeginRenderPass(nullptr, VK_SUBPASS_CONTENTS_INLINE);
+        commandBuffer.CmdBeginRenderPass(&mRenderTargets[0].get<VkRenderPassBeginInfo>(), VK_SUBPASS_CONTENTS_INLINE);
         {
-            commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mExtractPipeline);
+            commandBuffer.CmdBindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline);
+            commandBuffer.CmdBindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, mCombinePipeline.get<gvk::PipelineLayout>(), 0, 1, &mCombineDescriptorSet.get<VkDescriptorSet>(), 0, nullptr);
+            CombinePushConstants combinePushConstants{ };
+            combinePushConstants.baseIntensity = 1.0f;
+            combinePushConstants.baseSaturation = 1.0f;
+            combinePushConstants.bloomIntensity = 1.25f;
+            combinePushConstants.bloomSaturation = 1.0f;
+            commandBuffer.CmdPushConstants(mCombinePipeline.get<gvk::PipelineLayout>(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CombinePushConstants), &combinePushConstants);
+            commandBuffer.CmdDraw(3, 1, 0, 0);
         }
         commandBuffer.CmdEndRenderPass();
+#endif
     } gvk_result_scope_end;
     return gvkResult;
 }

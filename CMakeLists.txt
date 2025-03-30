@@ -30,7 +30,7 @@ cmake_dependent_option(DST_CREATE_TEST_PACKAGE   "" OFF "DST_BUILD_TESTS" OFF)
 ################################################################################
 # Dependencies
 find_package(Threads REQUIRED)
-find_package(Vulkan REQUIRED)
+# find_package(Vulkan REQUIRED)
 
 macro(dst_include_depenedency enabled dependency)
     if(${enabled})

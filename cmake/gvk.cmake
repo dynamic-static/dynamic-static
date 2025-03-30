@@ -3,7 +3,7 @@ include_guard()
 
 include(FetchContent)
 
-set(DST_GVK_VERSION 9a69ef9f2aad79df059efc33d0c96f0c8bf73e91)
+set(DST_GVK_VERSION e45cbe3aa7b4485ea4e4a9a097ee66c8ae60bfc7)
 set(DST_GVK_SOURCE_DIR "" CACHE STRING "Local GVK source directory")
 set(DST_GVK_INSTALL_DIR "" CACHE STRING "Local GVK install directory")
 set(DST_GVK_GIT_REPO_URL "https://github.com/dynamic-static/gvk.git")
